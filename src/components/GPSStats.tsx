@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { MapPin, Activity, TrendingUp, Compass, RotateCcw, MoveRight, GitCommit, Spline } from "lucide-react";
 import StatCard from "./StatCard";
 import TrackMap from "./TrackMap";
@@ -11,6 +11,7 @@ import {
   formatDistance,
   formatDuration,
   formatSpeed,
+  haversineDistance
 } from "@/utils/gpxParser";
 
 interface GPSStatsProps {
@@ -30,6 +31,55 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
     { id: "geometry", label: "Route Geometry", icon: Spline },
     { id: "elevation", label: "Elevation & Terrain", icon: TrendingUp },
   ];
+
+  // Calculate stats for the selected zoom range
+  const { filteredPoints, subsetStats } = useMemo(() => {
+    if (!zoomRange || !points.length) {
+      return { filteredPoints: points, subsetStats: null };
+    }
+
+    const [startIndex, endIndex] = zoomRange;
+    // Ensure indices are within bounds
+    const start = Math.max(0, startIndex);
+    const end = Math.min(points.length - 1, endIndex);
+
+    // Get the subset of points
+    const subset = points.slice(start, end + 1);
+
+    if (subset.length < 2) return { filteredPoints: subset, subsetStats: null };
+
+    // Calculate subset metrics
+    let distance = 0;
+
+    // Calculate distance for the subset
+    for (let i = 1; i < subset.length; i++) {
+      const prev = subset[i - 1];
+      const curr = subset[i];
+      distance += haversineDistance(prev.lat, prev.lon, curr.lat, curr.lon);
+    }
+
+    // Calculate time duration
+    let timeSeconds = 0;
+    const startTime = subset[0].time;
+    const endTime = subset[subset.length - 1].time;
+
+    if (startTime && endTime) {
+      timeSeconds = (endTime.getTime() - startTime.getTime()) / 1000;
+    }
+
+    // Calculate average speed
+    const avgSpeed = timeSeconds > 0 ? distance / (timeSeconds / 3600) : 0;
+
+    return {
+      filteredPoints: subset,
+      subsetStats: {
+        distance,
+        time: timeSeconds,
+        avgSpeed
+      }
+    };
+  }, [points, zoomRange]);
+
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -146,15 +196,49 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
 
               {/* Speed & Elevation Chart */}
               <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-foreground">Speed & Elevation Timeline</h3>
-                  {zoomRange && (
-                    <span className="text-sm text-muted-foreground animate-pulse cursor-pointer hover:text-primary" onClick={() => setZoomRange(null)}>
-                      Reset Zoom
-                    </span>
+                <div className="flex flex-col gap-4 mb-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-foreground">Speed & Elevation Timeline</h3>
+                    {zoomRange && (
+                      <span className="text-sm text-primary cursor-pointer hover:underline font-medium" onClick={() => setZoomRange(null)}>
+                        Reset Selection
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Selected Range Stats */}
+                  {zoomRange && subsetStats && (
+                    <div className="grid grid-cols-3 gap-4 bg-muted/50 p-3 rounded-xl border border-border/50 animate-in fade-in slide-in-from-top-2">
+                      <div>
+                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Distance</p>
+                        <p className="text-lg font-bold text-foreground">{formatDistance(subsetStats.distance)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Time</p>
+                        <p className="text-lg font-bold text-foreground">{formatDuration(subsetStats.time)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Avg Speed</p>
+                        <p className="text-lg font-bold text-foreground">{formatSpeed(subsetStats.avgSpeed)}</p>
+                      </div>
+                    </div>
                   )}
                 </div>
                 <SpeedElevationChart points={points} onHover={setHoveredPoint} onZoomChange={setZoomRange} zoomRange={zoomRange} />
+              </div>
+
+              {/* Speed Distribution (Moved to Overview) */}
+              <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-primary" />
+                    Speed Distribution
+                    {zoomRange && <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Filtered to selection</span>}
+                  </h3>
+                </div>
+                <div className="h-[250px]">
+                  <SpeedDistributionChart points={filteredPoints} />
+                </div>
               </div>
             </div>
           )}
@@ -244,17 +328,6 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
                         );
                       })}
                     </div>
-                  </div>
-                </div>
-
-                {/* Speed Distribution */}
-                <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
-                  <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-primary" />
-                    Speed Distribution
-                  </h3>
-                  <div className="h-[250px]">
-                    <SpeedDistributionChart points={points} />
                   </div>
                 </div>
               </div>
