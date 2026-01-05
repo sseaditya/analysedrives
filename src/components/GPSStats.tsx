@@ -26,7 +26,7 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
   const [hoveredPoint, setHoveredPoint] = useState<GPXPoint | null>(null);
   const [zoomRange, setZoomRange] = useState<[number, number] | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
-  const [speedLimit, setSpeedLimit] = useState<number>(stats.maxSpeed > 10 ? Math.round(stats.maxSpeed * 0.8) : 60);
+  const [speedLimit, setSpeedLimit] = useState<number>(Math.max(40, Math.floor((stats.maxSpeed * 0.8) / 10) * 10));
   const [showLimiter, setShowLimiter] = useState(false);
 
   const tabs = [
@@ -255,9 +255,9 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
                       <Slider
                         value={[speedLimit]}
                         onValueChange={([val]) => setSpeedLimit(val)}
-                        min={10}
-                        max={Math.max(Math.round(stats.maxSpeed), 120)}
-                        step={5}
+                        min={40}
+                        max={Math.max(Math.ceil(stats.maxSpeed / 10) * 10, 120)}
+                        step={10}
                         className="flex-1 max-w-xs"
                       />
                       <span className="text-sm font-mono font-bold text-amber-500 min-w-[60px]">
@@ -314,10 +314,11 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
                     <TrendingUp className="w-5 h-5 text-primary" />
                     Speed Distribution
                     {zoomRange && <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Filtered to selection</span>}
+                    {showLimiter && <span className="text-xs font-normal text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full">Capped at {speedLimit} km/h</span>}
                   </h3>
                 </div>
                 <div className="h-[250px]">
-                  <SpeedDistributionChart points={filteredPoints} />
+                  <SpeedDistributionChart points={filteredPoints} speedLimit={showLimiter ? speedLimit : null} />
                 </div>
               </div>
             </div>

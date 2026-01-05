@@ -8,15 +8,62 @@ import {
     Tooltip,
     ResponsiveContainer,
 } from "recharts";
-import { GPXPoint, calculateSpeedDistribution } from "@/utils/gpxParser";
+import { GPXPoint, calculateSpeedDistribution, SpeedBucket } from "@/utils/gpxParser";
 
 interface SpeedDistributionChartProps {
     points: GPXPoint[];
+    speedLimit?: number | null;
 }
 
-const SpeedDistributionChart = ({ points }: SpeedDistributionChartProps) => {
+const SpeedDistributionChart = ({ points, speedLimit }: SpeedDistributionChartProps) => {
     // Force bucket size of 10 and ensure range starts at 0
-    const data = useMemo(() => calculateSpeedDistribution(points, 10), [points]);
+    const data = useMemo(() => {
+        const rawData = calculateSpeedDistribution(points, 10);
+
+        if (!speedLimit || speedLimit <= 0 || !rawData || rawData.length === 0) {
+            return rawData;
+        }
+
+        // Collapse all buckets above the speed limit into the limit bucket
+        const limitBucketMin = Math.floor(speedLimit / 10) * 10;
+
+        const collapsedData: SpeedBucket[] = [];
+        let overLimitTime = 0;
+        let overLimitDistance = 0;
+
+        for (const bucket of rawData) {
+            if (bucket.minSpeed >= speedLimit) {
+                // This entire bucket is over the limit - add to overflow
+                overLimitTime += bucket.time;
+                overLimitDistance += bucket.distance;
+            } else if (bucket.minSpeed + 10 > speedLimit) {
+                // Bucket straddles the limit - include it but it will catch overflow
+                collapsedData.push(bucket);
+            } else {
+                collapsedData.push(bucket);
+            }
+        }
+
+        // Find the bucket that contains the limit and add overflow to it
+        const limitBucket = collapsedData.find(b => b.minSpeed === limitBucketMin);
+        if (limitBucket) {
+            limitBucket.time = Number((limitBucket.time + overLimitTime).toFixed(2));
+            limitBucket.distance = Number((limitBucket.distance + overLimitDistance).toFixed(2));
+        } else if (overLimitTime > 0 || overLimitDistance > 0) {
+            // Create the limit bucket if it doesn't exist
+            collapsedData.push({
+                range: `${limitBucketMin}-${limitBucketMin + 10}`,
+                minSpeed: limitBucketMin,
+                time: Number(overLimitTime.toFixed(2)),
+                distance: Number(overLimitDistance.toFixed(2))
+            });
+        }
+
+        // Sort and filter out empty and over-limit buckets
+        return collapsedData
+            .filter(b => b.minSpeed < speedLimit)
+            .sort((a, b) => a.minSpeed - b.minSpeed);
+    }, [points, speedLimit]);
 
     if (!data || data.length === 0) {
         return (
