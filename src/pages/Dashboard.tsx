@@ -8,6 +8,7 @@ import { parseGPX, calculateStats, formatDistance, formatDuration, generatePrevi
 import { supabase } from "@/lib/supabase";
 import ActivityMiniMap from "@/components/ActivityMiniMap";
 import { cn } from "@/lib/utils";
+import StravaImport from "@/components/StravaImport";
 
 interface ActivityRecord {
     id: string;
@@ -95,6 +96,13 @@ const Dashboard = () => {
 
     useEffect(() => {
         fetchActivities();
+
+        // Check for strava connection success param to auto-open upload
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('strava') === 'connected') {
+            setShowUpload(true);
+            window.history.replaceState({}, '', '/dashboard'); // Clean URL
+        }
     }, [user]);
 
     const fetchActivities = async () => {
@@ -268,7 +276,7 @@ const Dashboard = () => {
                                 variant={showUpload ? "secondary" : "default"}
                             >
                                 <Upload className="w-4 h-4 mr-2" />
-                                {showUpload ? "Cancel Upload" : "Upload GPX"}
+                                {showUpload ? "Cancel Upload" : "Add Activity"}
                             </Button>
                         </div>
 
@@ -279,8 +287,37 @@ const Dashboard = () => {
                         )}>
                             <div className="min-h-0">
                                 <div className="bg-card border border-border rounded-2xl p-6 shadow-xl shadow-primary/5">
-                                    <h3 className="text-lg font-semibold mb-4">Add New Activity</h3>
-                                    <FileUploader onFilesLoad={handleFilesLoad} isLoading={isLoading} />
+                                    <h3 className="text-lg font-semibold mb-6">Add New Activity</h3>
+
+                                    <div className="space-y-8">
+                                        {/* Strava Section */}
+                                        <div className="bg-muted/20 border border-border rounded-xl p-5">
+                                            <h4 className="text-sm font-bold mb-3 flex items-center gap-2 text-foreground">
+                                                <Activity className="w-4 h-4 text-[#FC4C02]" />
+                                                Import from Strava
+                                            </h4>
+                                            <StravaImport onImportComplete={() => {
+                                                fetchActivities();
+                                                setTimeout(() => setShowUpload(false), 1000);
+                                            }} />
+                                        </div>
+
+                                        <div className="relative flex items-center py-2">
+                                            <div className="flex-grow border-t border-border"></div>
+                                            <span className="flex-shrink-0 mx-4 text-xs font-semibold uppercase text-muted-foreground">Or</span>
+                                            <div className="flex-grow border-t border-border"></div>
+                                        </div>
+
+                                        {/* GPX Section */}
+                                        <div>
+                                            <h4 className="text-sm font-bold mb-3 flex items-center gap-2 text-foreground">
+                                                <Upload className="w-4 h-4 text-primary" />
+                                                Upload GPX File
+                                            </h4>
+                                            <FileUploader onFilesLoad={handleFilesLoad} isLoading={isLoading} />
+                                        </div>
+                                    </div>
+
                                     {error && (
                                         <p className="mt-4 text-sm text-destructive bg-destructive/10 p-3 rounded-lg text-center">
                                             {error}

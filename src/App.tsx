@@ -7,6 +7,7 @@ import { ThemeProvider } from "next-themes";
 import Index from "./pages/Index";
 import Activity from "./pages/Activity";
 import NotFound from "./pages/NotFound";
+import StravaCallback from "./pages/StravaCallback";
 
 const queryClient = new QueryClient();
 
@@ -35,6 +36,7 @@ const App = () => (
                 }
               />
               <Route path="/activity/:id?" element={<Activity />} />
+              <Route path="/strava-callback" element={<StravaCallback />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
