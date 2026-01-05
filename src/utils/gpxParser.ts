@@ -1,0 +1,656 @@
+export interface GPXPoint {
+  lat: number;
+  lon: number;
+  ele?: number;
+  time?: Date;
+}
+
+export interface GPXStats {
+  totalDistance: number; // in kilometers
+  totalTime: number; // in seconds
+  movingTime: number; // in seconds
+  stoppedTime: number; // in seconds
+  stopCount: number;
+  avgSpeed: number; // in km/h (Total Avg)
+  movingAvgSpeed: number; // in km/h (Moving Avg)
+  maxSpeed: number; // in km/h
+  elevationGain: number; // in meters
+  pointCount: number;
+  stopPoints?: [number, number][];
+  // Motion Metrics
+  hardAccelerationCount: number;
+  hardBrakingCount: number;
+  timeAccelerating: number; // seconds
+  timeBraking: number;      // seconds
+  timeCruising: number;     // seconds
+  accelBrakeRatio: number;
+  turbulenceScore: number;
+  startTime?: Date;
+  // Elevation Metrics
+  elevationLoss: number;
+  maxElevation: number;
+  minElevation: number;
+  steepestClimb: number; // percentage
+  steepestDescent: number; // percentage
+  timeClimbing: number; // seconds
+  timeDescending: number; // seconds
+  hillinessScore: number;
+  climbDistance: number; // km
+  // Geometry Metrics
+  totalHeadingChange: number;
+  tightTurnsCount: number;
+  hairpinCount: number;
+  twistinessScore: number;
+  longestStraightSection: number; // km
+  medianStraightLength: number; // km
+  percentStraight: number;
+  tightTurnPoints?: [number, number][];
+}
+
+// Haversine formula to calculate distance between two GPS points
+export function haversineDistance(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  const R = 6371; // Earth's radius in kilometers
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+    Math.cos((lat2 * Math.PI) / 180) *
+    Math.sin(dLon / 2) *
+    Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+export function calculateBearing(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const phi1 = (lat1 * Math.PI) / 180;
+  const phi2 = (lat2 * Math.PI) / 180;
+  const deltaLambda = ((lon2 - lon1) * Math.PI) / 180;
+
+  const y = Math.sin(deltaLambda) * Math.cos(phi2);
+  const x = Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(deltaLambda);
+  const theta = Math.atan2(y, x);
+  return ((theta * 180) / Math.PI + 360) % 360;
+}
+
+export interface SpeedBucket {
+  range: string;
+  minSpeed: number;
+  time: number; // minutes
+  distance: number; // km
+}
+
+export function calculateSpeedDistribution(points: GPXPoint[], bucketSize: number = 5): SpeedBucket[] {
+  if (points.length < 2) return [];
+
+  const segments: { distance: number; time: number; speed: number }[] = [];
+  const speeds: number[] = [];
+
+  // 1. Calculate Raw Segments
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1];
+    const curr = points[i];
+
+    const dist = haversineDistance(prev.lat, prev.lon, curr.lat, curr.lon);
+    let timeHours = 0;
+
+    if (prev.time && curr.time) {
+      timeHours = (curr.time.getTime() - prev.time.getTime()) / 1000 / 3600;
+    }
+
+    // Avoid division by zero or negative time
+    let speed = 0;
+    if (timeHours > 0) {
+      speed = dist / timeHours;
+    }
+
+    // Filter unlikely speeds (GPS jumps/signal drops)
+    if (speed > 200) speed = i > 1 ? segments[i - 2].speed : 0;
+
+    segments.push({ distance: dist, time: timeHours, speed });
+    speeds.push(speed);
+  }
+
+  // 2. Smooth Speeds (Moving Average)
+  const WINDOW_SIZE = 5;
+  const smoothedSpeeds: number[] = [];
+
+  for (let i = 0; i < speeds.length; i++) {
+    let sum = 0;
+    let count = 0;
+    const offset = Math.floor(WINDOW_SIZE / 2);
+
+    for (let j = -offset; j <= offset; j++) {
+      const idx = i + j;
+      if (idx >= 0 && idx < speeds.length) {
+        sum += speeds[idx];
+        count++;
+      }
+    }
+    smoothedSpeeds.push(count > 0 ? sum / count : 0);
+  }
+
+  // 3. Bucketize
+  const buckets: Record<number, { time: number; distance: number }> = {};
+  let maxBucketIndex = 0;
+
+  segments.forEach((seg, i) => {
+    const speed = smoothedSpeeds[i];
+    if (speed < 0.1) return; // Ignore stops
+
+    const bucketIndex = Math.floor(speed / bucketSize) * bucketSize;
+    if (!buckets[bucketIndex]) {
+      buckets[bucketIndex] = { time: 0, distance: 0 };
+    }
+    buckets[bucketIndex].time += seg.time * 60; // Convert to minutes
+    buckets[bucketIndex].distance += seg.distance;
+
+    if (bucketIndex > maxBucketIndex) maxBucketIndex = bucketIndex;
+  });
+
+  // 4. Format Output
+  const result: SpeedBucket[] = [];
+  // Iterate from 0 to maxBucket found (or a reasonable limit) to ensure continuity
+  // But typically we only want to show ranges that exist or up to the max.
+  // Let's fill gaps with 0
+  for (let i = 0; i <= maxBucketIndex; i += bucketSize) {
+    // Optional: Skip empty buckets at the very end if we wanted, but generally good to show scale
+    // Skip 0-0 bucket if mostly noise, but 0-5 is valid
+    const data = buckets[i] || { time: 0, distance: 0 };
+    result.push({
+      range: `${i}-${i + bucketSize}`,
+      minSpeed: i,
+      time: Number(data.time.toFixed(2)),
+      distance: Number(data.distance.toFixed(2))
+    });
+  }
+
+  return result;
+}
+
+export function parseGPX(gpxContent: string): GPXPoint[] {
+  const parser = new DOMParser();
+  const xmlDoc = parser.parseFromString(gpxContent, "text/xml");
+
+  const points: GPXPoint[] = [];
+
+  // Try to get trackpoints first (most common)
+  let trackpoints = xmlDoc.getElementsByTagName("trkpt");
+
+  // If no trackpoints, try waypoints
+  if (trackpoints.length === 0) {
+    trackpoints = xmlDoc.getElementsByTagName("wpt");
+  }
+
+  // If still no points, try route points
+  if (trackpoints.length === 0) {
+    trackpoints = xmlDoc.getElementsByTagName("rtept");
+  }
+
+  for (let i = 0; i < trackpoints.length; i++) {
+    const point = trackpoints[i];
+    const lat = parseFloat(point.getAttribute("lat") || "0");
+    const lon = parseFloat(point.getAttribute("lon") || "0");
+
+    const eleElement = point.getElementsByTagName("ele")[0];
+    const timeElement = point.getElementsByTagName("time")[0];
+
+    points.push({
+      lat,
+      lon,
+      ele: eleElement ? parseFloat(eleElement.textContent || "0") : undefined,
+      time: timeElement ? new Date(timeElement.textContent || "") : undefined,
+    });
+  }
+
+  return points;
+}
+
+export function calculateStats(points: GPXPoint[]): GPXStats {
+  const emptyStats: GPXStats = {
+    totalDistance: 0,
+    totalTime: 0,
+    movingTime: 0,
+    stoppedTime: 0,
+    stopCount: 0,
+    avgSpeed: 0,
+    movingAvgSpeed: 0,
+    maxSpeed: 0,
+    elevationGain: 0,
+    pointCount: points.length,
+    hardAccelerationCount: 0,
+    hardBrakingCount: 0,
+    timeAccelerating: 0,
+    timeBraking: 0,
+    timeCruising: 0,
+    accelBrakeRatio: 0,
+    turbulenceScore: 0,
+    elevationLoss: 0,
+    maxElevation: 0,
+    minElevation: 0,
+    steepestClimb: 0,
+    steepestDescent: 0,
+    timeClimbing: 0,
+    timeDescending: 0,
+    hillinessScore: 0,
+    climbDistance: 0,
+    totalHeadingChange: 0,
+    tightTurnsCount: 0,
+    hairpinCount: 0,
+    twistinessScore: 0,
+    longestStraightSection: 0,
+    medianStraightLength: 0,
+    percentStraight: 0,
+  };
+
+  if (points.length < 2) return emptyStats;
+
+  let totalDistance = 0;
+  let elevationGain = 0;
+  let elevationLoss = 0;
+  let maxElevation = -Infinity;
+  let minElevation = Infinity;
+  let steepestClimb = 0;
+  let steepestDescent = 0;
+  let timeClimbing = 0;
+  let timeDescending = 0;
+  let climbDistance = 0;
+  let maxSpeed = 0;
+  let lastBearing: number | null = null;
+  let totalHeadingChange = 0;
+  let tightTurnsCount = 0;
+  let hairpinCount = 0;
+  let currentStraightDist = 0;
+  const straightSections: number[] = [];
+  let totalStraightDistance = 0;
+  const tightTurnPoints: [number, number][] = [];
+  const speeds: number[] = [];
+  const timeDeltas: number[] = []; // seconds
+
+  // Handle first point elevation
+  if (points[0].ele !== undefined) {
+    maxElevation = points[0].ele;
+    minElevation = points[0].ele;
+  }
+
+  // First pass: Calculate raw speeds and basic metrics
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1];
+    const curr = points[i];
+
+    const distance = haversineDistance(prev.lat, prev.lon, curr.lat, curr.lon);
+    totalDistance += distance;
+
+    let speed = 0;
+    let timeDiff = 0;
+    if (prev.time && curr.time) {
+      timeDiff = (curr.time.getTime() - prev.time.getTime()) / 1000;
+      if (timeDiff > 0) {
+        speed = distance / (timeDiff / 3600);
+        if (speed > 200) speed = i > 1 ? speeds[i - 2] : 0;
+      }
+    }
+    speeds.push(speed);
+    timeDeltas.push(timeDiff);
+
+    if (prev.ele !== undefined && curr.ele !== undefined) {
+      const eleDiff = curr.ele - prev.ele;
+
+      // Basic Gain/Loss
+      if (eleDiff > 0) {
+        elevationGain += eleDiff;
+        timeClimbing += timeDiff;
+        climbDistance += distance;
+      } else if (eleDiff < 0) {
+        elevationLoss += Math.abs(eleDiff);
+        timeDescending += timeDiff;
+      }
+
+      // Max/Min
+      if (curr.ele > maxElevation) maxElevation = curr.ele;
+      if (curr.ele < minElevation) minElevation = curr.ele;
+
+      // Steepest sections (only for segments > 5m to filter GPS jitters)
+      if (distance > 0.005) {
+        const gradient = (eleDiff / (distance * 1000)) * 100;
+        if (gradient > steepestClimb) steepestClimb = gradient;
+        if (gradient < steepestDescent) steepestDescent = gradient;
+      }
+    }
+
+    // Geometry Calculations
+    if (distance > 0.002) { // Only calculate bearing if moved more than 2m
+      const bearing = calculateBearing(prev.lat, prev.lon, curr.lat, curr.lon);
+      if (lastBearing !== null) {
+        let delta = Math.abs(bearing - lastBearing);
+        if (delta > 180) delta = 360 - delta;
+
+        totalHeadingChange += delta;
+        if (delta > 45) {
+          tightTurnsCount++;
+          tightTurnPoints.push([curr.lat, curr.lon]);
+        }
+        if (delta > 135) hairpinCount++;
+
+        // Straight section logic (threshold 5 degrees)
+        if (delta < 5) {
+          currentStraightDist += distance;
+        } else {
+          if (currentStraightDist > 0.02) { // Min 20m
+            straightSections.push(currentStraightDist);
+            totalStraightDistance += currentStraightDist;
+          }
+          currentStraightDist = 0;
+        }
+      } else {
+        currentStraightDist = distance;
+      }
+      lastBearing = bearing;
+    } else {
+      // If stopped or jittering, don't update bearing but accumulate distance if moving slowly
+      if (currentStraightDist > 0) currentStraightDist += distance;
+    }
+  }
+
+  if (currentStraightDist > 0.02) {
+    straightSections.push(currentStraightDist);
+    totalStraightDistance += currentStraightDist;
+  }
+
+  // Summary Geometry Stats
+  const twistinessScore = totalDistance > 0 ? totalHeadingChange / totalDistance : 0;
+  const longestStraightSection = straightSections.length > 0 ? Math.max(...straightSections) : 0;
+  const sortedStraights = [...straightSections].sort((a, b) => a - b);
+  const medianStraightLength = sortedStraights.length > 0
+    ? sortedStraights[Math.floor(sortedStraights.length / 2)]
+    : 0;
+  const percentStraight = totalDistance > 0 ? (totalStraightDistance / totalDistance) * 100 : 0;
+
+  // Fallback for no elevation data
+  if (maxElevation === -Infinity) {
+    maxElevation = 0;
+    minElevation = 0;
+  }
+
+  // Apply Smoothing (Moving Average)
+  const WINDOW_SIZE = 5;
+  const smoothedSpeeds: number[] = [];
+  for (let i = 0; i < speeds.length; i++) {
+    let sum = 0, count = 0;
+    const offset = Math.floor(WINDOW_SIZE / 2);
+    for (let j = -offset; j <= offset; j++) {
+      const idx = i + j;
+      if (idx >= 0 && idx < speeds.length) {
+        sum += speeds[idx];
+        count++;
+      }
+    }
+    const avg = count > 0 ? sum / count : 0;
+    smoothedSpeeds.push(avg);
+    if (avg > maxSpeed && avg < 200) maxSpeed = avg;
+  }
+
+  // Calculate Motion Stats
+  let hardAccelerationCount = 0;
+  let hardBrakingCount = 0;
+  let timeAccelerating = 0;
+  let timeBraking = 0;
+  let timeCruising = 0;
+  let stoppedTime = 0;
+  let stopCount = 0;
+  let turbulenceSum = 0;
+
+  const STOP_THRESHOLD = 5.0; // km/h
+  const ACCEL_THRESHOLD = 0.2; // m/s^2 for "accelerating"
+  const HARD_ACCEL = 2.5;
+  const HARD_BRAKE = -3.0;
+
+  let isCurrentlyStoppedSegment = false;
+  let potentialStopDuration = 0;
+  let potentialStopStartIndex = -1;
+  const stopPoints: [number, number][] = [];
+
+  for (let i = 0; i < smoothedSpeeds.length; i++) {
+    const speed = smoothedSpeeds[i];
+    const time = timeDeltas[i];
+
+    let accel = 0;
+    if (i > 0 && time > 0) {
+      accel = (smoothedSpeeds[i] / 3.6 - smoothedSpeeds[i - 1] / 3.6) / time;
+    }
+
+    if (i > 1) {
+      const prevAccel = (smoothedSpeeds[i - 1] / 3.6 - smoothedSpeeds[i - 2] / 3.6) / timeDeltas[i - 1];
+      turbulenceSum += Math.abs(accel - prevAccel);
+    }
+
+    if (accel > HARD_ACCEL) hardAccelerationCount++;
+    if (accel < HARD_BRAKE) hardBrakingCount++;
+
+    if (speed < STOP_THRESHOLD) {
+      stoppedTime += time;
+      potentialStopDuration += time;
+      if (!isCurrentlyStoppedSegment) {
+        isCurrentlyStoppedSegment = true;
+        potentialStopStartIndex = i;
+      }
+    } else {
+      if (accel > ACCEL_THRESHOLD) timeAccelerating += time;
+      else if (accel < -ACCEL_THRESHOLD) timeBraking += time;
+      else timeCruising += time;
+
+      if (isCurrentlyStoppedSegment) {
+        if (potentialStopDuration >= 10) {
+          stopCount++;
+          if (potentialStopStartIndex >= 0 && potentialStopStartIndex < points.length) {
+            const p = points[potentialStopStartIndex];
+            stopPoints.push([p.lat, p.lon]);
+          }
+        }
+        potentialStopDuration = 0;
+        isCurrentlyStoppedSegment = false;
+        potentialStopStartIndex = -1;
+      }
+    }
+  }
+
+  if (isCurrentlyStoppedSegment && potentialStopDuration >= 10) {
+    stopCount++;
+    if (potentialStopStartIndex >= 0 && potentialStopStartIndex < points.length) {
+      const p = points[potentialStopStartIndex];
+      stopPoints.push([p.lat, p.lon]);
+    }
+  }
+
+  let totalTime = 0;
+  if (points[0].time && points[points.length - 1].time) {
+    totalTime = (points[points.length - 1].time.getTime() - points[0].time.getTime()) / 1000;
+  }
+  const movingTime = Math.max(0, totalTime - stoppedTime);
+  const avgSpeed = totalTime > 0 ? totalDistance / (totalTime / 3600) : 0;
+  const movingAvgSpeed = movingTime > 0 ? totalDistance / (movingTime / 3600) : 0;
+  const accelBrakeRatio = timeBraking > 0 ? timeAccelerating / timeBraking : timeAccelerating;
+  const turbulenceScore = smoothedSpeeds.length > 0 ? (turbulenceSum / smoothedSpeeds.length) * 10 : 0;
+
+  // Hilliness Score: Elevation gain per kilometer
+  const hillinessScore = totalDistance > 0 ? elevationGain / totalDistance : 0;
+
+  return {
+    totalDistance,
+    totalTime,
+    movingTime,
+    stoppedTime,
+    stopCount,
+    avgSpeed,
+    movingAvgSpeed,
+    maxSpeed,
+    elevationGain,
+    pointCount: points.length,
+    stopPoints,
+    hardAccelerationCount,
+    hardBrakingCount,
+    timeAccelerating,
+    timeBraking,
+    timeCruising,
+    accelBrakeRatio,
+    turbulenceScore,
+    startTime: points[0]?.time,
+    elevationLoss,
+    maxElevation,
+    minElevation,
+    steepestClimb,
+    steepestDescent,
+    timeClimbing,
+    timeDescending,
+    hillinessScore,
+    climbDistance,
+    totalHeadingChange,
+    tightTurnsCount,
+    hairpinCount,
+    twistinessScore,
+    longestStraightSection,
+    medianStraightLength,
+    percentStraight,
+    tightTurnPoints,
+  };
+}
+
+export interface TrackSegment {
+  speed: number;        // km/h
+  acceleration: number; // m/s^2
+}
+
+export function analyzeSegments(points: GPXPoint[]): TrackSegment[] {
+  if (points.length < 2) return [];
+
+  const segments: TrackSegment[] = [];
+  const speeds: number[] = [];
+  const timeDeltas: number[] = [];
+
+  // 1. Calculate Raw Speeds & Times
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1];
+    const curr = points[i];
+
+    const dist = haversineDistance(prev.lat, prev.lon, curr.lat, curr.lon); // km
+    let timeDiff = 0;
+    let speed = 0;
+
+    if (prev.time && curr.time) {
+      timeDiff = (curr.time.getTime() - prev.time.getTime()) / 1000; // seconds
+      if (timeDiff > 0) {
+        speed = dist / (timeDiff / 3600); // km/h
+        // Outlier rejection
+        if (speed > 200) speed = i > 1 ? speeds[i - 2] : 0;
+      }
+    }
+    speeds.push(speed);
+    timeDeltas.push(timeDiff);
+  }
+
+  // 2. Smooth Speeds (Moving Average)
+  const smoothedSpeeds: number[] = [];
+  const WINDOW_SIZE = 5;
+
+  for (let i = 0; i < speeds.length; i++) {
+    let sum = 0;
+    let count = 0;
+    const offset = Math.floor(WINDOW_SIZE / 2);
+
+    for (let j = -offset; j <= offset; j++) {
+      const idx = i + j;
+      if (idx >= 0 && idx < speeds.length) {
+        sum += speeds[idx];
+        count++;
+      }
+    }
+    smoothedSpeeds.push(count > 0 ? sum / count : 0);
+  }
+
+  // 3. Calculate Acceleration and Build Segments
+  for (let i = 0; i < smoothedSpeeds.length; i++) {
+    const currentSpeed = smoothedSpeeds[i]; // km/h
+
+    // Calculate accel
+    // a = delta_v / delta_t
+    // We need next speed to get delta, or simple calc: v_current - v_prev / t
+    // Let's use Forward Difference or Central Difference? 
+    // Simple: (Speed[i] - Speed[i-1]) / Time
+    // But we are at segment i. Let's use change from previous segment to current?
+    // Or just change over the segment?
+    // A segment connects P[i] and P[i+1]. It has an average speed. 
+    // Accel is change in speed between segments. 
+    // Let's define accel for segment i as (Speed[i+1] - Speed[i]) / ((Time[i] + Time[i+1])/2) ?
+
+    // Simpler: Accel at point i is (v[i] - v[i-1])/t.
+    // We map accel to the segment i. 
+
+    let acceleration = 0;
+    const time = timeDeltas[i];
+
+    // Need difference in speed. 
+    // If i > 0, we can compare with prev speed.
+    if (i > 0 && time > 0) {
+      const v1 = smoothedSpeeds[i - 1] / 3.6; // m/s
+      const v2 = smoothedSpeeds[i] / 3.6;   // m/s
+      acceleration = (v2 - v1) / time;
+    }
+
+    segments.push({
+      speed: currentSpeed,
+      acceleration
+    });
+  }
+
+  return segments;
+}
+
+export function formatDuration(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ${secs}s`;
+  } else if (minutes > 0) {
+    return `${minutes}m ${secs}s`;
+  }
+  return `${secs}s`;
+}
+
+export function formatDistance(km: number): string {
+  if (km < 1) {
+    return `${(km * 1000).toFixed(0)} m`;
+  }
+  return `${km.toFixed(2)} km`;
+}
+
+export function formatSpeed(kmh: number): string {
+  return `${kmh.toFixed(1)} km/h`;
+}
+
+// Helper to downsample track for mini-maps (preserve shape with fewer points)
+export function generatePreviewPolyline(points: GPXPoint[], targetCount: number = 100): [number, number][] {
+  if (points.length <= targetCount) {
+    return points.map(p => [p.lat, p.lon]);
+  }
+
+  const step = points.length / targetCount;
+  const sampled: [number, number][] = [];
+
+  for (let i = 0; i < targetCount; i++) {
+    const index = Math.min(Math.floor(i * step), points.length - 1);
+    sampled.push([points[index].lat, points[index].lon]);
+  }
+
+  // Always include the last point
+  const last = points[points.length - 1];
+  sampled.push([last.lat, last.lon]);
+
+  return sampled;
+}
