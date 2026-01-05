@@ -13,6 +13,26 @@ interface StravaImportProps {
     onImportComplete: () => void;
 }
 
+const createGPXContent = (points: GPXPoint[], activityName: string, startTime: string) => {
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="AnalyseDrive">
+  <metadata>
+    <name>${activityName}</name>
+    <time>${startTime}</time>
+  </metadata>
+  <trk>
+    <name>${activityName}</name>
+    <trkseg>
+      ${points.map(p => `
+      <trkpt lat="${p.lat}" lon="${p.lon}">
+        ${p.ele !== undefined ? `<ele>${p.ele}</ele>` : ''}
+        <time>${p.time.toISOString()}</time>
+      </trkpt>`).join('')}
+    </trkseg>
+  </trk>
+</gpx>`;
+};
+
 export default function StravaImport({ onImportComplete }: StravaImportProps) {
     const { user } = useAuth();
     const { toast } = useToast();
@@ -91,18 +111,29 @@ export default function StravaImport({ onImportComplete }: StravaImportProps) {
                 // Generate Stats
                 const stats = calculateStats(points);
                 const previewCoordinates = generatePreviewPolyline(points);
-                const fileName = `${user.id}/strava_${id}_${Date.now()}.gpx`; // Virtual path
+                const fileName = `${user.id}/strava_${id}_${Date.now()}.gpx`;
 
-                // Insert into DB
+                // 1. Create and Upload GPX File
+                try {
+                    const gpxContent = createGPXContent(points, activity.name, activity.start_date);
+                    const { error: uploadError } = await supabase.storage
+                        .from('gpx-files')
+                        .upload(fileName, new Blob([gpxContent], { type: 'text/xml' }));
+
+                    if (uploadError) {
+                        console.error(`Failed to upload GPX for ${activity.name}`, uploadError);
+                        continue; // Skip DB insert if storage fails
+                    }
+                } catch (err) {
+                    console.error("Error creating/uploading GPX", err);
+                    continue;
+                }
+
+                // 2. Insert into DB
                 const { error } = await supabase.from('activities').insert({
                     user_id: user.id,
                     title: activity.name,
-                    file_path: fileName, // We might not save a physical file for Strava imports to save storage, or we could generate one. 
-                    // For consistency with deleting, let's just use a placeholder path or consider uploading a constructred GPX if needed. 
-                    // Creating a dummy path that won't resolve in storage is fine as long as we don't try to download it without checking. 
-                    // Actually, existing logic usually deletes from storage. We should probably NOT upload to storage for Strava to save space/bandwidth
-                    // unless we really want the GPX file download feature.
-                    // Let's stick to just DB insert for now, assuming file_path can be just a virtual identifier reference.
+                    file_path: fileName,
                     stats: {
                         ...stats,
                         previewCoordinates
