@@ -13,7 +13,7 @@ interface StravaActivity {
 }
 
 const CLIENT_ID = import.meta.env.VITE_STRAVA_CLIENT_ID;
-const CLIENT_SECRET = import.meta.env.VITE_STRAVA_CLIENT_SECRET;
+// NOTE: CLIENT_SECRET should NOT be used on the frontend anymore.
 // Dynamic redirect URI based on current environment
 const REDIRECT_URI = `${typeof window !== 'undefined' ? window.location.origin : ''}/strava-callback`;
 
@@ -28,18 +28,23 @@ export const initiateStravaAuth = () => {
 };
 
 export const exchangeToken = async (code: string) => {
-    const response = await fetch('https://www.strava.com/oauth/token', {
+    // Call our own secure backend endpoint instead of Strava directly
+    const response = await fetch('/api/exchange-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            client_id: CLIENT_ID,
-            client_secret: CLIENT_SECRET,
-            code,
-            grant_type: 'authorization_code',
-        }),
+        body: JSON.stringify({ code }),
     });
 
-    if (!response.ok) throw new Error('Failed to exchange token');
+    if (!response.ok) {
+        let errorMessage = 'Failed to exchange token';
+        try {
+            const err = await response.json();
+            errorMessage = err.error || errorMessage;
+        } catch (e) {
+            // ignore JSON parse error
+        }
+        throw new Error(errorMessage);
+    }
     return response.json();
 };
 
