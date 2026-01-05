@@ -54,7 +54,9 @@ export default function StravaImport({ onImportComplete }: StravaImportProps) {
         setIsLoading(true);
         try {
             const data = await getActivities(accessToken);
-            setActivities(data);
+            // Filter only for Rides
+            const rides = data.filter(activity => activity.type === 'Ride');
+            setActivities(rides);
         } catch (error) {
             console.error(error);
             toast({ title: "Failed to fetch activities", description: "Your session may have expired.", variant: "destructive" });
@@ -178,7 +180,7 @@ export default function StravaImport({ onImportComplete }: StravaImportProps) {
     return (
         <div className="space-y-4">
             <div className="flex items-center justify-between">
-                <h3 className="font-semibold">Recent Activities</h3>
+                <h3 className="font-semibold">Recent Activities (Rides Only)</h3>
                 <Button variant="ghost" size="sm" onClick={fetchActivities} disabled={isLoading}>
                     <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
                 </Button>
@@ -186,28 +188,32 @@ export default function StravaImport({ onImportComplete }: StravaImportProps) {
 
             <ScrollArea className="h-[300px] border rounded-md p-4">
                 <div className="space-y-2">
-                    {activities.map(activity => (
-                        <div key={activity.id} className="flex items-center space-x-3 p-2 hover:bg-muted/50 rounded-lg">
-                            <Checkbox
-                                id={`ac-${activity.id}`}
-                                checked={selectedIds.includes(activity.id)}
-                                onCheckedChange={(checked) => {
-                                    if (checked) setSelectedIds([...selectedIds, activity.id]);
-                                    else setSelectedIds(selectedIds.filter(id => id !== activity.id));
-                                }}
-                            />
-                            <div className="flex-1">
-                                <label htmlFor={`ac-${activity.id}`} className="text-sm font-medium cursor-pointer block">
-                                    {activity.name}
-                                </label>
-                                <div className="text-xs text-muted-foreground flex gap-2">
-                                    <span>{new Date(activity.start_date).toLocaleDateString()}</span>
-                                    <span>•</span>
-                                    <span>{(activity.distance / 1000).toFixed(2)} km</span>
+                    {activities.length === 0 && !isLoading ? (
+                        <div className="text-center text-muted-foreground p-4">No recent cycling activities found.</div>
+                    ) : (
+                        activities.map(activity => (
+                            <div key={activity.id} className="flex items-center space-x-3 p-2 hover:bg-muted/50 rounded-lg">
+                                <Checkbox
+                                    id={`ac-${activity.id}`}
+                                    checked={selectedIds.includes(activity.id)}
+                                    onCheckedChange={(checked) => {
+                                        if (checked) setSelectedIds([...selectedIds, activity.id]);
+                                        else setSelectedIds(selectedIds.filter(id => id !== activity.id));
+                                    }}
+                                />
+                                <div className="flex-1">
+                                    <label htmlFor={`ac-${activity.id}`} className="text-sm font-medium cursor-pointer block">
+                                        {activity.name}
+                                    </label>
+                                    <div className="text-xs text-muted-foreground flex gap-2">
+                                        <span>{new Date(activity.start_date).toLocaleDateString()}</span>
+                                        <span>•</span>
+                                        <span>{(activity.distance / 1000).toFixed(2)} km</span>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ))}
+                        ))
+                    )}
                 </div>
             </ScrollArea>
 
