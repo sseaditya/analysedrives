@@ -87,8 +87,8 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
   // Calculate speed limited stats
   const limitedStats = useMemo(() => {
     if (!showLimiter || speedLimit <= 0) return null;
-    return calculateLimitedStats(points, speedLimit);
-  }, [points, speedLimit, showLimiter]);
+    return calculateLimitedStats(filteredPoints, speedLimit);
+  }, [filteredPoints, speedLimit, showLimiter]);
 
 
   return (
