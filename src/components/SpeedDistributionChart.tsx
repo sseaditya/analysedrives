@@ -34,14 +34,18 @@ const SpeedDistributionChart = ({ points, speedLimit }: SpeedDistributionChartPr
 
         for (const bucket of rawData) {
             if (bucket.minSpeed >= speedLimit) {
-                // This entire bucket is at or over the limit - add to overflow
-                overLimitTime += bucket.time;
+                // This entire bucket is at or over the limit
+                // We only cascade distance, and will calculate time based on the limit speed
                 overLimitDistance += bucket.distance;
             } else {
                 // Bucket is below the limit - keep it
                 collapsedData.push({ ...bucket }); // Clone to avoid mutating original
             }
         }
+
+        // Calculate time for the overflow distance based on the speed limit
+        // Time (min) = (Distance (km) / Speed (km/h)) * 60
+        overLimitTime = (overLimitDistance / speedLimit) * 60;
 
         // Find the bucket just below the limit and add overflow to it
         const targetBucket = collapsedData.find(b => b.minSpeed === limitBucketMin);
