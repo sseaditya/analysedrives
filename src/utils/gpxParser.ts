@@ -654,3 +654,75 @@ export function generatePreviewPolyline(points: GPXPoint[], targetCount: number 
 
   return sampled;
 }
+
+/**
+ * Calculate what-if stats if speed was capped at a given limit.
+ * Returns: original time, simulated time, time added, new avg speed, % slower
+ */
+export interface LimitedStatsResult {
+  originalTime: number;    // seconds
+  simulatedTime: number;   // seconds
+  timeAdded: number;       // seconds
+  originalAvgSpeed: number; // km/h
+  newAvgSpeed: number;     // km/h
+  percentSlower: number;   // percentage
+  cappedSegments: number;  // count of segments that were capped
+  totalSegments: number;   // total segments
+}
+
+export function calculateLimitedStats(points: GPXPoint[], speedLimitKmh: number): LimitedStatsResult | null {
+  if (points.length < 2 || speedLimitKmh <= 0) return null;
+
+  let totalDistance = 0;    // km
+  let originalTime = 0;     // seconds
+  let simulatedTime = 0;    // seconds
+  let cappedSegments = 0;
+  let totalSegments = 0;
+
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1];
+    const curr = points[i];
+
+    const dist = haversineDistance(prev.lat, prev.lon, curr.lat, curr.lon); // km
+    totalDistance += dist;
+
+    if (prev.time && curr.time) {
+      const segmentTimeSeconds = (curr.time.getTime() - prev.time.getTime()) / 1000;
+
+      if (segmentTimeSeconds > 0) {
+        originalTime += segmentTimeSeconds;
+        totalSegments++;
+
+        const segmentSpeedKmh = dist / (segmentTimeSeconds / 3600);
+
+        if (segmentSpeedKmh > speedLimitKmh && segmentSpeedKmh < 200) { // 200 is sanity cap
+          // Time if we traveled at speed limit instead
+          const newTimeSeconds = (dist / speedLimitKmh) * 3600;
+          simulatedTime += newTimeSeconds;
+          cappedSegments++;
+        } else {
+          simulatedTime += segmentTimeSeconds;
+        }
+      }
+    }
+  }
+
+  if (originalTime === 0 || totalDistance === 0) return null;
+
+  const originalAvgSpeed = totalDistance / (originalTime / 3600);
+  const newAvgSpeed = totalDistance / (simulatedTime / 3600);
+  const timeAdded = simulatedTime - originalTime;
+  const percentSlower = originalAvgSpeed > 0 ? ((originalAvgSpeed - newAvgSpeed) / originalAvgSpeed) * 100 : 0;
+
+  return {
+    originalTime,
+    simulatedTime,
+    timeAdded,
+    originalAvgSpeed,
+    newAvgSpeed,
+    percentSlower,
+    cappedSegments,
+    totalSegments
+  };
+}
+

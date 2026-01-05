@@ -1,17 +1,19 @@
 import { useState, useMemo } from "react";
-import { MapPin, Activity, TrendingUp, Compass, RotateCcw, MoveRight, GitCommit, Spline } from "lucide-react";
+import { MapPin, Activity, TrendingUp, Compass, RotateCcw, MoveRight, GitCommit, Spline, Gauge, Clock, AlertTriangle } from "lucide-react";
 import StatCard from "./StatCard";
 import TrackMap from "./TrackMap";
 import SpeedElevationChart from "./SpeedElevationChart";
 import SpeedDistributionChart from "./SpeedDistributionChart";
 import { cn } from "@/lib/utils";
+import { Slider } from "@/components/ui/slider";
 import {
   GPXStats,
   GPXPoint,
   formatDistance,
   formatDuration,
   formatSpeed,
-  haversineDistance
+  haversineDistance,
+  calculateLimitedStats
 } from "@/utils/gpxParser";
 
 interface GPSStatsProps {
@@ -24,6 +26,8 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
   const [hoveredPoint, setHoveredPoint] = useState<GPXPoint | null>(null);
   const [zoomRange, setZoomRange] = useState<[number, number] | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
+  const [speedLimit, setSpeedLimit] = useState<number>(stats.maxSpeed > 10 ? Math.round(stats.maxSpeed * 0.8) : 60);
+  const [showLimiter, setShowLimiter] = useState(false);
 
   const tabs = [
     { id: "overview", label: "Overview", icon: MapPin },
@@ -79,6 +83,12 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
       }
     };
   }, [points, zoomRange]);
+
+  // Calculate speed limited stats
+  const limitedStats = useMemo(() => {
+    if (!showLimiter || speedLimit <= 0) return null;
+    return calculateLimitedStats(points, speedLimit);
+  }, [points, speedLimit, showLimiter]);
 
 
   return (
@@ -224,7 +234,77 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
                     </div>
                   )}
                 </div>
-                <SpeedElevationChart points={points} onHover={setHoveredPoint} onZoomChange={setZoomRange} zoomRange={zoomRange} />
+
+                {/* Speed Limiter Toggle & Slider */}
+                <div className="flex items-center gap-4 mb-4">
+                  <button
+                    onClick={() => setShowLimiter(!showLimiter)}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg transition-all",
+                      showLimiter
+                        ? "bg-amber-500/20 text-amber-500 border border-amber-500/50"
+                        : "bg-muted text-muted-foreground hover:bg-muted/80"
+                    )}
+                  >
+                    <Gauge className="w-4 h-4" />
+                    Speed Limiter
+                  </button>
+
+                  {showLimiter && (
+                    <div className="flex-1 flex items-center gap-4 animate-in fade-in slide-in-from-left-2">
+                      <Slider
+                        value={[speedLimit]}
+                        onValueChange={([val]) => setSpeedLimit(val)}
+                        min={10}
+                        max={Math.max(Math.round(stats.maxSpeed), 120)}
+                        step={5}
+                        className="flex-1 max-w-xs"
+                      />
+                      <span className="text-sm font-mono font-bold text-amber-500 min-w-[60px]">
+                        {speedLimit} km/h
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* What-If Stats Panel */}
+                {showLimiter && limitedStats && limitedStats.timeAdded > 0 && (
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 mb-4 animate-in fade-in slide-in-from-top-2">
+                    <div className="flex items-center gap-2 mb-3">
+                      <AlertTriangle className="w-4 h-4 text-amber-500" />
+                      <span className="font-semibold text-amber-500">What If You Stayed Under {speedLimit} km/h?</span>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wider">Time Added</p>
+                        <p className="text-lg font-bold text-red-500">+{formatDuration(limitedStats.timeAdded)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wider">New Total Time</p>
+                        <p className="text-lg font-bold text-foreground">{formatDuration(limitedStats.simulatedTime)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wider">New Avg Speed</p>
+                        <p className="text-lg font-bold text-foreground">{formatSpeed(limitedStats.newAvgSpeed)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wider">Slower By</p>
+                        <p className="text-lg font-bold text-amber-500">{limitedStats.percentSlower.toFixed(1)}%</p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-3">
+                      {limitedStats.cappedSegments} of {limitedStats.totalSegments} segments exceeded the limit.
+                    </p>
+                  </div>
+                )}
+
+                <SpeedElevationChart
+                  points={points}
+                  onHover={setHoveredPoint}
+                  onZoomChange={setZoomRange}
+                  zoomRange={zoomRange}
+                  speedLimit={showLimiter ? speedLimit : null}
+                />
               </div>
 
               {/* Speed Distribution (Moved to Overview) */}

@@ -9,6 +9,7 @@ import {
   ResponsiveContainer,
   Legend,
   ReferenceArea,
+  ReferenceLine,
 } from "recharts";
 import { GPXPoint } from "@/utils/gpxParser";
 
@@ -19,6 +20,7 @@ interface SpeedElevationChartProps {
   onHover?: (point: GPXPoint | null) => void;
   onZoomChange: (range: [number, number] | null) => void;
   zoomRange: [number, number] | null;
+  speedLimit?: number | null;
 }
 
 interface ChartDataPoint {
@@ -49,7 +51,7 @@ function haversineDistance(
   return R * c;
 }
 
-const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange }: SpeedElevationChartProps) => {
+const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLimit }: SpeedElevationChartProps) => {
   const [refAreaLeft, setRefAreaLeft] = useState<string | null>(null);
   const [refAreaRight, setRefAreaRight] = useState<string | null>(null);
 
@@ -364,6 +366,24 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange }: Speed
                 strokeOpacity={0.3}
                 fill="hsl(37, 92%, 50%)"
                 fillOpacity={0.3}
+              />
+            )}
+
+            {/* Speed Limit Reference Line */}
+            {speedLimit && (
+              <ReferenceLine
+                yAxisId="speed"
+                y={speedLimit}
+                stroke="hsl(38, 92%, 50%)"
+                strokeWidth={2}
+                strokeDasharray="8 4"
+                label={{
+                  value: `Limit: ${speedLimit} km/h`,
+                  position: 'right',
+                  fill: 'hsl(38, 92%, 50%)',
+                  fontSize: 11,
+                  fontWeight: 600,
+                }}
               />
             )}
           </ComposedChart>
