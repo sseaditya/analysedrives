@@ -85,7 +85,7 @@ export interface SpeedBucket {
   distance: number; // km
 }
 
-export function calculateSpeedDistribution(points: GPXPoint[], bucketSize: number = 5): SpeedBucket[] {
+export function calculateSpeedDistribution(points: GPXPoint[], bucketSize: number = 10): SpeedBucket[] {
   if (points.length < 2) return [];
 
   const segments: { distance: number; time: number; speed: number }[] = [];

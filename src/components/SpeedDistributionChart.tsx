@@ -6,7 +6,6 @@ import {
     YAxis,
     CartesianGrid,
     Tooltip,
-    Legend,
     ResponsiveContainer,
 } from "recharts";
 import { GPXPoint, calculateSpeedDistribution } from "@/utils/gpxParser";
@@ -16,7 +15,8 @@ interface SpeedDistributionChartProps {
 }
 
 const SpeedDistributionChart = ({ points }: SpeedDistributionChartProps) => {
-    const data = useMemo(() => calculateSpeedDistribution(points), [points]);
+    // Force bucket size of 10 and ensure range starts at 0
+    const data = useMemo(() => calculateSpeedDistribution(points, 10), [points]);
 
     if (!data || data.length === 0) {
         return (
@@ -25,6 +25,13 @@ const SpeedDistributionChart = ({ points }: SpeedDistributionChartProps) => {
             </div>
         );
     }
+
+    // Calculate max value to synchronize axes 1:1
+    // We find the absolute maximum value across both time(min) and distance(km)
+    // and set the domain of BOTH axes to [0, maxVal]
+    const maxTime = Math.max(...data.map(d => d.time));
+    const maxDist = Math.max(...data.map(d => d.distance));
+    const maxVal = Math.ceil(Math.max(maxTime, maxDist) * 1.1); // Add 10% headroom
 
     return (
         <ResponsiveContainer width="100%" height="100%">
@@ -59,6 +66,7 @@ const SpeedDistributionChart = ({ points }: SpeedDistributionChartProps) => {
                     tickLine={false}
                     axisLine={false}
                     tickFormatter={(val) => `${val}m`}
+                    domain={[0, maxVal]}
                 />
                 <YAxis
                     yAxisId="right"
@@ -68,6 +76,7 @@ const SpeedDistributionChart = ({ points }: SpeedDistributionChartProps) => {
                     tickLine={false}
                     axisLine={false}
                     tickFormatter={(val) => `${val}km`}
+                    domain={[0, maxVal]}
                 />
                 <Tooltip
                     contentStyle={{
@@ -93,7 +102,7 @@ const SpeedDistributionChart = ({ points }: SpeedDistributionChartProps) => {
                     strokeWidth={1}
                     radius={[4, 4, 0, 0]}
                     maxBarSize={40}
-                    animationDuration={1500}
+                    animationDuration={1000}
                 />
                 <Bar
                     yAxisId="right"
@@ -104,7 +113,7 @@ const SpeedDistributionChart = ({ points }: SpeedDistributionChartProps) => {
                     strokeWidth={1}
                     radius={[4, 4, 0, 0]}
                     maxBarSize={40}
-                    animationDuration={1500}
+                    animationDuration={1000}
                 />
             </BarChart>
         </ResponsiveContainer>
