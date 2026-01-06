@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { MapPin, Activity, TrendingUp, Compass, RotateCcw, MoveRight, GitCommit, Spline, Gauge, Clock, AlertTriangle } from "lucide-react";
+import { MapPin, Activity, TrendingUp, Compass, RotateCcw, MoveRight, GitCommit, Spline, Gauge, Clock, AlertTriangle, Globe, Lock } from "lucide-react";
 import TrackMap from "./TrackMap";
 import SpeedElevationChart from "./SpeedElevationChart";
 import SpeedDistributionChart from "./SpeedDistributionChart";
@@ -21,9 +21,11 @@ interface GPSStatsProps {
   points: GPXPoint[];
   speedCap?: number | null;  // For public viewers - cap all speeds to this value
   isOwner?: boolean;         // true if viewing own activity
+  isPublic?: boolean;        // whether activity is public
+  description?: string | null; // activity description
 }
 
-const GPSStats = ({ stats, fileName, points, speedCap, isOwner = true }: GPSStatsProps) => {
+const GPSStats = ({ stats, fileName, points, speedCap, isOwner = true, isPublic = false, description }: GPSStatsProps) => {
   const [hoveredPoint, setHoveredPoint] = useState<GPXPoint | null>(null);
   const [zoomRange, setZoomRange] = useState<[number, number] | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
@@ -167,9 +169,29 @@ const GPSStats = ({ stats, fileName, points, speedCap, isOwner = true }: GPSStat
 
                       </div>
                     </div>
-                    <button className="mt-6 px-3 py-1 text-xs font-semibold border border-border rounded-md hover:bg-accent">
-                      Add private notes
-                    </button>
+
+                    {/* Description */}
+                    {description && (
+                      <p className="mt-4 text-sm text-muted-foreground line-clamp-3">
+                        {description}
+                      </p>
+                    )}
+
+                    {/* Visibility Status */}
+                    <div className="mt-4 flex items-center gap-2 text-xs">
+                      {isPublic ? (
+                        <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-500/10 text-green-500 border border-green-500/30">
+                          <Globe className="w-3 h-3" />
+                          Public
+                          {speedCap && <span className="text-green-400">• Capped at {speedCap} km/h</span>}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-muted text-muted-foreground border border-border">
+                          <Lock className="w-3 h-3" />
+                          Private
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* RIGHT SIDE: Data Grid (The Strava Data Layout) */}

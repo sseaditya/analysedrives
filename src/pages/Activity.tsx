@@ -36,6 +36,7 @@ const ActivityPage = () => {
   const [metadata, setMetadata] = useState<ActivityMetadata | null>(null);
   const [loading, setLoading] = useState(!!id);
   const [showFullDescription, setShowFullDescription] = useState(false);
+  const [accessDenied, setAccessDenied] = useState(false);
 
   // Determine ownership
   const isOwner = user && metadata ? user.id === metadata.user_id : false;
@@ -49,18 +50,30 @@ const ActivityPage = () => {
       const fetchActivity = async () => {
         try {
           setLoading(true);
-          // 1. Get Metadata
+          setAccessDenied(false);
+
+          // 1. Get Metadata - RLS should allow public activities
           const { data: record, error: dbError } = await supabase
             .from('activities')
             .select('*')
             .eq('id', id)
             .single();
 
-          if (dbError) throw dbError;
+          if (dbError) {
+            // If error is "no rows returned" or permission denied, show access denied
+            console.error("DB Error:", dbError);
+            if (dbError.code === 'PGRST116' || dbError.code === '42501') {
+              setAccessDenied(true);
+              setLoading(false);
+              return;
+            }
+            throw dbError;
+          }
 
-          // Check access: if not public and not owner, redirect
+          // Check access: if not public and not owner, show access denied
           if (!record.public && (!user || user.id !== record.user_id)) {
-            navigate("/", { replace: true });
+            setAccessDenied(true);
+            setLoading(false);
             return;
           }
 
@@ -79,7 +92,10 @@ const ActivityPage = () => {
             .from('gpx-files')
             .download(record.file_path);
 
-          if (storageError) throw storageError;
+          if (storageError) {
+            console.error("Storage Error:", storageError);
+            throw storageError;
+          }
 
           // 3. Parse
           const text = await fileData.text();
@@ -96,7 +112,7 @@ const ActivityPage = () => {
 
         } catch (err) {
           console.error("Error loading activity:", err);
-          navigate("/"); // Return to home on error
+          setAccessDenied(true);
         } finally {
           setLoading(false);
         }
@@ -122,7 +138,19 @@ const ActivityPage = () => {
     );
   }
 
-  if (!data) return null;
+  // Show access denied page instead of redirecting
+  if (accessDenied || !data) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4">
+        <Lock className="w-12 h-12 text-muted-foreground" />
+        <h1 className="text-xl font-bold">Activity Not Found</h1>
+        <p className="text-muted-foreground text-sm">This activity doesn't exist or is private.</p>
+        <Button onClick={() => navigate("/")} variant="outline">
+          Go Home
+        </Button>
+      </div>
+    );
+  }
 
   // Description truncation
   const description = metadata?.description || "";
@@ -220,6 +248,8 @@ const ActivityPage = () => {
             points={data.points}
             speedCap={effectiveSpeedCap}
             isOwner={isOwner}
+            isPublic={metadata?.public || false}
+            description={metadata?.description || null}
           />
         </div>
       </main>
