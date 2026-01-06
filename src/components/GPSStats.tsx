@@ -150,63 +150,63 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
                   {/* RIGHT SIDE: Data Grid (The Strava Data Layout) */}
                   <div className="flex-1">
                     {/* 1. Hero Stats (Distance, Time, Elevation) */}
-                    <div className="grid grid-cols-3 gap-6 mb-8 items-end">
+                    <div className="grid grid-cols-3 gap-y-12 gap-x-6 mb-8 items-end">
                       <div>
                         <div className="flex items-baseline gap-1">
-                          <span className="text-2xl font-light tabular-nums">{formatDistance(stats.totalDistance).replace(' km', '')}</span>
-                          <span className="text-m text-muted-foreground">km</span>
+                          <span className="text-4xl font-normal tabular-nums">{formatDistance(stats.totalDistance).replace(' km', '')}</span>
+                          <span className="text-xl text-muted-foreground ml-1">km</span>
                         </div>
-                        <span className="text-xs text-muted-foreground">Distance</span>
+                        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Distance</span>
                       </div>
                       <div>
                         <div className="flex items-baseline gap-1">
-                          <span className="text-2xl font-light tabular-nums">{formatDuration(stats.totalTime)}</span>
+                          <span className="text-4xl font-normal tabular-nums">{formatDuration(stats.totalTime)}</span>
                         </div>
-                        <span className="text-xs text-muted-foreground">Elapsed Time</span>
+                        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Elapsed Time</span>
                       </div>
                       <div>
                         <div className="flex items-baseline gap-1">
-                          <span className="text-2xl font-light tabular-nums">{formatSpeed(stats.avgSpeed).replace(' km/h', '')}</span>
-                          <span className="text-m text-muted-foreground">km/h</span>
+                          <span className="text-4xl font-normal tabular-nums">{formatSpeed(stats.avgSpeed).replace(' km/h', '')}</span>
+                          <span className="text-xl text-muted-foreground ml-1">km/h</span>
                         </div>
-                        <span className="text-xs text-muted-foreground">Average Speed</span>
+                        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Average Speed</span>
                       </div>
                       <div>
                         <div className="flex items-baseline gap-1">
-                          <span className="text-2xl font-light tabular-nums">{stats.elevationGain.toFixed(0)}</span>
-                          <span className="text-m text-muted-foreground">m</span>
+                          <span className="text-4xl font-normal tabular-nums">{stats.elevationGain.toFixed(0)}</span>
+                          <span className="text-xl text-muted-foreground ml-1">m</span>
                         </div>
-                        <span className="text-xs text-muted-foreground">Elevation Gained</span>
+                        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Elevation Gained</span>
                       </div>
                       <div>
-                        <div className="text-2xl font-light tabular-nums">{formatDuration(stats.movingTime)}</div>
-                        <span className="text-xs text-muted-foreground">Moving Time</span>
-                      </div>
-                      <div>
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-2xl font-light tabular-nums">{formatSpeed(stats.movingAvgSpeed).replace(' km/h', '')}</span>
-                          <span className="text-m text-muted-foreground">km/h</span>
-                        </div>
-                        <span className="text-xs text-muted-foreground">Average Moving Speed</span>
+                        <div className="text-4xl font-normal tabular-nums">{formatDuration(stats.movingTime)}</div>
+                        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Moving Time</span>
                       </div>
                       <div>
                         <div className="flex items-baseline gap-1">
-                          <span className="text-2xl font-light tabular-nums">{formatSpeed(stats.maxSpeed).replace(' km/h', '')}</span>
-                          <span className="text-m text-muted-foreground">km/h</span>
+                          <span className="text-4xl font-normal tabular-nums">{formatSpeed(stats.movingAvgSpeed).replace(' km/h', '')}</span>
+                          <span className="text-xl text-muted-foreground ml-1">km/h</span>
                         </div>
-                        <span className="text-xs text-muted-foreground">Top Speed</span>
+                        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Average Moving Speed</span>
                       </div>
                       <div>
                         <div className="flex items-baseline gap-1">
-                          <span className="text-2xl font-light tabular-nums">{formatDuration(stats.stoppedTime)}</span>
+                          <span className="text-4xl font-normal tabular-nums">{formatSpeed(stats.maxSpeed).replace(' km/h', '')}</span>
+                          <span className="text-xl text-muted-foreground ml-1">km/h</span>
                         </div>
-                        <span className="text-xs text-muted-foreground">Stopped Time</span>
+                        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Top Speed</span>
                       </div>
                       <div>
                         <div className="flex items-baseline gap-1">
-                          <span className="text-2xl font-light tabular-nums">{stats.stopCount}</span>
+                          <span className="text-4xl font-normal tabular-nums">{formatDuration(stats.stoppedTime)}</span>
                         </div>
-                        <span className="text-xs text-muted-foreground">Stops</span>
+                        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Stopped Time</span>
+                      </div>
+                      <div>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-4xl font-normal tabular-nums">{stats.stopCount}</span>
+                        </div>
+                        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Stops</span>
                       </div>
                     </div>
                   </div>
@@ -233,18 +233,18 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
 
                   {/* Selected Range Stats */}
                   {zoomRange && subsetStats && (
-                    <div className="grid grid-cols-3 gap-4 bg-muted/50 p-3 rounded-xl border border-border/50 animate-in fade-in slide-in-from-top-2">
+                    <div className="grid grid-cols-3 gap-8 bg-muted/30 p-4 rounded-xl border border-border/50 animate-in fade-in slide-in-from-top-2">
                       <div>
-                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Distance</p>
-                        <p className="text-lg font-bold text-foreground">{formatDistance(subsetStats.distance)}</p>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Distance</p>
+                        <p className="text-2xl font-normal text-foreground">{formatDistance(subsetStats.distance)}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Time</p>
-                        <p className="text-lg font-bold text-foreground">{formatDuration(subsetStats.time)}</p>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Time</p>
+                        <p className="text-2xl font-normal text-foreground">{formatDuration(subsetStats.time)}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Avg Speed</p>
-                        <p className="text-lg font-bold text-foreground">{formatSpeed(subsetStats.avgSpeed)}</p>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Avg Speed</p>
+                        <p className="text-2xl font-normal text-foreground">{formatSpeed(subsetStats.avgSpeed)}</p>
                       </div>
                     </div>
                   )}
@@ -289,22 +289,22 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
                       <AlertTriangle className="w-4 h-4 text-amber-500" />
                       <span className="font-semibold text-amber-500">What If You Stayed Under {speedLimit} km/h?</span>
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
                       <div>
-                        <p className="text-xs text-muted-foreground uppercase tracking-wider">Time Added</p>
-                        <p className="text-lg font-bold text-red-500">+{formatDuration(limitedStats.timeAdded)}</p>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Time Added</p>
+                        <p className="text-2xl font-normal text-red-500">+{formatDuration(limitedStats.timeAdded)}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground uppercase tracking-wider">New Total Time</p>
-                        <p className="text-lg font-bold text-foreground">{formatDuration(limitedStats.simulatedTime)}</p>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Simulated Total</p>
+                        <p className="text-2xl font-normal text-foreground">{formatDuration(limitedStats.simulatedTime)}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground uppercase tracking-wider">New Avg Speed</p>
-                        <p className="text-lg font-bold text-foreground">{formatSpeed(limitedStats.newAvgSpeed)}</p>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Simulated Avg</p>
+                        <p className="text-2xl font-normal text-foreground">{formatSpeed(limitedStats.newAvgSpeed)}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground uppercase tracking-wider">Slower By</p>
-                        <p className="text-lg font-bold text-amber-500">{limitedStats.percentSlower.toFixed(1)}%</p>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Slower By</p>
+                        <p className="text-2xl font-normal text-amber-500">{limitedStats.percentSlower.toFixed(1)}%</p>
                       </div>
                     </div>
                     <p className="text-xs text-muted-foreground mt-3">

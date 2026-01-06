@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { MapPin, Activity, Route, Clock, Zap, LogIn, LayoutDashboard } from "lucide-react";
+import { MapPin, Route, Clock, Zap, LogIn, LayoutDashboard } from "lucide-react";
 import FileUploader from "@/components/FileUploader";
 import { parseGPX, calculateStats } from "@/utils/gpxParser";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,9 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleFileLoad = (content: string, name: string) => {
+  const handleFilesLoad = (files: { content: string; name: string }[]) => {
+    if (files.length === 0) return;
+    const { content, name } = files[0];
     setIsLoading(true);
     setError(null);
 
@@ -117,7 +119,7 @@ const Index = () => {
           {/* Upload Section */}
           <div className="max-w-2xl mx-auto">
             <div className="bg-card border border-border rounded-2xl p-2 shadow-xl shadow-primary/5">
-              <FileUploader onFileLoad={handleFileLoad} isLoading={isLoading} />
+              <FileUploader onFilesLoad={handleFilesLoad} isLoading={isLoading} />
 
               {/* Error Message */}
               {error && (
@@ -128,81 +130,83 @@ const Index = () => {
                 </div>
               )}
             </div>
-          </section>
-
-          {/* Features Section */}
-          <section className="container mx-auto px-4 py-12 md:py-16 border-t border-border">
-            <div className="max-w-4xl mx-auto">
-              <h2 className="text-2xl font-bold text-center text-foreground mb-8">
-                What You'll Get
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {[
-                  {
-                    icon: Route,
-                    title: "Distance",
-                    description: "Accurate total distance from GPS coordinates",
-                  },
-                  {
-                    icon: Clock,
-                    title: "Time",
-                    description: "Total duration and moving time analysis",
-                  },
-                  {
-                    icon: Zap,
-                    title: "Speed",
-                    description: "Average and maximum speed with timeline chart",
-                  },
-                  {
-                    icon: MapPin,
-                    title: "Route Map",
-                    description: "Interactive map with your complete track",
-                  },
-                ].map((feature, index) => (
-                  <div
-                    key={index}
-                    className="text-center p-6 rounded-2xl bg-card border border-border hover:shadow-lg hover:shadow-primary/5 transition-all duration-300"
-                  >
-                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                      <feature.icon className="w-6 h-6 text-primary" />
-                    </div>
-                    <h3 className="font-semibold text-foreground mb-2">
-                      {feature.title}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      {feature.description}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          {/* Supported Apps */}
-          <section className="container mx-auto px-4 py-12 md:py-16 bg-card/50">
-            <div className="max-w-4xl mx-auto text-center">
-              <p className="text-muted-foreground mb-4">Works with GPX files from</p>
-              <div className="flex flex-wrap justify-center gap-4 text-sm font-medium text-foreground">
-                {["Strava", "Garmin", "Komoot", "AllTrails", "Apple Watch", "Google Maps"].map((app) => (
-                  <span
-                    key={app}
-                    className="px-4 py-2 rounded-full bg-background border border-border"
-                  >
-                    {app}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          {/* Footer */}
-          <footer className="border-t border-border bg-card/50">
-            <div className="container mx-auto px-4 py-6 text-center text-sm text-muted-foreground">
-              <p>Upload your GPX files securely — all processing happens in your browser.</p>
-            </div>
-          </footer>
+          </div>
         </div>
-        );
+      </section>
+
+      {/* Features Section */}
+      <section className="container mx-auto px-4 py-12 md:py-16 border-t border-border">
+        <div className="max-w-4xl mx-auto">
+          <h2 className="text-2xl font-bold text-center text-foreground mb-8">
+            What You'll Get
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              {
+                icon: Route,
+                title: "Distance",
+                description: "Accurate total distance from GPS coordinates",
+              },
+              {
+                icon: Clock,
+                title: "Time",
+                description: "Total duration and moving time analysis",
+              },
+              {
+                icon: Zap,
+                title: "Speed",
+                description: "Average and maximum speed with timeline chart",
+              },
+              {
+                icon: MapPin,
+                title: "Route Map",
+                description: "Interactive map with your complete track",
+              },
+            ].map((feature, index) => (
+              <div
+                key={index}
+                className="text-center p-6 rounded-2xl bg-card border border-border hover:shadow-lg hover:shadow-primary/5 transition-all duration-300"
+              >
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                  <feature.icon className="w-6 h-6 text-primary" />
+                </div>
+                <h3 className="font-semibold text-foreground mb-2">
+                  {feature.title}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  {feature.description}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Supported Apps */}
+      <section className="container mx-auto px-4 py-12 md:py-16 bg-card/50">
+        <div className="max-w-4xl mx-auto text-center">
+          <p className="text-muted-foreground mb-4">Works with GPX files from</p>
+          <div className="flex flex-wrap justify-center gap-4 text-sm font-medium text-foreground">
+            {["Strava", "Garmin", "Komoot", "AllTrails", "Apple Watch", "Google Maps"].map((app) => (
+              <span
+                key={app}
+                className="px-4 py-2 rounded-full bg-background border border-border"
+              >
+                {app}
+              </span>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t border-border bg-card/50">
+        <div className="container mx-auto px-4 py-6 text-center text-sm text-muted-foreground">
+          <p>Upload your GPX files securely — all processing happens in your browser.</p>
+        </div>
+      </footer>
+    </div>
+  );
 };
 
-        export default Index;
+export default Index;
