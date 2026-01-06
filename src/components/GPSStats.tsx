@@ -143,12 +143,19 @@ const GPSStats = ({ stats, fileName, points, speedCap, isOwner = true, isPublic 
       };
     }
 
+    const originalStoppedTime = stats.totalTime - stats.movingTime;
+    const newTotalTime = limited.simulatedTime;
+    const newMovingTime = Math.max(0, newTotalTime - originalStoppedTime);
+
+    // Recalculate moving avg speed based on new moving time
+    const newMovingAvgSpeed = newMovingTime > 0 ? (stats.totalDistance / (newMovingTime / 3600)) : 0;
+
     return {
       maxSpeed: Math.min(stats.maxSpeed, speedCap),
       avgSpeed: limited.newAvgSpeed,
-      movingAvgSpeed: limited.newAvgSpeed, // Approximation: applying same ratio or just using avg for simplicity
-      totalTime: limited.simulatedTime,
-      movingTime: limited.simulatedTime, // Approximation: capped time is all moving? Or scale moving time?
+      movingAvgSpeed: newMovingAvgSpeed,
+      totalTime: newTotalTime,
+      movingTime: newMovingTime,
     };
   }, [stats, speedCap, isOwner, points]);
 
