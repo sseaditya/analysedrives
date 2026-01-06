@@ -492,17 +492,21 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                   {showLimiter && (
                     <div className="absolute top-[10px] bottom-[30px] left-0 w-[60px] z-20 flex flex-col items-center justify-center animate-in fade-in zoom-in-95">
                       <Slider
-                        orientation="vertical"
-                        value={[speedLimit]}
-                        onValueChange={([val]) => setSpeedLimit(val)}
-                        min={40}
-                        max={speedCap ? Math.min(speedCap - 10, 200) : Math.max(Math.ceil(stats.maxSpeed / 10) * 10, 120)}
-                        step={10}
+                        min={0}
+                        max={speedCap ? speedCap : Math.ceil(stats.maxSpeed / 10) * 10}
+                        step={1}
+                        onValueChange={([val]) => {
+                          const minLimit = 40;
+                          setSpeedLimit(Math.max(minLimit, val));
+                        }}
                         className="h-full flex-1 cursor-grab active:cursor-grabbing w-full"
-                        thumbClassName="h-4 w-full rounded-none border-0 bg-transparent relative outline-none ring-0 focus:ring-0"
+                        thumbClassName="h-0 w-full rounded-none border-0 bg-transparent relative outline-none ring-0 focus:ring-0"
                         thumbChildren={
-                          <div className="absolute w-[60px] left-0 h-0 border-t-[3px] border-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)] flex items-center justify-end pr-1">
-                            <div className="bg-amber-500 text-[10px] font-bold text-black px-1 rounded-sm -mt-[9px]">
+                          <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1 pr-1">
+                            {/* Line pointing to value */}
+                            <div className="w-2 h-[2px] bg-amber-500" />
+                            {/* Label Bubble - Right aligned, outside numbers */}
+                            <div className="bg-amber-500 text-[10px] font-bold text-black px-1.5 py-0.5 rounded-sm min-w-[24px] text-center shadow-sm">
                               {speedLimit}
                             </div>
                           </div>
