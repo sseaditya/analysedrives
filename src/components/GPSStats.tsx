@@ -166,7 +166,7 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
                       </div>
                       <div>
                         <div className="flex items-baseline gap-1">
-                          <span className="text-2xl font-light tabular-nums">{formatSpeed(stats.avgSpeed)}</span>
+                          <span className="text-2xl font-light tabular-nums">{formatSpeed(stats.avgSpeed).replace(' km/h', '')}</span>
                           <span className="text-m text-muted-foreground">km/h</span>
                         </div>
                         <span className="text-xs text-muted-foreground">Average Speed</span>
@@ -184,14 +184,14 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
                       </div>
                       <div>
                         <div className="flex items-baseline gap-1">
-                          <span className="text-2xl font-light tabular-nums">{formatSpeed(stats.movingAvgSpeed)}</span>
+                          <span className="text-2xl font-light tabular-nums">{formatSpeed(stats.movingAvgSpeed).replace(' km/h', '')}</span>
                           <span className="text-m text-muted-foreground">km/h</span>
                         </div>
                         <span className="text-xs text-muted-foreground">Average Moving Speed</span>
                       </div>
                       <div>
                         <div className="flex items-baseline gap-1">
-                          <span className="text-2xl font-light tabular-nums">{formatSpeed(stats.maxSpeed)}</span>
+                          <span className="text-2xl font-light tabular-nums">{formatSpeed(stats.maxSpeed).replace(' km/h', '')}</span>
                           <span className="text-m text-muted-foreground">km/h</span>
                         </div>
                         <span className="text-xs text-muted-foreground">Top Speed</span>
