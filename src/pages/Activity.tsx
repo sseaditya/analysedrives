@@ -107,9 +107,9 @@ const ActivityPage = () => {
               <span className="font-bold text-xl text-foreground">GPS Analyzer</span>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Activity className="w-4 h-4" />
-            Activity Details
+          <div className="flex flex-col items-end">
+            <span className="font-bold text-lg text-foreground">{data.fileName}</span>
+            <span className="text-xs text-muted-foreground">Activity Details</span>
           </div>
         </div>
       </header>
