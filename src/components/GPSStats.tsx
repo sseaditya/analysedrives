@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { MapPin, Activity, TrendingUp, Compass, RotateCcw, MoveRight, GitCommit, Spline, Gauge, Clock, AlertTriangle, Globe, Lock } from "lucide-react";
+import { ResponsiveContainer } from "recharts";
 import TrackMap from "./TrackMap";
 import SpeedElevationChart from "./SpeedElevationChart";
 import SpeedDistributionChart from "./SpeedDistributionChart";
@@ -391,106 +392,125 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
 
               {/* Speed & Elevation Chart */}
               <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
-                <div className="flex flex-col gap-4 mb-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-foreground">Speed & Elevation Timeline</h3>
-                    {zoomRange && (
-                      <span className="text-sm text-primary cursor-pointer hover:underline font-medium" onClick={() => setZoomRange(null)}>
-                        Reset Selection
-                      </span>
-                    )}
-                  </div>
+                {/* Compact Header & Stats Row */}
+                <div className="flex flex-col gap-4 mb-2">
+                  <div className="flex items-center justify-between flex-wrap gap-4">
+                    <div className="flex items-center gap-4">
+                      <h3 className="text-lg font-semibold text-foreground">Speed & Elevation Timeline</h3>
 
-                  {/* Selected Range Stats */}
-                  {zoomRange && subsetStats && (
-                    <div className="grid grid-cols-3 gap-8 bg-muted/30 p-4 rounded-xl border border-border/50 animate-in fade-in slide-in-from-top-2">
-                      <div>
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Distance</p>
-                        <p className="text-2xl font-normal text-foreground">{formatDistance(subsetStats.distance)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Time</p>
-                        <p className="text-2xl font-normal text-foreground">{formatDuration(subsetStats.time)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Avg Speed</p>
-                        <p className="text-2xl font-normal text-foreground">{formatSpeed(subsetStats.avgSpeed)}</p>
+                      {/* Speed Limiter Toggle - Moved to Header */}
+                      <div className="flex items-center">
+                        <span className="text-sm font-medium mr-2 text-muted-foreground/80">Simulator:</span>
+                        <div className="flex items-center bg-muted rounded-lg p-1 border border-border">
+                          <button
+                            onClick={() => setShowLimiter(!showLimiter)}
+                            className={cn(
+                              "text-xs font-semibold px-2 py-1 rounded transition-all flex items-center gap-1.5",
+                              showLimiter
+                                ? "bg-amber-500 text-white shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
+                            )}
+                          >
+                            <Gauge className="w-3.5 h-3.5" />
+                            {showLimiter ? "ON" : "OFF"}
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  )}
+
+                    <div className="flex items-center gap-4">
+                      {zoomRange && (
+                        <button
+                          className="flex items-center gap-1.5 text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-md hover:bg-primary/20 transition-colors"
+                          onClick={() => setZoomRange(null)}
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          Reset View
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Compact Stats Row - Always Present */}
+                  <div className="flex items-center justify-between bg-muted/30 rounded-lg p-3 border border-border/50">
+                    <div className="flex items-center gap-6 divide-x divide-border/50">
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Distance</span>
+                        <span className="text-lg font-medium tabular-nums">
+                          {zoomRange && subsetStats
+                            ? formatDistance(subsetStats.distance)
+                            : formatDistance(stats.totalDistance)
+                          }
+                        </span>
+                      </div>
+                      <div className="flex items-baseline gap-2 pl-6">
+                        <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Time</span>
+                        <span className="text-lg font-medium tabular-nums">
+                          {zoomRange && subsetStats
+                            ? formatDuration(subsetStats.time)
+                            : formatDuration(displayStats.totalTime)
+                          }
+                        </span>
+                      </div>
+                      <div className="flex items-baseline gap-2 pl-6">
+                        <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Avg Speed</span>
+                        <span className="text-lg font-medium tabular-nums">
+                          {zoomRange && subsetStats
+                            ? formatSpeed(subsetStats.avgSpeed)
+                            : formatSpeed(displayStats.avgSpeed)
+                          }
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Compact What-If Stats (Inline) */}
+                    {showLimiter && limitedStats && limitedStats.timeAdded > 0 && (
+                      <div className="flex items-center gap-4 animate-in fade-in slide-in-from-right-4">
+                        <div className="h-8 w-px bg-border/50 mx-2" />
+                        <div className="flex items-center gap-2 bg-amber-500/10 text-amber-600 px-3 py-1.5 rounded-md border border-amber-500/20">
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                          <span className="text-xs font-bold whitespace-nowrap">If &lt; {speedLimit} km/h:</span>
+                          <span className="text-sm font-semibold text-red-600 tabular-nums">+{formatDuration(limitedStats.timeAdded)}</span>
+                          <span className="text-xs text-amber-600/80 hidden xl:inline">({limitedStats.percentSlower.toFixed(0)}% slower)</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                {/* Speed Limiter Toggle & Slider (Available to all) */}
-                <div className="flex items-center gap-4 mb-4">
-                  <button
-                    onClick={() => setShowLimiter(!showLimiter)}
-                    className={cn(
-                      "flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg transition-all",
-                      showLimiter
-                        ? "bg-amber-500/20 text-amber-500 border border-amber-500/50"
-                        : "bg-muted text-muted-foreground hover:bg-muted/80"
-                    )}
-                  >
-                    <Gauge className="w-4 h-4" />
-                    Speed Limiter
-                  </button>
-
+                <div className="relative h-[300px] w-full">
+                  {/* Speed Limiter Overlay Slider */}
                   {showLimiter && (
-                    <div className="flex-1 flex items-center gap-4 animate-in fade-in slide-in-from-left-2">
+                    <div className="absolute top-4 bottom-8 right-12 z-10 flex flex-col items-center h-[240px] animate-in fade-in zoom-in-95">
+                      <div className="mb-2 bg-background/80 backdrop-blur-sm px-2 py-1 rounded border border-amber-500/30 text-xs font-bold text-amber-500 shadow-sm whitespace-nowrap">
+                        Limit: {speedLimit} km/h
+                      </div>
                       <Slider
+                        orientation="vertical"
                         value={[speedLimit]}
                         onValueChange={([val]) => setSpeedLimit(val)}
                         min={40}
                         max={speedCap ? Math.min(speedCap - 10, 200) : Math.max(Math.ceil(stats.maxSpeed / 10) * 10, 120)}
                         step={10}
-                        className="flex-1 max-w-xs"
+                        className="flex-1 cursor-grab active:cursor-grabbing [&>.absolute]:bg-amber-500 [&>span]:border-amber-500"
                       />
-                      <span className="text-sm font-mono font-bold text-amber-500 min-w-[60px]">
-                        {speedLimit} km/h
-                      </span>
+                      <div className="mt-2 text-[10px] uppercase font-bold text-muted-foreground rotate-90 origin-left translate-x-3">
+                        Drag Limit
+                      </div>
                     </div>
                   )}
+
+                  <ResponsiveContainer width="100%" height="100%">
+                    <SpeedElevationChart
+                      points={points}
+                      onHover={setHoveredPoint}
+                      onZoomChange={setZoomRange}
+                      zoomRange={zoomRange}
+                      speedLimit={effectiveChartSpeedLimit}
+                      speedCap={!isOwner ? speedCap : null}
+                    />
+                  </ResponsiveContainer>
                 </div>
-
-                {/* What-If Stats Panel */}
-                {showLimiter && limitedStats && limitedStats.timeAdded > 0 && (
-                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 mb-4 animate-in fade-in slide-in-from-top-2">
-                    <div className="flex items-center gap-2 mb-3">
-                      <AlertTriangle className="w-4 h-4 text-amber-500" />
-                      <span className="font-semibold text-amber-500">What If You Stayed Under {speedLimit} km/h?</span>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-                      <div>
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Time Added</p>
-                        <p className="text-2xl font-normal text-red-500">+{formatDuration(limitedStats.timeAdded)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Simulated Total</p>
-                        <p className="text-2xl font-normal text-foreground">{formatDuration(limitedStats.simulatedTime)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Simulated Avg</p>
-                        <p className="text-2xl font-normal text-foreground">{formatSpeed(limitedStats.newAvgSpeed)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Slower By</p>
-                        <p className="text-2xl font-normal text-amber-500">{limitedStats.percentSlower.toFixed(1)}%</p>
-                      </div>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-3">
-                      {limitedStats.cappedSegments} of {limitedStats.totalSegments} segments exceeded the limit.
-                    </p>
-                  </div>
-                )}
-
-                <SpeedElevationChart
-                  points={points}
-                  onHover={setHoveredPoint}
-                  onZoomChange={setZoomRange}
-                  zoomRange={zoomRange}
-                  speedLimit={effectiveChartSpeedLimit}
-                  speedCap={!isOwner ? speedCap : null}
-                />
               </div>
 
               {/* Speed Distribution (Moved to Overview) */}

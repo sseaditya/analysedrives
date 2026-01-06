@@ -255,8 +255,8 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
   const elevationRange = maxElevation - minElevation || 100;
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-6 select-none">
-      <div className="h-[300px] w-full">
+    <div className="h-full w-full rounded-2xl border border-border bg-card p-6 select-none">
+      <div className="h-full w-full select-none">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart
             data={chartData}
@@ -367,20 +367,22 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
               />
             )}
 
-            {/* Speed Limit Reference Line */}
+            {/* Speed Limit Reference Line - Bolder & Highlighted */}
             {speedLimit && (
               <ReferenceLine
                 yAxisId="speed"
                 y={speedLimit}
-                stroke="hsl(38, 92%, 50%)"
-                strokeWidth={2}
-                strokeDasharray="8 4"
+                stroke="hsl(0, 84%, 60%)" // Red-ish for visibility
+                strokeWidth={4}
+                strokeDasharray="4 4"
+                strokeOpacity={0.9}
                 label={{
                   value: `Limit: ${speedLimit} km/h`,
-                  position: 'right',
-                  fill: 'hsl(38, 92%, 50%)',
-                  fontSize: 11,
-                  fontWeight: 600,
+                  position: 'insideRight',
+                  fill: 'hsl(0, 84%, 60%)',
+                  fontSize: 12,
+                  fontWeight: 800,
+                  dy: -10
                 }}
               />
             )}
