@@ -92,15 +92,35 @@ const GPSStats = ({ stats, fileName, points, speedCap, isOwner = true, isPublic 
     let displayTime = timeSeconds;
     let displayAvgSpeed = avgSpeed;
 
+    // Determine the effective limit for calculation
+    // If owner: only limit if showLimiter is true
+    // If public: limit is speedCap, OR if showLimiter is true and < speedCap
+    let activeLimit: number | null = null;
+
+    if (isOwner) {
+      if (showLimiter) activeLimit = speedLimit;
+    } else {
+      // Public viewer
+      if (speedCap) {
+        activeLimit = speedCap;
+        // If they enabled the tool (which is allowed now) and it's lower, use that
+        if (showLimiter && speedLimit < speedCap) {
+          activeLimit = speedLimit;
+        }
+      } else if (showLimiter) {
+        activeLimit = speedLimit;
+      }
+    }
+
     // Apply speed cap if active
-    if (!isOwner && speedCap) {
-      const limited = calculateLimitedStats(subset, speedCap);
+    if (activeLimit) {
+      const limited = calculateLimitedStats(subset, activeLimit);
       if (limited) {
         displayTime = limited.simulatedTime;
         displayAvgSpeed = limited.newAvgSpeed;
       } else {
         // Fallback
-        displayAvgSpeed = Math.min(avgSpeed, speedCap);
+        displayAvgSpeed = Math.min(avgSpeed, activeLimit);
         displayTime = displayAvgSpeed > 0 ? distance / (displayAvgSpeed / 3600) * 3600 : timeSeconds;
       }
     }
@@ -113,7 +133,8 @@ const GPSStats = ({ stats, fileName, points, speedCap, isOwner = true, isPublic 
         avgSpeed: displayAvgSpeed
       }
     };
-  }, [points, zoomRange, speedCap, isOwner]);
+  }, [points, zoomRange, speedCap, isOwner, showLimiter, speedLimit]);
+
 
   // Calculate speed limited stats
   const limitedStats = useMemo(() => {
