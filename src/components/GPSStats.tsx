@@ -29,7 +29,18 @@ const GPSStats = ({ stats, fileName, points, speedCap, isOwner = true, isPublic 
   const [hoveredPoint, setHoveredPoint] = useState<GPXPoint | null>(null);
   const [zoomRange, setZoomRange] = useState<[number, number] | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
-  const [speedLimit, setSpeedLimit] = useState<number>(Math.max(40, Math.floor((stats.maxSpeed * 0.8) / 10) * 10));
+
+  // Calculate safe initial speed limit
+  const initialSpeedLimit = useMemo(() => {
+    let limit = Math.max(40, Math.floor((stats.maxSpeed * 0.8) / 10) * 10);
+    if (speedCap) {
+      limit = Math.min(limit, speedCap - 10);
+    }
+    // Ensure it doesn't go below minimum 40 unless cap is very low (which shouldn't happen given logic)
+    return Math.max(40, limit);
+  }, [stats.maxSpeed, speedCap]);
+
+  const [speedLimit, setSpeedLimit] = useState<number>(initialSpeedLimit);
   const [showLimiter, setShowLimiter] = useState(false);
 
   const tabs = [
@@ -148,16 +159,12 @@ const GPSStats = ({ stats, fileName, points, speedCap, isOwner = true, isPublic 
 
   // Effective speed limit for charts (owner's limiter or public speed cap)
   // Effective speed limit for charts
+  // Effective speed limit for charts
   const effectiveChartSpeedLimit = useMemo(() => {
-    // For public, we enforce cap via axis, NOT via "limit line" tool usage unless we want to show it.
-    // User requested: "do not use the speed limiter functionality to put govern speed cap they are sepaarate things"
-    // So for public, we pass NOTHING as "speedLimit" (the line), but we pass speedCap as a separate prop to constrain axis.
-    if (!isOwner) return null;
-
-    // For owner, only show if enabled
+    // If the tool is enabled, show the line.
     if (showLimiter) return speedLimit;
     return null;
-  }, [isOwner, showLimiter, speedLimit]);
+  }, [showLimiter, speedLimit]);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -339,39 +346,37 @@ const GPSStats = ({ stats, fileName, points, speedCap, isOwner = true, isPublic 
                   )}
                 </div>
 
-                {/* Speed Limiter Toggle & Slider (only for owners) */}
-                {isOwner && (
-                  <div className="flex items-center gap-4 mb-4">
-                    <button
-                      onClick={() => setShowLimiter(!showLimiter)}
-                      className={cn(
-                        "flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg transition-all",
-                        showLimiter
-                          ? "bg-amber-500/20 text-amber-500 border border-amber-500/50"
-                          : "bg-muted text-muted-foreground hover:bg-muted/80"
-                      )}
-                    >
-                      <Gauge className="w-4 h-4" />
-                      Speed Limiter
-                    </button>
-
-                    {showLimiter && (
-                      <div className="flex-1 flex items-center gap-4 animate-in fade-in slide-in-from-left-2">
-                        <Slider
-                          value={[speedLimit]}
-                          onValueChange={([val]) => setSpeedLimit(val)}
-                          min={40}
-                          max={speedCap ? Math.min(speedCap - 10, 200) : Math.max(Math.ceil(stats.maxSpeed / 10) * 10, 120)}
-                          step={10}
-                          className="flex-1 max-w-xs"
-                        />
-                        <span className="text-sm font-mono font-bold text-amber-500 min-w-[60px]">
-                          {speedLimit} km/h
-                        </span>
-                      </div>
+                {/* Speed Limiter Toggle & Slider (Available to all) */}
+                <div className="flex items-center gap-4 mb-4">
+                  <button
+                    onClick={() => setShowLimiter(!showLimiter)}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg transition-all",
+                      showLimiter
+                        ? "bg-amber-500/20 text-amber-500 border border-amber-500/50"
+                        : "bg-muted text-muted-foreground hover:bg-muted/80"
                     )}
-                  </div>
-                )}
+                  >
+                    <Gauge className="w-4 h-4" />
+                    Speed Limiter
+                  </button>
+
+                  {showLimiter && (
+                    <div className="flex-1 flex items-center gap-4 animate-in fade-in slide-in-from-left-2">
+                      <Slider
+                        value={[speedLimit]}
+                        onValueChange={([val]) => setSpeedLimit(val)}
+                        min={40}
+                        max={speedCap ? Math.min(speedCap - 10, 200) : Math.max(Math.ceil(stats.maxSpeed / 10) * 10, 120)}
+                        step={10}
+                        className="flex-1 max-w-xs"
+                      />
+                      <span className="text-sm font-mono font-bold text-amber-500 min-w-[60px]">
+                        {speedLimit} km/h
+                      </span>
+                    </div>
+                  )}
+                </div>
 
                 {/* What-If Stats Panel */}
                 {showLimiter && limitedStats && limitedStats.timeAdded > 0 && (
@@ -425,7 +430,10 @@ const GPSStats = ({ stats, fileName, points, speedCap, isOwner = true, isPublic 
                   </h3>
                 </div>
                 <div className="h-[250px]">
-                  <SpeedDistributionChart points={filteredPoints} speedLimit={effectiveChartSpeedLimit} />
+                  <SpeedDistributionChart
+                    points={filteredPoints}
+                    speedLimit={!isOwner ? (effectiveChartSpeedLimit ?? speedCap) : effectiveChartSpeedLimit}
+                  />
                 </div>
               </div>
             </div>
@@ -783,8 +791,8 @@ const GPSStats = ({ stats, fileName, points, speedCap, isOwner = true, isPublic 
           )}
 
         </main>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 };
 

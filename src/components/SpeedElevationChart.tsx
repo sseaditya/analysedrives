@@ -129,9 +129,14 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
       const shouldSample = (originalIndex % sampleRate === 0) || originalIndex === points.length - 1 || (zoomRange && originalIndex === zoomRange[1]);
 
       if (shouldSample) {
+        let finalSpeed = parseFloat(smoothedSpeed.toFixed(1));
+        if (speedCap && finalSpeed > speedCap) {
+          finalSpeed = speedCap;
+        }
+
         chartData.push({
           distance: currRaw.dist,
-          speed: parseFloat(smoothedSpeed.toFixed(1)),
+          speed: finalSpeed,
           elevation: currRaw.ele !== undefined ? parseFloat(currRaw.ele.toFixed(1)) : null,
           time: currRaw.time ? currRaw.time.toLocaleTimeString() : "",
           pointIndex: originalIndex,

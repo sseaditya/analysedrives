@@ -24,42 +24,13 @@ const SpeedDistributionChart = ({ points, speedLimit }: SpeedDistributionChartPr
             return rawData;
         }
 
-        // The bucket that will receive overflow is the one just BELOW the speed limit
-        // For speedLimit=100, the limit bucket is 90-100 (minSpeed=90)
-        const limitBucketMin = speedLimit - 10;
-
         const collapsedData: SpeedBucket[] = [];
-        let overLimitTime = 0;
-        let overLimitDistance = 0;
 
         for (const bucket of rawData) {
-            if (bucket.minSpeed >= speedLimit) {
-                // This entire bucket is at or over the limit
-                // We only cascade distance, and will calculate time based on the limit speed
-                overLimitDistance += bucket.distance;
-            } else {
-                // Bucket is below the limit - keep it
-                collapsedData.push({ ...bucket }); // Clone to avoid mutating original
+            // For public speed cap, we just hide anything above the cap
+            if (bucket.minSpeed < speedLimit) {
+                collapsedData.push({ ...bucket });
             }
-        }
-
-        // Calculate time for the overflow distance based on the speed limit
-        // Time (min) = (Distance (km) / Speed (km/h)) * 60
-        overLimitTime = (overLimitDistance / speedLimit) * 60;
-
-        // Find the bucket just below the limit and add overflow to it
-        const targetBucket = collapsedData.find(b => b.minSpeed === limitBucketMin);
-        if (targetBucket) {
-            targetBucket.time = Number((targetBucket.time + overLimitTime).toFixed(2));
-            targetBucket.distance = Number((targetBucket.distance + overLimitDistance).toFixed(2));
-        } else if (overLimitTime > 0 || overLimitDistance > 0) {
-            // Create the limit bucket if it doesn't exist
-            collapsedData.push({
-                range: `${limitBucketMin}-${limitBucketMin + 10}`,
-                minSpeed: limitBucketMin,
-                time: Number(overLimitTime.toFixed(2)),
-                distance: Number(overLimitDistance.toFixed(2))
-            });
         }
 
         // Sort buckets by speed
