@@ -21,6 +21,7 @@ interface ActivityMetadata {
   description: string | null;
   public: boolean;
   speed_cap: number | null;
+  hide_radius: number | null;
 }
 
 const ActivityPage = () => {
@@ -92,6 +93,7 @@ const ActivityPage = () => {
             description: record.description,
             public: record.public,
             speed_cap: record.speed_cap,
+            hide_radius: record.hide_radius,
           });
 
           // 2. Download File
@@ -222,6 +224,7 @@ const ActivityPage = () => {
                   description: metadata.description,
                   public: metadata.public,
                   speed_cap: metadata.speed_cap,
+                  hide_radius: metadata.hide_radius,
                 }}
                 onUpdate={(updated) => setMetadata({ ...metadata, ...updated })}
               >
@@ -269,6 +272,7 @@ const ActivityPage = () => {
             isOwner={isOwner}
             isPublic={metadata?.public || false}
             description={metadata?.description || null}
+            hideRadius={metadata?.hide_radius ?? 5} // Default to 5km if not set
           />
         </div>
       </main>

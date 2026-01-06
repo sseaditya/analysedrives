@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
-import { Loader2, Globe, Lock, Gauge } from "lucide-react";
+import { Loader2, Globe, Lock, Gauge, MapPin } from "lucide-react";
 import { toast } from "sonner";
 
 interface ActivityData {
@@ -22,6 +22,7 @@ interface ActivityData {
     description: string | null;
     public: boolean;
     speed_cap: number | null;
+    hide_radius: number | null;
 }
 
 interface ActivityEditorProps {
@@ -37,6 +38,7 @@ const ActivityEditor = ({ children, activity, onUpdate }: ActivityEditorProps) =
     const [description, setDescription] = useState(activity.description || "");
     const [isPublic, setIsPublic] = useState(activity.public || false);
     const [speedCap, setSpeedCap] = useState(activity.speed_cap || 120);
+    const [hideRadius, setHideRadius] = useState(activity.hide_radius || 5);
 
     // Reset state when dialog opens
     useEffect(() => {
@@ -44,6 +46,7 @@ const ActivityEditor = ({ children, activity, onUpdate }: ActivityEditorProps) =
             setDescription(activity.description || "");
             setIsPublic(activity.public || false);
             setSpeedCap(activity.speed_cap || 120);
+            setHideRadius(activity.hide_radius || 5);
         }
     }, [open, activity]);
 
@@ -56,6 +59,7 @@ const ActivityEditor = ({ children, activity, onUpdate }: ActivityEditorProps) =
                     description: description.trim() || null,
                     public: isPublic,
                     speed_cap: isPublic ? speedCap : null,
+                    hide_radius: isPublic ? hideRadius : null,
                 })
                 .eq("id", activity.id);
 
@@ -70,6 +74,7 @@ const ActivityEditor = ({ children, activity, onUpdate }: ActivityEditorProps) =
                     description: description.trim() || null,
                     public: isPublic,
                     speed_cap: isPublic ? speedCap : null,
+                    hide_radius: isPublic ? hideRadius : null,
                 });
             }
         } catch (err) {
@@ -129,6 +134,34 @@ const ActivityEditor = ({ children, activity, onUpdate }: ActivityEditorProps) =
                             onCheckedChange={setIsPublic}
                         />
                     </div>
+
+                    {/* Hide Radius (only when public) */}
+                    {isPublic && (
+                        <div className="space-y-4 p-4 rounded-lg bg-red-500/10 border border-red-500/30 animate-in fade-in slide-in-from-top-2">
+                            <div className="flex items-center gap-2">
+                                <MapPin className="w-4 h-4 text-red-500" />
+                                <Label className="text-red-500 font-medium">
+                                    Hide Start/End Location
+                                </Label>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                                Hide the first and last {hideRadius}km of your route to protect your privacy. Only you will see the full path.
+                            </p>
+                            <div className="flex items-center gap-4">
+                                <Slider
+                                    value={[hideRadius]}
+                                    onValueChange={([val]) => setHideRadius(val)}
+                                    min={1}
+                                    max={10}
+                                    step={1}
+                                    className="flex-1"
+                                />
+                                <span className="text-sm font-mono font-bold text-red-500 min-w-[60px]">
+                                    {hideRadius} km
+                                </span>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Speed Cap (only when public) */}
                     {isPublic && (

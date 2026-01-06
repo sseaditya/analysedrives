@@ -12,23 +12,89 @@ import {
   formatDuration,
   formatSpeed,
   haversineDistance,
-  calculateLimitedStats
+  calculateLimitedStats,
+  calculateStats
 } from "@/utils/gpxParser";
 
 interface GPSStatsProps {
   stats: GPXStats;
   fileName: string;
   points: GPXPoint[];
-  speedCap?: number | null;  // For public viewers - cap all speeds to this value
-  isOwner?: boolean;         // true if viewing own activity
-  isPublic?: boolean;        // whether activity is public
-  description?: string | null; // activity description
+  speedCap?: number | null;
+  isOwner?: boolean;
+  isPublic?: boolean;
+  description?: string | null;
+  hideRadius?: number; // km
 }
 
-const GPSStats = ({ stats, fileName, points, speedCap, isOwner = true, isPublic = false, description }: GPSStatsProps) => {
+const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedCap, isOwner = true, isPublic = false, description, hideRadius = 0 }: GPSStatsProps) => {
   const [hoveredPoint, setHoveredPoint] = useState<GPXPoint | null>(null);
   const [zoomRange, setZoomRange] = useState<[number, number] | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
+
+  // Filter points based on privacy radius
+  const { points, stats, privacyMask } = useMemo(() => {
+    if ((!hideRadius || hideRadius <= 0) && isOwner) {
+      return { points: initialPoints, stats: initialStats, privacyMask: null };
+    }
+
+    // Calculate cumulative distances to find cut-off points
+    let cumulativeDist = 0;
+    let startIndex = 0;
+    let endIndex = initialPoints.length - 1;
+
+    // Find start index (distance > hideRadius)
+    if (hideRadius > 0) {
+      for (let i = 1; i < initialPoints.length; i++) {
+        const dist = haversineDistance(
+          initialPoints[i - 1].lat, initialPoints[i - 1].lon,
+          initialPoints[i].lat, initialPoints[i].lon
+        );
+        cumulativeDist += dist;
+        if (cumulativeDist >= hideRadius) {
+          startIndex = i;
+          break;
+        }
+      }
+
+      // Find end index (distance from end > hideRadius)
+      cumulativeDist = 0;
+      for (let i = initialPoints.length - 2; i >= 0; i--) {
+        const dist = haversineDistance(
+          initialPoints[i].lat, initialPoints[i].lon,
+          initialPoints[i + 1].lat, initialPoints[i + 1].lon
+        );
+        cumulativeDist += dist;
+        if (cumulativeDist >= hideRadius) {
+          endIndex = i;
+          break;
+        }
+      }
+    }
+
+    // Safety check: if start crosses end, showing nothing or very little
+    if (startIndex >= endIndex) {
+      // Should probably show empty or minimal?
+      // Let's just return everything if it fails to find safe bounds (fallback)
+      // Or return empty array?
+      if (!isOwner) return { points: [], stats: calculateStats([]), privacyMask: null };
+      return { points: initialPoints, stats: initialStats, privacyMask: { start: startIndex, end: endIndex } };
+    }
+
+    if (!isOwner) {
+      // Public viewer: Slice the points physically
+      const slicedPoints = initialPoints.slice(startIndex, endIndex + 1);
+      const recalculatedStats = calculateStats(slicedPoints);
+      return { points: slicedPoints, stats: recalculatedStats, privacyMask: null };
+    } else {
+      // Owner: Keep all points, but pass mask indices
+      return {
+        points: initialPoints,
+        stats: initialStats,
+        privacyMask: { start: startIndex, end: endIndex }
+      };
+    }
+  }, [initialPoints, initialStats, hideRadius, isOwner]);
 
   // Calculate safe initial speed limit
   const initialSpeedLimit = useMemo(() => {
@@ -36,7 +102,6 @@ const GPSStats = ({ stats, fileName, points, speedCap, isOwner = true, isPublic 
     if (speedCap) {
       limit = Math.min(limit, speedCap - 10);
     }
-    // Ensure it doesn't go below minimum 40 unless cap is very low (which shouldn't happen given logic)
     return Math.max(40, limit);
   }, [stats.maxSpeed, speedCap]);
 
@@ -314,7 +379,14 @@ const GPSStats = ({ stats, fileName, points, speedCap, isOwner = true, isPublic 
               {/* Map Section */}
               <div className="bg-card border border-border rounded-2xl p-2 shadow-sm">
                 <h3 className="text-lg font-semibold mb-4 text-foreground">Route Map</h3>
-                <TrackMap points={points} hoveredPoint={hoveredPoint} zoomRange={zoomRange} stopPoints={stats.stopPoints} tightTurnPoints={stats.tightTurnPoints} />
+                <TrackMap
+                  points={points}
+                  hoveredPoint={hoveredPoint}
+                  zoomRange={zoomRange}
+                  stopPoints={stats.stopPoints}
+                  tightTurnPoints={stats.tightTurnPoints}
+                  privacyMask={privacyMask}
+                />
               </div>
 
               {/* Speed & Elevation Chart */}

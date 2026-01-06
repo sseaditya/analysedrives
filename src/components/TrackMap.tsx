@@ -10,9 +10,10 @@ interface TrackMapProps {
   zoomRange?: [number, number] | null;
   stopPoints?: [number, number][];
   tightTurnPoints?: [number, number][];
+  privacyMask?: { start: number; end: number } | null;
 }
 
-const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints }: TrackMapProps) => {
+const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints, privacyMask }: TrackMapProps) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const layersRef = useRef<{
@@ -105,14 +106,51 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
       currentBaseOpacity = 0.3;
     }
 
-    L.polyline(allCoordinates, {
-      color: currentBaseColor,
-      weight: currentBaseWeight,
-      opacity: currentBaseOpacity,
-      interactive: false,
-      lineJoin: 'round',
-      lineCap: 'round'
-    }).addTo(trackGroup);
+    if (privacyMask) {
+      // 1. Hidden Start (Translucent & Dashed)
+      if (privacyMask.start > 0) {
+        L.polyline(allCoordinates.slice(0, privacyMask.start + 1), {
+          color: currentBaseColor,
+          weight: currentBaseWeight,
+          opacity: 0.3,
+          dashArray: '10, 10',
+          interactive: false,
+          lineJoin: 'round'
+        }).addTo(trackGroup);
+      }
+
+      // 2. Visible Middle (Normal)
+      L.polyline(allCoordinates.slice(privacyMask.start, privacyMask.end + 1), {
+        color: currentBaseColor,
+        weight: currentBaseWeight,
+        opacity: currentBaseOpacity,
+        interactive: false,
+        lineJoin: 'round',
+        lineCap: 'round'
+      }).addTo(trackGroup);
+
+      // 3. Hidden End (Translucent & Dashed)
+      if (privacyMask.end < allCoordinates.length - 1) {
+        L.polyline(allCoordinates.slice(privacyMask.end), {
+          color: currentBaseColor,
+          weight: currentBaseWeight,
+          opacity: 0.3,
+          dashArray: '10, 10',
+          interactive: false,
+          lineJoin: 'round'
+        }).addTo(trackGroup);
+      }
+    } else {
+      // Standard Full Track
+      L.polyline(allCoordinates, {
+        color: currentBaseColor,
+        weight: currentBaseWeight,
+        opacity: currentBaseOpacity,
+        interactive: false,
+        lineJoin: 'round',
+        lineCap: 'round'
+      }).addTo(trackGroup);
+    }
 
     // 1. Render Segment Overlays
     const shouldRenderSegments = (mode !== 'plain') || (mode === 'plain' && zoomRange);
@@ -128,6 +166,11 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
         const p1 = points[i];
         const p2 = points[i + 1];
         if (!p1 || !p2) return;
+
+        // Privacy Filter for Analysis Layers
+        if (privacyMask) {
+          if (i < privacyMask.start || i >= privacyMask.end) return;
+        }
 
         // In analytics mode without zoom, highlight everything. 
         // In plain mode with zoom, ONLY highlight the selection.
