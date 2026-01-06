@@ -19,9 +19,11 @@ interface GPSStatsProps {
   stats: GPXStats;
   fileName: string;
   points: GPXPoint[];
+  speedCap?: number | null;  // For public viewers - cap all speeds to this value
+  isOwner?: boolean;         // true if viewing own activity
 }
 
-const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
+const GPSStats = ({ stats, fileName, points, speedCap, isOwner = true }: GPSStatsProps) => {
   const [hoveredPoint, setHoveredPoint] = useState<GPXPoint | null>(null);
   const [zoomRange, setZoomRange] = useState<[number, number] | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
@@ -89,6 +91,29 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
     return calculateLimitedStats(filteredPoints, speedLimit);
   }, [filteredPoints, speedLimit, showLimiter]);
 
+  // Calculate capped display values for public viewers
+  const displayStats = useMemo(() => {
+    if (!speedCap || isOwner) {
+      return {
+        maxSpeed: stats.maxSpeed,
+        avgSpeed: stats.avgSpeed,
+        movingAvgSpeed: stats.movingAvgSpeed,
+      };
+    }
+    // Apply speed cap for public viewers
+    return {
+      maxSpeed: Math.min(stats.maxSpeed, speedCap),
+      avgSpeed: Math.min(stats.avgSpeed, speedCap),
+      movingAvgSpeed: Math.min(stats.movingAvgSpeed, speedCap),
+    };
+  }, [stats, speedCap, isOwner]);
+
+  // Effective speed limit for charts (owner's limiter or public speed cap)
+  const effectiveChartSpeedLimit = useMemo(() => {
+    if (!isOwner && speedCap) return speedCap;
+    if (showLimiter) return speedLimit;
+    return null;
+  }, [isOwner, speedCap, showLimiter, speedLimit]);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -139,7 +164,7 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
                         </p>
                         <h1 className="text-2xl font-bold tracking-tight mt-1">{fileName}</h1>
                         <span className="flex items-center gap-1.5"><MapPin className="w-3 h-3" /> {stats.pointCount.toLocaleString()} points recorded</span>
-                        <button className="mt-3 text-sm font-medium text-blue-500 hover:underline">Add a description</button>
+
                       </div>
                     </div>
                     <button className="mt-6 px-3 py-1 text-xs font-semibold border border-border rounded-md hover:bg-accent">
@@ -166,7 +191,7 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
                       </div>
                       <div>
                         <div className="flex items-baseline gap-1">
-                          <span className="text-2xl font-normal tabular-nums">{formatSpeed(stats.avgSpeed).replace(' km/h', '')}</span>
+                          <span className="text-2xl font-normal tabular-nums">{formatSpeed(displayStats.avgSpeed).replace(' km/h', '')}</span>
                           <span className="text-xl text-muted-foreground ml-1">km/h</span>
                         </div>
                         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Average Speed</span>
@@ -184,14 +209,14 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
                       </div>
                       <div>
                         <div className="flex items-baseline gap-1">
-                          <span className="text-2xl font-normal tabular-nums">{formatSpeed(stats.movingAvgSpeed).replace(' km/h', '')}</span>
+                          <span className="text-2xl font-normal tabular-nums">{formatSpeed(displayStats.movingAvgSpeed).replace(' km/h', '')}</span>
                           <span className="text-xl text-muted-foreground ml-1">km/h</span>
                         </div>
                         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Average Moving Speed</span>
                       </div>
                       <div>
                         <div className="flex items-baseline gap-1">
-                          <span className="text-2xl font-normal tabular-nums">{formatSpeed(stats.maxSpeed).replace(' km/h', '')}</span>
+                          <span className="text-2xl font-normal tabular-nums">{formatSpeed(displayStats.maxSpeed).replace(' km/h', '')}</span>
                           <span className="text-xl text-muted-foreground ml-1">km/h</span>
                         </div>
                         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Top Speed</span>
@@ -250,37 +275,39 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
                   )}
                 </div>
 
-                {/* Speed Limiter Toggle & Slider */}
-                <div className="flex items-center gap-4 mb-4">
-                  <button
-                    onClick={() => setShowLimiter(!showLimiter)}
-                    className={cn(
-                      "flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg transition-all",
-                      showLimiter
-                        ? "bg-amber-500/20 text-amber-500 border border-amber-500/50"
-                        : "bg-muted text-muted-foreground hover:bg-muted/80"
-                    )}
-                  >
-                    <Gauge className="w-4 h-4" />
-                    Speed Limiter
-                  </button>
+                {/* Speed Limiter Toggle & Slider (only for owners) */}
+                {isOwner && (
+                  <div className="flex items-center gap-4 mb-4">
+                    <button
+                      onClick={() => setShowLimiter(!showLimiter)}
+                      className={cn(
+                        "flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg transition-all",
+                        showLimiter
+                          ? "bg-amber-500/20 text-amber-500 border border-amber-500/50"
+                          : "bg-muted text-muted-foreground hover:bg-muted/80"
+                      )}
+                    >
+                      <Gauge className="w-4 h-4" />
+                      Speed Limiter
+                    </button>
 
-                  {showLimiter && (
-                    <div className="flex-1 flex items-center gap-4 animate-in fade-in slide-in-from-left-2">
-                      <Slider
-                        value={[speedLimit]}
-                        onValueChange={([val]) => setSpeedLimit(val)}
-                        min={40}
-                        max={Math.max(Math.ceil(stats.maxSpeed / 10) * 10, 120)}
-                        step={10}
-                        className="flex-1 max-w-xs"
-                      />
-                      <span className="text-sm font-mono font-bold text-amber-500 min-w-[60px]">
-                        {speedLimit} km/h
-                      </span>
-                    </div>
-                  )}
-                </div>
+                    {showLimiter && (
+                      <div className="flex-1 flex items-center gap-4 animate-in fade-in slide-in-from-left-2">
+                        <Slider
+                          value={[speedLimit]}
+                          onValueChange={([val]) => setSpeedLimit(val)}
+                          min={40}
+                          max={Math.max(Math.ceil(stats.maxSpeed / 10) * 10, 120)}
+                          step={10}
+                          className="flex-1 max-w-xs"
+                        />
+                        <span className="text-sm font-mono font-bold text-amber-500 min-w-[60px]">
+                          {speedLimit} km/h
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* What-If Stats Panel */}
                 {showLimiter && limitedStats && limitedStats.timeAdded > 0 && (
@@ -318,7 +345,7 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
                   onHover={setHoveredPoint}
                   onZoomChange={setZoomRange}
                   zoomRange={zoomRange}
-                  speedLimit={showLimiter ? speedLimit : null}
+                  speedLimit={effectiveChartSpeedLimit}
                 />
               </div>
 
@@ -329,11 +356,11 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
                     <TrendingUp className="w-5 h-5 text-primary" />
                     Speed Distribution
                     {zoomRange && <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Filtered to selection</span>}
-                    {showLimiter && <span className="text-xs font-normal text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full">Capped at {speedLimit} km/h</span>}
+                    {effectiveChartSpeedLimit && <span className="text-xs font-normal text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full">Capped at {effectiveChartSpeedLimit} km/h</span>}
                   </h3>
                 </div>
                 <div className="h-[250px]">
-                  <SpeedDistributionChart points={filteredPoints} speedLimit={showLimiter ? speedLimit : null} />
+                  <SpeedDistributionChart points={filteredPoints} speedLimit={effectiveChartSpeedLimit} />
                 </div>
               </div>
             </div>
