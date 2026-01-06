@@ -22,6 +22,7 @@ interface SpeedElevationChartProps {
   zoomRange: [number, number] | null;
   speedLimit?: number | null;
   speedCap?: number | null;
+  visualLimit?: number;
 }
 
 interface ChartDataPoint {
@@ -52,7 +53,7 @@ function haversineDistance(
   return R * c;
 }
 
-const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLimit, speedCap }: SpeedElevationChartProps) => {
+const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLimit, speedCap, visualLimit }: SpeedElevationChartProps) => {
   const [refAreaLeft, setRefAreaLeft] = useState<string | null>(null);
   const [refAreaRight, setRefAreaRight] = useState<string | null>(null);
 
@@ -87,6 +88,9 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
       time: curr.time
     });
   }
+
+  // Calculate True Max Speed (for Scale) BEFORE any visual clipping
+  const trueMaxSpeed = Math.max(...rawData.map(d => d.speed), 0);
 
   // Second pass: Apply smoothing and sampling
   const WINDOW_SIZE = 5;
@@ -130,16 +134,20 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
 
       if (shouldSample) {
         let finalSpeed = parseFloat(smoothedSpeed.toFixed(1));
-        if (speedCap && finalSpeed > speedCap) {
-          finalSpeed = speedCap;
-        }
+        // speedCap is the HARD limit (e.g. 50km/h set by owner).
+        // Data is physically clamped to this.
+        if (speedCap && finalSpeed > speedCap) finalSpeed = speedCap;
+
+        // visualLimit is the SOFT limit (e.g. simulation).
+        // Data is visually clamped, but we want to animate it.
+        if (visualLimit && finalSpeed > visualLimit) finalSpeed = visualLimit;
 
         chartData.push({
-          distance: currRaw.dist,
-          speed: finalSpeed,
-          elevation: currRaw.ele !== undefined ? parseFloat(currRaw.ele.toFixed(1)) : null,
-          time: currRaw.time ? currRaw.time.toLocaleTimeString() : "",
-          pointIndex: originalIndex,
+          distance: rawData[i].dist,
+          speed: parseFloat(finalSpeed.toFixed(1)), // Apply limit here
+          elevation: rawData[i].ele,
+          time: rawData[i].time ? rawData[i].time!.toLocaleTimeString() : '',
+          pointIndex: i + 1,
         });
       }
     }
@@ -296,7 +304,10 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
                 tickFormatter={(value) => Math.round(value).toString()}
                 label={{ value: "Speed (km/h)", angle: -90, position: "insideLeft", fontSize: 12, fill: "hsl(37, 92%, 50%)" }}
                 width={60}
-                domain={[0, speedCap || 'auto']}
+                // Domain: If speedCap exists, use that + buffer. 
+                // If NO speedCap, use the true max speed of the track (calculated before clipping).
+                // This ensures that when we slide down the visualLimit, the chart axis doesn't shrink.
+                domain={[0, speedCap ? speedCap : Math.ceil(trueMaxSpeed / 10) * 10]}
               />
             )}
             {/* Right Y-axis for Elevation */}

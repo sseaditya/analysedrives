@@ -5,6 +5,8 @@ import TrackMap from "./TrackMap";
 import SpeedElevationChart from "./SpeedElevationChart";
 import SpeedDistributionChart from "./SpeedDistributionChart";
 import { cn } from "@/lib/utils";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import {
   GPXStats,
@@ -398,23 +400,15 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                     <div className="flex items-center gap-4">
                       <h3 className="text-lg font-semibold text-foreground">Speed & Elevation Timeline</h3>
 
-                      {/* Speed Limiter Toggle - Moved to Header */}
-                      <div className="flex items-center">
-                        <span className="text-sm font-medium mr-2 text-muted-foreground/80">Simulator:</span>
-                        <div className="flex items-center bg-muted rounded-lg p-1 border border-border">
-                          <button
-                            onClick={() => setShowLimiter(!showLimiter)}
-                            className={cn(
-                              "text-xs font-semibold px-2 py-1 rounded transition-all flex items-center gap-1.5",
-                              showLimiter
-                                ? "bg-amber-500 text-white shadow-sm"
-                                : "text-muted-foreground hover:text-foreground"
-                            )}
-                          >
-                            <Gauge className="w-3.5 h-3.5" />
-                            {showLimiter ? "ON" : "OFF"}
-                          </button>
-                        </div>
+                      {/* Speed Limiter Toggle - Switch Design */}
+                      <div className="flex items-center gap-2 bg-muted/50 px-3 py-1.5 rounded-full border border-border/50">
+                        <Switch
+                          id="speed-limiter"
+                          checked={showLimiter}
+                          onCheckedChange={setShowLimiter}
+                          className="data-[state=checked]:bg-amber-500"
+                        />
+                        <Label htmlFor="speed-limiter" className="text-xs font-semibold cursor-pointer">Speed Limiter</Label>
                       </div>
                     </div>
 
@@ -431,59 +425,69 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                     </div>
                   </div>
 
-                  {/* Compact Stats Row - Always Present */}
-                  <div className="flex items-center justify-between bg-muted/30 rounded-lg p-3 border border-border/50">
-                    <div className="flex items-center gap-6 divide-x divide-border/50">
+                  {/* Stats Row - Enhanced with Prominent Simulated Metrics */}
+                  <div className="flex items-center justify-between bg-muted/30 rounded-lg p-4 border border-border/50">
+                    <div className="flex items-center gap-8 divide-x divide-border/50">
+                      {/* Original Metrics */}
                       <div className="flex items-baseline gap-2">
                         <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Distance</span>
-                        <span className="text-lg font-medium tabular-nums">
+                        <span className="text-2xl font-normal tabular-nums">
                           {zoomRange && subsetStats
                             ? formatDistance(subsetStats.distance)
                             : formatDistance(stats.totalDistance)
                           }
                         </span>
                       </div>
-                      <div className="flex items-baseline gap-2 pl-6">
-                        <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Time</span>
-                        <span className="text-lg font-medium tabular-nums">
-                          {zoomRange && subsetStats
-                            ? formatDuration(subsetStats.time)
-                            : formatDuration(displayStats.totalTime)
-                          }
-                        </span>
-                      </div>
-                      <div className="flex items-baseline gap-2 pl-6">
-                        <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Avg Speed</span>
-                        <span className="text-lg font-medium tabular-nums">
-                          {zoomRange && subsetStats
-                            ? formatSpeed(subsetStats.avgSpeed)
-                            : formatSpeed(displayStats.avgSpeed)
-                          }
-                        </span>
-                      </div>
-                    </div>
 
-                    {/* Compact What-If Stats (Inline) */}
-                    {showLimiter && limitedStats && limitedStats.timeAdded > 0 && (
-                      <div className="flex items-center gap-4 animate-in fade-in slide-in-from-right-4">
-                        <div className="h-8 w-px bg-border/50 mx-2" />
-                        <div className="flex items-center gap-2 bg-amber-500/10 text-amber-600 px-3 py-1.5 rounded-md border border-amber-500/20">
-                          <AlertTriangle className="w-3.5 h-3.5" />
-                          <span className="text-xs font-bold whitespace-nowrap">If &lt; {speedLimit} km/h:</span>
-                          <span className="text-sm font-semibold text-red-600 tabular-nums">+{formatDuration(limitedStats.timeAdded)}</span>
-                          <span className="text-xs text-amber-600/80 hidden xl:inline">({limitedStats.percentSlower.toFixed(0)}% slower)</span>
+                      <div className="flex items-center gap-4 pl-8">
+                        {/* Time Cluster */}
+                        <div className="flex flex-col">
+                          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Time</span>
+                          <div className="flex items-baseline gap-3">
+                            <span className={cn("text-2xl font-normal tabular-nums", showLimiter && limitedStats && limitedStats.timeAdded > 0 ? "text-muted-foreground/50 line-through decoration-muted-foreground/50" : "text-foreground")}>
+                              {zoomRange && subsetStats
+                                ? formatDuration(subsetStats.time)
+                                : formatDuration(displayStats.totalTime)
+                              }
+                            </span>
+                            {showLimiter && limitedStats && limitedStats.timeAdded > 0 && (
+                              <span className="text-2xl font-normal text-amber-500 tabular-nums animate-in fade-in slide-in-from-left-2">
+                                {formatDuration(limitedStats.simulatedTime)}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    )}
+
+                      <div className="flex items-center gap-4 pl-8">
+                        {/* Speed Cluster */}
+                        <div className="flex flex-col">
+                          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Avg Speed</span>
+                          <div className="flex items-baseline gap-3">
+                            <span className={cn("text-2xl font-normal tabular-nums", showLimiter && limitedStats && limitedStats.timeAdded > 0 ? "text-muted-foreground/50 line-through decoration-muted-foreground/50" : "text-foreground")}>
+                              {zoomRange && subsetStats
+                                ? formatSpeed(subsetStats.avgSpeed)
+                                : formatSpeed(displayStats.avgSpeed)
+                              }
+                            </span>
+                            {showLimiter && limitedStats && limitedStats.timeAdded > 0 && (
+                              <span className="text-2xl font-normal text-amber-500 tabular-nums animate-in fade-in slide-in-from-left-2">
+                                {formatSpeed(limitedStats.newAvgSpeed)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
                 <div className="relative h-[300px] w-full">
-                  {/* Speed Limiter Overlay Slider */}
+                  {/* Speed Limiter Overlay Slider - Moved to Extreme Right */}
                   {showLimiter && (
-                    <div className="absolute top-4 bottom-8 right-12 z-10 flex flex-col items-center h-[240px] animate-in fade-in zoom-in-95">
-                      <div className="mb-2 bg-background/80 backdrop-blur-sm px-2 py-1 rounded border border-amber-500/30 text-xs font-bold text-amber-500 shadow-sm whitespace-nowrap">
-                        Limit: {speedLimit} km/h
+                    <div className="absolute top-4 bottom-8 right-0 z-10 flex flex-col items-center h-[240px] animate-in fade-in zoom-in-95 bg-background/50 backdrop-blur-[2px] rounded-l-lg border-y border-l border-border/50 shadow-sm pl-1 pr-1">
+                      <div className="mb-2 px-1 py-0.5 rounded bg-amber-500/10 text-xs font-bold text-amber-500 whitespace-nowrap writing-vertical-rl rotate-180 flex items-center justify-center h-full max-h-[20px]">
+                        {speedLimit}
                       </div>
                       <Slider
                         orientation="vertical"
@@ -494,9 +498,6 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                         step={10}
                         className="flex-1 cursor-grab active:cursor-grabbing [&>.absolute]:bg-amber-500 [&>span]:border-amber-500"
                       />
-                      <div className="mt-2 text-[10px] uppercase font-bold text-muted-foreground rotate-90 origin-left translate-x-3">
-                        Drag Limit
-                      </div>
                     </div>
                   )}
 
@@ -508,6 +509,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                       zoomRange={zoomRange}
                       speedLimit={effectiveChartSpeedLimit}
                       speedCap={!isOwner ? speedCap : null}
+                      visualLimit={showLimiter ? speedLimit : undefined}
                     />
                   </ResponsiveContainer>
                 </div>
