@@ -153,58 +153,58 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
                     <div className="grid grid-cols-3 gap-y-12 gap-x-6 mb-8 items-end">
                       <div>
                         <div className="flex items-baseline gap-1">
-                          <span className="text-4xl font-normal tabular-nums">{formatDistance(stats.totalDistance).replace(' km', '')}</span>
+                          <span className="text-2xl font-normal tabular-nums">{formatDistance(stats.totalDistance).replace(' km', '')}</span>
                           <span className="text-xl text-muted-foreground ml-1">km</span>
                         </div>
                         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Distance</span>
                       </div>
                       <div>
                         <div className="flex items-baseline gap-1">
-                          <span className="text-4xl font-normal tabular-nums">{formatDuration(stats.totalTime)}</span>
+                          <span className="text-2xl font-normal tabular-nums">{formatDuration(stats.totalTime)}</span>
                         </div>
                         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Elapsed Time</span>
                       </div>
                       <div>
                         <div className="flex items-baseline gap-1">
-                          <span className="text-4xl font-normal tabular-nums">{formatSpeed(stats.avgSpeed).replace(' km/h', '')}</span>
+                          <span className="text-2xl font-normal tabular-nums">{formatSpeed(stats.avgSpeed).replace(' km/h', '')}</span>
                           <span className="text-xl text-muted-foreground ml-1">km/h</span>
                         </div>
                         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Average Speed</span>
                       </div>
                       <div>
                         <div className="flex items-baseline gap-1">
-                          <span className="text-4xl font-normal tabular-nums">{stats.elevationGain.toFixed(0)}</span>
+                          <span className="text-2xl font-normal tabular-nums">{stats.elevationGain.toFixed(0)}</span>
                           <span className="text-xl text-muted-foreground ml-1">m</span>
                         </div>
                         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Elevation Gained</span>
                       </div>
                       <div>
-                        <div className="text-4xl font-normal tabular-nums">{formatDuration(stats.movingTime)}</div>
+                        <div className="text-2xl font-normal tabular-nums">{formatDuration(stats.movingTime)}</div>
                         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Moving Time</span>
                       </div>
                       <div>
                         <div className="flex items-baseline gap-1">
-                          <span className="text-4xl font-normal tabular-nums">{formatSpeed(stats.movingAvgSpeed).replace(' km/h', '')}</span>
+                          <span className="text-2xl font-normal tabular-nums">{formatSpeed(stats.movingAvgSpeed).replace(' km/h', '')}</span>
                           <span className="text-xl text-muted-foreground ml-1">km/h</span>
                         </div>
                         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Average Moving Speed</span>
                       </div>
                       <div>
                         <div className="flex items-baseline gap-1">
-                          <span className="text-4xl font-normal tabular-nums">{formatSpeed(stats.maxSpeed).replace(' km/h', '')}</span>
+                          <span className="text-2xl font-normal tabular-nums">{formatSpeed(stats.maxSpeed).replace(' km/h', '')}</span>
                           <span className="text-xl text-muted-foreground ml-1">km/h</span>
                         </div>
                         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Top Speed</span>
                       </div>
                       <div>
                         <div className="flex items-baseline gap-1">
-                          <span className="text-4xl font-normal tabular-nums">{formatDuration(stats.stoppedTime)}</span>
+                          <span className="text-2xl font-normal tabular-nums">{formatDuration(stats.stoppedTime)}</span>
                         </div>
                         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Stopped Time</span>
                       </div>
                       <div>
                         <div className="flex items-baseline gap-1">
-                          <span className="text-4xl font-normal tabular-nums">{stats.stopCount}</span>
+                          <span className="text-2xl font-normal tabular-nums">{stats.stopCount}</span>
                         </div>
                         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Stops</span>
                       </div>
@@ -348,22 +348,22 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
                 <h3 className="text-xl font-bold mb-10">Dynamics Overview</h3>
                 <div className="flex flex-wrap gap-16">
                   <div>
-                    <span className="block text-4xl font-normal text-foreground leading-none">{stats.hardAccelerationCount}</span>
+                    <span className="block text-2xl font-normal text-foreground leading-none">{stats.hardAccelerationCount}</span>
                     <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Hard Accels</span>
                     <span className="text-[10px] text-muted-foreground mt-1 block">&gt; 2.5 m/s²</span>
                   </div>
                   <div>
-                    <span className="block text-4xl font-normal text-foreground leading-none">{stats.hardBrakingCount}</span>
+                    <span className="block text-2xl font-normal text-foreground leading-none">{stats.hardBrakingCount}</span>
                     <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Hard Braking</span>
                     <span className="text-[10px] text-muted-foreground mt-1 block">&lt; -3.0 m/s²</span>
                   </div>
                   <div>
-                    <span className="block text-4xl font-normal text-foreground leading-none">{stats.turbulenceScore.toFixed(1)}</span>
+                    <span className="block text-2xl font-normal text-foreground leading-none">{stats.turbulenceScore.toFixed(1)}</span>
                     <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Turbulence</span>
                     <span className="text-[10px] text-muted-foreground mt-1 block">Score</span>
                   </div>
                   <div>
-                    <span className="block text-4xl font-normal text-foreground leading-none">{stats.accelBrakeRatio.toFixed(2)}</span>
+                    <span className="block text-2xl font-normal text-foreground leading-none">{stats.accelBrakeRatio.toFixed(2)}</span>
                     <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Accel Ratio</span>
                     <span className="text-[10px] text-muted-foreground mt-1 block">Balance</span>
                   </div>
@@ -441,11 +441,11 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
                   <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-6">turning</h4>
                   <div className="flex gap-12">
                     <div>
-                      <span className="block text-4xl font-normal text-foreground">{Math.round(stats.totalHeadingChange).toLocaleString()}°</span>
+                      <span className="block text-2xl font-normal text-foreground">{Math.round(stats.totalHeadingChange).toLocaleString()}°</span>
                       <span className="text-xs text-muted-foreground mt-1 block">Rotation</span>
                     </div>
                     <div>
-                      <span className="block text-4xl font-normal text-foreground">{stats.twistinessScore.toFixed(0)}</span>
+                      <span className="block text-2xl font-normal text-foreground">{stats.twistinessScore.toFixed(0)}</span>
                       <span className="text-xs text-muted-foreground mt-1 block">Twistiness</span>
                     </div>
                   </div>
@@ -455,11 +455,11 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
                   <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-6">technical</h4>
                   <div className="flex gap-12">
                     <div>
-                      <span className="block text-4xl font-normal text-foreground">{stats.tightTurnsCount}</span>
+                      <span className="block text-2xl font-normal text-foreground">{stats.tightTurnsCount}</span>
                       <span className="text-xs text-muted-foreground mt-1 block">Tight Turns</span>
                     </div>
                     <div>
-                      <span className="block text-4xl font-normal text-foreground">{stats.hairpinCount}</span>
+                      <span className="block text-2xl font-normal text-foreground">{stats.hairpinCount}</span>
                       <span className="text-xs text-muted-foreground mt-1 block">Hairpins</span>
                     </div>
                   </div>
@@ -469,11 +469,11 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
                   <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-6">straights</h4>
                   <div className="flex gap-12">
                     <div>
-                      <span className="block text-4xl font-normal text-foreground">{formatDistance(stats.longestStraightSection)}</span>
+                      <span className="block text-2xl font-normal text-foreground">{formatDistance(stats.longestStraightSection)}</span>
                       <span className="text-xs text-muted-foreground mt-1 block">Longest</span>
                     </div>
                     <div>
-                      <span className="block text-4xl font-normal text-foreground">{stats.percentStraight.toFixed(1)}%</span>
+                      <span className="block text-2xl font-normal text-foreground">{stats.percentStraight.toFixed(1)}%</span>
                       <span className="text-xs text-muted-foreground mt-1 block">Straight %</span>
                     </div>
                   </div>
@@ -546,13 +546,13 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
                   <div className="grid grid-cols-2 gap-8">
                     <div>
                       <p className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground mb-2">Turns / km</p>
-                      <p className="text-4xl font-normal text-foreground leading-none">
+                      <p className="text-2xl font-normal text-foreground leading-none">
                         {stats.totalDistance > 0 ? ((stats.tightTurnsCount / stats.totalDistance)).toFixed(1) : "0.0"}
                       </p>
                     </div>
                     <div>
                       <p className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground mb-2">Complexity</p>
-                      <p className="text-4xl font-normal text-foreground uppercase leading-none">
+                      <p className="text-2xl font-normal text-foreground uppercase leading-none">
                         {stats.twistinessScore < 100 ? "Low" : stats.twistinessScore < 500 ? "Medium" : "High"}
                       </p>
                     </div>
@@ -571,36 +571,36 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
                 <h3 className="text-xl font-bold mb-10">Terrain Analysis</h3>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-12 gap-y-12">
                   <div>
-                    <span className="block text-4xl font-normal text-foreground leading-none">+{stats.elevationGain.toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
+                    <span className="block text-2xl font-normal text-foreground leading-none">+{stats.elevationGain.toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
                     <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Gain</span>
                   </div>
                   <div>
-                    <span className="block text-4xl font-normal text-foreground leading-none">-{stats.elevationLoss.toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
+                    <span className="block text-2xl font-normal text-foreground leading-none">-{stats.elevationLoss.toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
                     <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Loss</span>
                   </div>
                   <div>
-                    <span className="block text-4xl font-normal text-foreground leading-none">{stats.elevationGain - stats.elevationLoss > 0 ? "+" : ""}{(stats.elevationGain - stats.elevationLoss).toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
+                    <span className="block text-2xl font-normal text-foreground leading-none">{stats.elevationGain - stats.elevationLoss > 0 ? "+" : ""}{(stats.elevationGain - stats.elevationLoss).toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
                     <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Net Change</span>
                   </div>
                   <div>
-                    <span className="block text-4xl font-normal text-foreground leading-none">{stats.hillinessScore.toFixed(1)}</span>
+                    <span className="block text-2xl font-normal text-foreground leading-none">{stats.hillinessScore.toFixed(1)}</span>
                     <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Hilliness</span>
                   </div>
 
                   <div>
-                    <span className="block text-4xl font-normal text-foreground leading-none">{stats.maxElevation.toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
+                    <span className="block text-2xl font-normal text-foreground leading-none">{stats.maxElevation.toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
                     <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Peak</span>
                   </div>
                   <div>
-                    <span className="block text-4xl font-normal text-foreground leading-none">{stats.minElevation.toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
+                    <span className="block text-2xl font-normal text-foreground leading-none">{stats.minElevation.toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
                     <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Low</span>
                   </div>
                   <div>
-                    <span className="block text-4xl font-normal text-foreground leading-none">{stats.steepestClimb.toFixed(1)}%</span>
+                    <span className="block text-2xl font-normal text-foreground leading-none">{stats.steepestClimb.toFixed(1)}%</span>
                     <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Max Grade</span>
                   </div>
                   <div>
-                    <span className="block text-4xl font-normal text-foreground leading-none">{stats.steepestDescent.toFixed(1)}%</span>
+                    <span className="block text-2xl font-normal text-foreground leading-none">{stats.steepestDescent.toFixed(1)}%</span>
                     <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Min Grade</span>
                   </div>
                 </div>
@@ -674,13 +674,13 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
                   <div className="grid grid-cols-2 gap-8">
                     <div>
                       <p className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground mb-2">Avg Grade</p>
-                      <p className="text-4xl font-normal text-foreground leading-none">
+                      <p className="text-2xl font-normal text-foreground leading-none">
                         {stats.elevationGain > 0 ? ((stats.elevationGain / (stats.climbDistance * 1000 || 1)) * 100).toFixed(1) : "0.0"}%
                       </p>
                     </div>
                     <div>
                       <p className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground mb-2">VAM</p>
-                      <p className="text-4xl font-normal text-foreground leading-none">
+                      <p className="text-2xl font-normal text-foreground leading-none">
                         {stats.movingTime > 0 ? ((stats.elevationGain / (stats.movingTime / 3600))).toFixed(0) : "0"}
                       </p>
                     </div>
