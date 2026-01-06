@@ -112,17 +112,11 @@ const GPSStats = ({ stats, fileName, points, speedCap, isOwner = true, isPublic 
       }
     }
 
-    // Apply speed cap if active
-    if (activeLimit) {
-      const limited = calculateLimitedStats(subset, activeLimit);
-      if (limited) {
-        displayTime = limited.simulatedTime;
-        displayAvgSpeed = limited.newAvgSpeed;
-      } else {
-        // Fallback
-        displayAvgSpeed = Math.min(avgSpeed, activeLimit);
-        displayTime = displayAvgSpeed > 0 ? distance / (displayAvgSpeed / 3600) * 3600 : timeSeconds;
-      }
+
+
+    if (activeLimit && avgSpeed > activeLimit) {
+      displayAvgSpeed = activeLimit;
+      displayTime = displayAvgSpeed > 0 ? distance / (displayAvgSpeed / 3600) * 3600 : timeSeconds;
     }
 
     return {
@@ -173,8 +167,8 @@ const GPSStats = ({ stats, fileName, points, speedCap, isOwner = true, isPublic 
       maxSpeed: Math.min(stats.maxSpeed, speedCap),
       avgSpeed: limited.newAvgSpeed,
       movingAvgSpeed: limited.newAvgSpeed, // Approximation: applying same ratio or just using avg for simplicity
-      totalTime: limited.simulatedTime * 1000, // Convert to ms
-      movingTime: limited.simulatedTime * 1000, // Approximation: capped time is all moving? Or scale moving time?
+      totalTime: limited.simulatedTime,
+      movingTime: limited.simulatedTime, // Approximation: capped time is all moving? Or scale moving time?
     };
   }, [stats, speedCap, isOwner, points]);
 
