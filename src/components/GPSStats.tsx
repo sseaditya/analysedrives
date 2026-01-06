@@ -400,6 +400,20 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                     <div className="flex items-center gap-4">
                       <h3 className="text-lg font-semibold text-foreground">Speed & Elevation Timeline</h3>
 
+                      {/* Horizontal Speed Limiter Slider */}
+                      {showLimiter && (
+                        <div className="flex-1 max-w-[300px] px-4 animate-in fade-in slide-in-from-left-4">
+                          <Slider
+                            min={40}
+                            max={speedCap ? Math.min(speedCap - 10, 200) : Math.max(Math.ceil(stats.maxSpeed / 10) * 10, 120)}
+                            step={10}
+                            value={[speedLimit]}
+                            onValueChange={([val]) => setSpeedLimit(val)}
+                            className="w-full"
+                          />
+                        </div>
+                      )}
+
                       {/* Speed Limiter Toggle - Switch Design */}
                       <div className="flex items-center gap-2 bg-muted/50 px-3 py-1.5 rounded-full border border-border/50">
                         <Switch
@@ -425,77 +439,49 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                     </div>
                   </div>
 
-                  {/* Stats Row - Enhanced with Prominent Simulated Metrics */}
-                  <div className="flex items-center justify-between bg-muted/30 rounded-lg p-4 border border-border/50">
-                    <div className="flex items-center gap-8 divide-x divide-border/50">
-                      {/* Original Metrics */}
+                  {/* Single Line Uniform Stats Row */}
+                  <div className="flex items-center justify-between bg-muted/30 rounded-lg px-4 py-3 border border-border/50">
+                    <div className="flex items-center gap-10">
+                      {/* Distance - Simple Inline */}
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-xl font-normal tabular-nums">{zoomRange && subsetStats ? formatDistance(subsetStats.distance) : formatDistance(stats.totalDistance)}</span>
+                      </div>
+
+                      {/* Time - Inline with Arrow Delta */}
                       <div className="flex items-baseline gap-2">
-                        <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Distance</span>
-                        <span className="text-2xl font-normal tabular-nums">
-                          {zoomRange && subsetStats
-                            ? formatDistance(subsetStats.distance)
-                            : formatDistance(stats.totalDistance)
-                          }
+                        <span className={cn("text-xl font-normal tabular-nums", showLimiter && limitedStats?.timeAdded > 0 ? "text-muted-foreground/50 line-through" : "text-foreground")}>
+                          {zoomRange && subsetStats ? formatDuration(subsetStats.time) : formatDuration(displayStats.totalTime)}
                         </span>
+                        {showLimiter && limitedStats && limitedStats.timeAdded > 0 && (
+                          <div className="flex items-baseline gap-2 animate-in fade-in slide-in-from-left-2">
+                            <span className="text-xl font-normal text-amber-500 tabular-nums">
+                              {formatDuration(limitedStats.simulatedTime)}
+                            </span>
+                            <span className="flex items-center text-xs font-bold text-amber-500/90 gap-1">
+                              <TrendingUp className="w-3 h-3" />
+                              +{formatDuration(limitedStats.timeAdded)}
+                              <span className="text-[10px] opacity-80 uppercase tracking-wide ml-0.5">({((limitedStats.simulatedTime - displayStats.totalTime) / displayStats.totalTime * 100).toFixed(0)}% Slower)</span>
+                            </span>
+                          </div>
+                        )}
                       </div>
 
-                      <div className="flex items-center gap-4 pl-8">
-                        {/* Time Cluster */}
-                        <div className="flex flex-col">
-                          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Time</span>
-                          <div className="flex items-baseline gap-3">
-                            <span className={cn("text-2xl font-normal tabular-nums", showLimiter && limitedStats && limitedStats.timeAdded > 0 ? "text-muted-foreground/50 line-through decoration-muted-foreground/50" : "text-foreground")}>
-                              {zoomRange && subsetStats
-                                ? formatDuration(subsetStats.time)
-                                : formatDuration(displayStats.totalTime)
-                              }
+                      {/* Speed - Inline with Arrow Delta */}
+                      <div className="flex items-baseline gap-2">
+                        <span className={cn("text-xl font-normal tabular-nums", showLimiter && limitedStats?.timeAdded > 0 ? "text-muted-foreground/50 line-through" : "text-foreground")}>
+                          {zoomRange && subsetStats ? formatSpeed(subsetStats.avgSpeed) : formatSpeed(displayStats.avgSpeed)}
+                        </span>
+                        {showLimiter && limitedStats && limitedStats.timeAdded > 0 && (
+                          <div className="flex items-baseline gap-2 animate-in fade-in slide-in-from-left-2">
+                            <span className="text-xl font-normal text-amber-500 tabular-nums">
+                              {formatSpeed(limitedStats.newAvgSpeed)}
                             </span>
-                            {showLimiter && limitedStats && limitedStats.timeAdded > 0 && (
-                              <div className="flex flex-col items-start leading-none gap-0.5">
-                                {/* Simulated Time & Delta */}
-                                <div className="flex items-baseline gap-2">
-                                  <span className="text-2xl font-normal text-amber-500 tabular-nums animate-in fade-in slide-in-from-left-2">
-                                    {formatDuration(limitedStats.simulatedTime)}
-                                  </span>
-                                  <span className="flex items-center text-xs font-medium text-amber-500/80">
-                                    <TrendingUp className="w-3 h-3 mr-0.5" />
-                                    +{formatDuration(limitedStats.timeAdded)}
-                                  </span>
-                                </div>
-                                {/* Percentage Slower */}
-                                <span className="text-[10px] font-bold text-amber-500/80 uppercase tracking-wide">
-                                  {((limitedStats.simulatedTime - displayStats.totalTime) / displayStats.totalTime * 100).toFixed(0)}% Slower
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-4 pl-8">
-                        {/* Speed Cluster */}
-                        <div className="flex flex-col">
-                          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Avg Speed</span>
-                          <div className="flex items-baseline gap-3">
-                            <span className={cn("text-2xl font-normal tabular-nums", showLimiter && limitedStats && limitedStats.timeAdded > 0 ? "text-muted-foreground/50 line-through decoration-muted-foreground/50" : "text-foreground")}>
-                              {zoomRange && subsetStats
-                                ? formatSpeed(subsetStats.avgSpeed)
-                                : formatSpeed(displayStats.avgSpeed)
-                              }
+                            <span className="flex items-center text-xs font-bold text-amber-500/90">
+                              <TrendingUp className="w-3 h-3 rotate-180 mr-0.5" />
+                              -{formatSpeed((zoomRange && subsetStats ? subsetStats.avgSpeed : displayStats.avgSpeed) - limitedStats.newAvgSpeed)}
                             </span>
-                            {showLimiter && limitedStats && limitedStats.timeAdded > 0 && (
-                              <div className="flex flex-col items-start leading-none gap-0.5">
-                                <span className="text-2xl font-normal text-amber-500 tabular-nums animate-in fade-in slide-in-from-left-2">
-                                  {formatSpeed(limitedStats.newAvgSpeed)}
-                                </span>
-                                <span className="flex items-center text-xs font-medium text-amber-500/80">
-                                  <TrendingUp className="w-3 h-3 mr-0.5 rotate-180" />
-                                  -{formatSpeed((zoomRange && subsetStats ? subsetStats.avgSpeed : displayStats.avgSpeed) - limitedStats.newAvgSpeed)}
-                                </span>
-                              </div>
-                            )}
                           </div>
-                        </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -503,32 +489,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
 
                 <div className="relative h-[300px] w-full">
                   {/* Speed Limiter Overlay Slider - Moved to Extreme Left over Y-Axis */}
-                  {showLimiter && (
-                    <div className="absolute top-[10px] bottom-[30px] left-0 w-[60px] z-20 flex flex-col items-center justify-center animate-in fade-in zoom-in-95">
-                      <Slider
-                        orientation="vertical"
-                        min={0}
-                        max={speedCap ? speedCap : Math.ceil(stats.maxSpeed / 10) * 10}
-                        step={10}
-                        onValueChange={([val]) => {
-                          const minLimit = 40;
-                          setSpeedLimit(Math.max(minLimit, val));
-                        }}
-                        className="h-full flex-1 cursor-grab active:cursor-grabbing w-full"
-                        thumbClassName="h-0 w-full rounded-none border-0 bg-transparent relative outline-none ring-0 focus:ring-0"
-                        thumbChildren={
-                          <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1 pr-1">
-                            {/* Line pointing to value */}
-                            <div className="w-2 h-[2px] bg-amber-500" />
-                            {/* Label Bubble - Right aligned, outside numbers */}
-                            <div className="bg-amber-500 text-[10px] font-bold text-black px-1.5 py-0.5 rounded-sm min-w-[24px] text-center shadow-sm">
-                              {speedLimit}
-                            </div>
-                          </div>
-                        }
-                      />
-                    </div>
-                  )}
+
 
                   <ResponsiveContainer width="100%" height="100%">
                     <SpeedElevationChart
