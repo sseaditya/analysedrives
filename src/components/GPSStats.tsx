@@ -92,30 +92,10 @@ const GPSStats = ({ stats, fileName, points, speedCap, isOwner = true, isPublic 
     let displayTime = timeSeconds;
     let displayAvgSpeed = avgSpeed;
 
-    // Determine the effective limit for calculation
-    // If owner: only limit if showLimiter is true
-    // If public: limit is speedCap, OR if showLimiter is true and < speedCap
-    let activeLimit: number | null = null;
-
-    if (isOwner) {
-      if (showLimiter) activeLimit = speedLimit;
-    } else {
-      // Public viewer
-      if (speedCap) {
-        activeLimit = speedCap;
-        // If they enabled the tool (which is allowed now) and it's lower, use that
-        if (showLimiter && speedLimit < speedCap) {
-          activeLimit = speedLimit;
-        }
-      } else if (showLimiter) {
-        activeLimit = speedLimit;
-      }
-    }
-
-
-
-    if (activeLimit && avgSpeed > activeLimit) {
-      displayAvgSpeed = activeLimit;
+    // Apply speed cap if active (ignores interactive Speed Limiter)
+    // Only enforces hard speed_cap for public viewers
+    if (!isOwner && speedCap && avgSpeed > speedCap) {
+      displayAvgSpeed = speedCap;
       displayTime = displayAvgSpeed > 0 ? distance / (displayAvgSpeed / 3600) * 3600 : timeSeconds;
     }
 
@@ -127,7 +107,7 @@ const GPSStats = ({ stats, fileName, points, speedCap, isOwner = true, isPublic 
         avgSpeed: displayAvgSpeed
       }
     };
-  }, [points, zoomRange, speedCap, isOwner, showLimiter, speedLimit]);
+  }, [points, zoomRange, speedCap, isOwner]);
 
 
   // Calculate speed limited stats
