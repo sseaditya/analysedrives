@@ -135,9 +135,10 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
                       </div>
                       <div className="flex-1">
                         <p className="text-xs text-muted-foreground leading-tight">
-                          {new Date(stats.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} on {new Date(stats.startTime).toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                          {new Date(stats.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} on {new Date(stats.startTime).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
                         </p>
                         <h1 className="text-2xl font-bold tracking-tight mt-1">{fileName}</h1>
+                        <span className="flex items-center gap-1.5"><MapPin className="w-3 h-3" /> {stats.pointCount.toLocaleString()} points recorded</span>
                         <button className="mt-3 text-sm font-medium text-blue-500 hover:underline">Add a description</button>
                       </div>
                     </div>
@@ -152,63 +153,61 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
                     <div className="grid grid-cols-3 gap-6 mb-8 items-end">
                       <div>
                         <div className="flex items-baseline gap-1">
-                          <span className="text-4xl font-light tabular-nums">{formatDistance(stats.totalDistance).replace(' km', '')}</span>
-                          <span className="text-xl text-muted-foreground">km</span>
+                          <span className="text-2xl font-light tabular-nums">{formatDistance(stats.totalDistance).replace(' km', '')}</span>
+                          <span className="text-m text-muted-foreground">km</span>
                         </div>
                         <span className="text-xs text-muted-foreground">Distance</span>
                       </div>
                       <div>
-                        <div className="text-4xl font-light tabular-nums">{formatDuration(stats.movingTime)}</div>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-2xl font-light tabular-nums">{formatDuration(stats.totalTime)}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">Elapsed Time</span>
+                      </div>
+                      <div>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-2xl font-light tabular-nums">{formatSpeed(stats.avgSpeed)}</span>
+                          <span className="text-m text-muted-foreground">km/h</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">Average Speed</span>
+                      </div>
+                      <div>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-2xl font-light tabular-nums">{stats.elevationGain.toFixed(0)}</span>
+                          <span className="text-m text-muted-foreground">m</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">Elevation Gained</span>
+                      </div>
+                      <div>
+                        <div className="text-2xl font-light tabular-nums">{formatDuration(stats.movingTime)}</div>
                         <span className="text-xs text-muted-foreground">Moving Time</span>
                       </div>
                       <div>
                         <div className="flex items-baseline gap-1">
-                          <span className="text-4xl font-light tabular-nums">{stats.elevationGain.toFixed(0)}</span>
-                          <span className="text-xl text-muted-foreground">m</span>
+                          <span className="text-2xl font-light tabular-nums">{formatSpeed(stats.movingAvgSpeed)}</span>
+                          <span className="text-m text-muted-foreground">km/h</span>
                         </div>
-                        <span className="text-xs text-muted-foreground">Elevation</span>
+                        <span className="text-xs text-muted-foreground">Average Moving Speed</span>
                       </div>
-                    </div>
-
-                    {/* 2. Secondary Stats Section */}
-                    <div className="pt-6 border-t border-border/60">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="text-muted-foreground border-b border-border/30">
-                            <th className="text-left font-normal pb-2"></th>
-                            <th className="text-left font-semibold pb-2 px-4">Avg</th>
-                            <th className="text-left font-semibold pb-2">Max</th>
-                          </tr>
-                        </thead>
-                        <tbody className="tabular-nums">
-                          <tr className="border-b border-border/30 h-10">
-                            <td className="text-muted-foreground">Speed</td>
-                            <td className="px-4 font-medium">{formatSpeed(stats.avgSpeed)}</td>
-                            <td className="font-medium">{formatSpeed(stats.maxSpeed)}</td>
-                          </tr>
-                          <tr className="border-b border-border/30 h-10">
-                            <td className="text-muted-foreground">Moving Average</td>
-                            <td className="px-4 font-medium">{formatSpeed(stats.movingAvgSpeed)}</td>
-                            <td>—</td>
-                          </tr>
-                          <tr className="border-b border-border/30 h-10">
-                            <td className="text-muted-foreground">Elapsed Time</td>
-                            <td className="px-4 font-medium">{formatDuration(stats.totalTime)}</td>
-                            <td>—</td>
-                          </tr>
-                          <tr className="h-10">
-                            <td className="text-muted-foreground">Stops</td>
-                            <td className="px-4 font-medium">{stats.stopCount}</td>
-                            <td className="text-xs text-muted-foreground italic">{formatDuration(stats.stoppedTime)} stopped</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* 3. Footer Gear Section */}
-                    <div className="mt-8 pt-4 border-t border-border/60 flex justify-between text-xs text-muted-foreground">
-                      <span>Device: GPS Analysis Tool</span>
-                      <span className="flex items-center gap-1.5"><MapPin className="w-3 h-3" /> {stats.pointCount.toLocaleString()} points recorded</span>
+                      <div>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-2xl font-light tabular-nums">{formatSpeed(stats.maxSpeed)}</span>
+                          <span className="text-m text-muted-foreground">km/h</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">Top Speed</span>
+                      </div>
+                      <div>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-2xl font-light tabular-nums">{formatDuration(stats.stoppedTime)}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">Stopped Time</span>
+                      </div>
+                      <div>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-2xl font-light tabular-nums">{stats.stopCount}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">Stops</span>
+                      </div>
                     </div>
                   </div>
                 </div>
