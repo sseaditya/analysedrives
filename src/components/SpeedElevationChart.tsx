@@ -383,16 +383,15 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
               <ReferenceLine
                 yAxisId="speed"
                 y={speedLimit}
-                stroke="hsl(0, 84%, 60%)" // Red-ish for visibility
-                strokeWidth={4}
-                strokeDasharray="4 4"
-                strokeOpacity={0.9}
+                stroke="hsl(37, 92%, 50%)" // Match the speed color
+                strokeWidth={3}
+                strokeOpacity={0.8}
                 label={{
                   value: `Limit: ${speedLimit} km/h`,
                   position: 'insideRight',
-                  fill: 'hsl(0, 84%, 60%)',
+                  fill: 'hsl(37, 92%, 50%)',
                   fontSize: 12,
-                  fontWeight: 800,
+                  fontWeight: 600,
                   dy: -10
                 }}
               />

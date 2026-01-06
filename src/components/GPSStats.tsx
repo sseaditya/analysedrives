@@ -451,9 +451,14 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                               }
                             </span>
                             {showLimiter && limitedStats && limitedStats.timeAdded > 0 && (
-                              <span className="text-2xl font-normal text-amber-500 tabular-nums animate-in fade-in slide-in-from-left-2">
-                                {formatDuration(limitedStats.simulatedTime)}
-                              </span>
+                              <div className="flex flex-col items-start leading-none">
+                                <span className="text-2xl font-normal text-amber-500 tabular-nums animate-in fade-in slide-in-from-left-2">
+                                  {formatDuration(limitedStats.simulatedTime)}
+                                </span>
+                                <span className="text-[10px] font-bold text-amber-500/80 uppercase tracking-wide">
+                                  {((limitedStats.simulatedTime - displayStats.totalTime) / displayStats.totalTime * 100).toFixed(0)}% Slower
+                                </span>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -483,12 +488,9 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                 </div>
 
                 <div className="relative h-[300px] w-full">
-                  {/* Speed Limiter Overlay Slider - Moved to Extreme Right */}
+                  {/* Speed Limiter Overlay Slider - Moved to Extreme Left over Y-Axis */}
                   {showLimiter && (
-                    <div className="absolute top-4 bottom-8 right-0 z-10 flex flex-col items-center h-[240px] animate-in fade-in zoom-in-95 bg-background/50 backdrop-blur-[2px] rounded-l-lg border-y border-l border-border/50 shadow-sm pl-1 pr-1">
-                      <div className="mb-2 px-1 py-0.5 rounded bg-amber-500/10 text-xs font-bold text-amber-500 whitespace-nowrap writing-vertical-rl rotate-180 flex items-center justify-center h-full max-h-[20px]">
-                        {speedLimit}
-                      </div>
+                    <div className="absolute top-[10px] bottom-[30px] left-0 w-[60px] z-20 flex flex-col items-center justify-center animate-in fade-in zoom-in-95">
                       <Slider
                         orientation="vertical"
                         value={[speedLimit]}
@@ -496,7 +498,15 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                         min={40}
                         max={speedCap ? Math.min(speedCap - 10, 200) : Math.max(Math.ceil(stats.maxSpeed / 10) * 10, 120)}
                         step={10}
-                        className="flex-1 cursor-grab active:cursor-grabbing [&>.absolute]:bg-amber-500 [&>span]:border-amber-500"
+                        className="h-full flex-1 cursor-grab active:cursor-grabbing w-full"
+                        thumbClassName="h-4 w-full rounded-none border-0 bg-transparent relative outline-none ring-0 focus:ring-0"
+                        thumbChildren={
+                          <div className="absolute w-[60px] left-0 h-0 border-t-[3px] border-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)] flex items-center justify-end pr-1">
+                            <div className="bg-amber-500 text-[10px] font-bold text-black px-1 rounded-sm -mt-[9px]">
+                              {speedLimit}
+                            </div>
+                          </div>
+                        }
                       />
                     </div>
                   )}
