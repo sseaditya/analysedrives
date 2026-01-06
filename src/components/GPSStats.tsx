@@ -409,7 +409,16 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                             step={10}
                             value={[speedLimit]}
                             onValueChange={([val]) => setSpeedLimit(val)}
-                            className="w-full"
+                            className="w-full h-4"
+                            thumbClassName="h-5 w-5 border-2 border-white bg-amber-500 shadow-md ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 hover:scale-110 active:scale-110 transition-all"
+                            thumbChildren={
+                              <div className="absolute -top-7 left-1/2 -translate-x-1/2 flex flex-col items-center animate-in fade-in zoom-in-95 duration-200">
+                                <div className="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap">
+                                  {speedLimit} km/h
+                                </div>
+                                <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[4px] border-t-amber-500 -mt-[1px]" />
+                              </div>
+                            }
                           />
                         </div>
                       )}
