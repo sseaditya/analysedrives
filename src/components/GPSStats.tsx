@@ -96,7 +96,7 @@ const GPSStats = ({ stats, fileName, points, speedCap, isOwner = true, isPublic 
     // Only enforces hard speed_cap for public viewers
     if (!isOwner && speedCap && avgSpeed > speedCap) {
       displayAvgSpeed = speedCap;
-      displayTime = displayAvgSpeed > 0 ? distance / (displayAvgSpeed / 3600) * 3600 : timeSeconds;
+      displayTime = displayAvgSpeed > 0 ? distance / (displayAvgSpeed) * 3600 : timeSeconds;
     }
 
     return {
