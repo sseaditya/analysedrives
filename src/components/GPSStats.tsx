@@ -143,7 +143,7 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
                 </div>
 
                 {/* Primary Row */}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-x-10 gap-y-8 pt-8 max-w-full">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-x-10 gap-y-8 pt-8 max-w-full">
                   <div>
                     <span className="block text-2xl font-normal text-foreground">{formatDistance(stats.totalDistance).replace(' km', '')}<span className="text-xl text-muted-foreground ml-1">km</span></span>
                     <span className="text-xs text-muted-foreground mt-1 block">Distance</span>
@@ -163,7 +163,7 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
                 </div>
 
                 {/* Secondary Row Table */}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-x-10 gap-y-8 pt-8 max-w-full">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-x-10 gap-y-8 pt-8 max-w-full">
                   <div>
                     <span className="block text-2xl font-normal text-foreground">{formatSpeed(stats.maxSpeed)}</span>
                     <span className="text-xs text-muted-foreground mt-1 block">Top Speed</span>
