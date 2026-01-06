@@ -123,7 +123,7 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
           {/* OVERVIEW TAB */}
           {activeTab === "overview" && (
             <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="bg-background text-foreground p-6 border border-border max-w-5xl mx-auto">
+              <div className="bg-background text-foreground p-6 border border-border">
                 <div className="flex flex-col md:flex-row gap-8">
 
                   {/* LEFT SIDE: Avatar & Title (Mirroring Strava's Left Column) */}
