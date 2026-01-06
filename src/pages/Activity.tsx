@@ -1,5 +1,5 @@
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, MapPin, Pencil, ChevronDown, ChevronUp, Globe, Lock } from "lucide-react";
+import { ArrowLeft, MapPin, Pencil, ChevronDown, ChevronUp, Globe, Lock, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import GPSStats from "@/components/GPSStats";
 import { GPXStats, GPXPoint, parseGPX, calculateStats } from "@/utils/gpxParser";
@@ -28,7 +28,7 @@ const ActivityPage = () => {
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, signInWithGoogle } = useAuth();
 
   // Initialize state from location state (if uploaded locally) or null
   const [data, setData] = useState<ActivityState | null>(
@@ -233,6 +233,20 @@ const ActivityPage = () => {
                 </Button>
               </ActivityEditor>
             )}
+
+            {/* Header Login Button for Anonymous Users */}
+            {/* Header Login Button for Anonymous Users */}
+            {!user && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 ml-2"
+                onClick={() => signInWithGoogle()}
+              >
+                <LogIn className="w-4 h-4" />
+                <span className="hidden sm:inline">Sign in with Google</span>
+              </Button>
+            )}
           </div>
         </div>
       </header>
@@ -278,7 +292,7 @@ const ActivityPage = () => {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-border bg-card/50 mt-auto">
+      <footer className="border-t border-border bg-card/50 mt-auto mb-20 md:mb-0">
         <div className="container mx-auto px-4 py-6 text-center text-sm text-muted-foreground">
           <Button
             variant="outline"
@@ -289,6 +303,31 @@ const ActivityPage = () => {
           </Button>
         </div>
       </footer>
+
+      {/* Fixed Bottom Banner for Anonymous Users */}
+      {!user && (
+        <div className="fixed bottom-0 left-0 right-0 z-[1002] border-t border-primary/20 bg-background/95 backdrop-blur-md shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.2)] animate-in slide-in-from-bottom-full duration-700 delay-500">
+          <div className="container mx-auto px-4 py-4 md:py-6 flex flex-col md:flex-row items-center justify-between gap-4 max-w-5xl">
+            <div className="text-center md:text-left space-y-1">
+              <h3 className="font-bold text-base md:text-lg flex items-center justify-center md:justify-start gap-2">
+                <Globe className="w-4 h-4 text-primary" />
+                Unlock the Full Experience
+              </h3>
+              <p className="text-sm text-muted-foreground max-w-xl">
+                Sign in for free to view other public drives, save your own activities, and access advanced analysis tools.
+              </p>
+            </div>
+            <Button
+              onClick={() => signInWithGoogle()}
+              size="lg"
+              className="shrink-0 w-full md:w-auto shadow-lg shadow-primary/20 gap-2 font-semibold"
+            >
+              <LogIn className="w-4 h-4" />
+              Sign in with Google
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
