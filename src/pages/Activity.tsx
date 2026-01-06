@@ -250,31 +250,6 @@ const ActivityPage = () => {
           </div>
         </div>
       </header>
-
-      {/* Description Section (if exists) */}
-      {description && (
-        <div className="container mx-auto px-4 py-4 border-b border-border">
-          <div className="max-w-[1600px] mx-auto">
-            <p className="text-sm text-muted-foreground">
-              {displayDescription}
-              {isLongDescription && !showFullDescription && "..."}
-            </p>
-            {isLongDescription && (
-              <button
-                onClick={() => setShowFullDescription(!showFullDescription)}
-                className="mt-2 text-xs font-medium text-primary hover:underline flex items-center gap-1"
-              >
-                {showFullDescription ? (
-                  <>Show less <ChevronUp className="w-3 h-3" /></>
-                ) : (
-                  <>Show more <ChevronDown className="w-3 h-3" /></>
-                )}
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8 md:py-12">
         <div className="max-w-[1600px] mx-auto">

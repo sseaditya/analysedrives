@@ -351,7 +351,7 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
 
   return (
     <div className="rounded-2xl overflow-hidden border border-border bg-card relative shadow-2xl">
-      <div ref={mapRef} className="w-full h-[600px]" />
+      <div ref={mapRef} className="w-full h-[400px]" />
 
       {/* Map Controls Overlay (Top Right) */}
       <div className="absolute top-4 right-4 z-[400] bg-card/90 backdrop-blur-md border border-border rounded-2xl p-1 shadow-2xl flex items-center gap-2">

@@ -328,15 +328,6 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
               }}
               labelFormatter={(label) => `Distance: ${label} km`}
             />
-            <Legend
-              wrapperStyle={{ paddingTop: "20px" }}
-              iconType="line"
-              formatter={(value) => {
-                if (value === "speed") return "Speed";
-                if (value === "elevation") return "Elevation";
-                return value;
-              }}
-            />
             {/* Speed Area (more prominent - thicker stroke, more visible fill) */}
             {hasSpeed && (
               <Area
