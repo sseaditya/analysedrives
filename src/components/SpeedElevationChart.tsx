@@ -21,6 +21,7 @@ interface SpeedElevationChartProps {
   onZoomChange: (range: [number, number] | null) => void;
   zoomRange: [number, number] | null;
   speedLimit?: number | null;
+  speedCap?: number | null;
 }
 
 interface ChartDataPoint {
@@ -51,7 +52,7 @@ function haversineDistance(
   return R * c;
 }
 
-const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLimit }: SpeedElevationChartProps) => {
+const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLimit, speedCap }: SpeedElevationChartProps) => {
   const [refAreaLeft, setRefAreaLeft] = useState<string | null>(null);
   const [refAreaRight, setRefAreaRight] = useState<string | null>(null);
 
@@ -290,6 +291,7 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
                 tickFormatter={(value) => Math.round(value).toString()}
                 label={{ value: "Speed (km/h)", angle: -90, position: "insideLeft", fontSize: 12, fill: "hsl(37, 92%, 50%)" }}
                 width={60}
+                domain={[0, speedCap || 'auto']}
               />
             )}
             {/* Right Y-axis for Elevation */}

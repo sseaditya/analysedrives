@@ -75,17 +75,34 @@ const GPSStats = ({ stats, fileName, points, speedCap, isOwner = true, isPublic 
     }
 
     // Calculate average speed
+    // Calculate average speed
     const avgSpeed = timeSeconds > 0 ? distance / (timeSeconds / 3600) : 0;
+
+    let displayTime = timeSeconds;
+    let displayAvgSpeed = avgSpeed;
+
+    // Apply speed cap if active
+    if (!isOwner && speedCap) {
+      const limited = calculateLimitedStats(subset, speedCap);
+      if (limited) {
+        displayTime = limited.simulatedTime;
+        displayAvgSpeed = limited.newAvgSpeed;
+      } else {
+        // Fallback
+        displayAvgSpeed = Math.min(avgSpeed, speedCap);
+        displayTime = displayAvgSpeed > 0 ? distance / (displayAvgSpeed / 3600) * 3600 : timeSeconds;
+      }
+    }
 
     return {
       filteredPoints: subset,
       subsetStats: {
         distance,
-        time: timeSeconds,
-        avgSpeed
+        time: displayTime,
+        avgSpeed: displayAvgSpeed
       }
     };
-  }, [points, zoomRange]);
+  }, [points, zoomRange, speedCap, isOwner]);
 
   // Calculate speed limited stats
   const limitedStats = useMemo(() => {
@@ -100,22 +117,47 @@ const GPSStats = ({ stats, fileName, points, speedCap, isOwner = true, isPublic 
         maxSpeed: stats.maxSpeed,
         avgSpeed: stats.avgSpeed,
         movingAvgSpeed: stats.movingAvgSpeed,
+        totalTime: stats.totalTime,
+        movingTime: stats.movingTime,
       };
     }
-    // Apply speed cap for public viewers
+    // Apply speed cap calculation
+    // If a point's speed > speedCap, we pretend it was traveled at speedCap
+    // This increases the time taken for that segment
+    const limited = calculateLimitedStats(points, speedCap);
+
+    // If limited stats calculation fails or makes no sense, fallback to simple clamp
+    if (!limited) {
+      return {
+        maxSpeed: Math.min(stats.maxSpeed, speedCap),
+        avgSpeed: Math.min(stats.avgSpeed, speedCap),
+        movingAvgSpeed: Math.min(stats.movingAvgSpeed, speedCap),
+        totalTime: stats.totalTime,
+        movingTime: stats.movingTime,
+      };
+    }
+
     return {
       maxSpeed: Math.min(stats.maxSpeed, speedCap),
-      avgSpeed: Math.min(stats.avgSpeed, speedCap),
-      movingAvgSpeed: Math.min(stats.movingAvgSpeed, speedCap),
+      avgSpeed: limited.newAvgSpeed,
+      movingAvgSpeed: limited.newAvgSpeed, // Approximation: applying same ratio or just using avg for simplicity
+      totalTime: limited.simulatedTime * 1000, // Convert to ms
+      movingTime: limited.simulatedTime * 1000, // Approximation: capped time is all moving? Or scale moving time?
     };
-  }, [stats, speedCap, isOwner]);
+  }, [stats, speedCap, isOwner, points]);
 
   // Effective speed limit for charts (owner's limiter or public speed cap)
+  // Effective speed limit for charts
   const effectiveChartSpeedLimit = useMemo(() => {
-    if (!isOwner && speedCap) return speedCap;
+    // For public, we enforce cap via axis, NOT via "limit line" tool usage unless we want to show it.
+    // User requested: "do not use the speed limiter functionality to put govern speed cap they are sepaarate things"
+    // So for public, we pass NOTHING as "speedLimit" (the line), but we pass speedCap as a separate prop to constrain axis.
+    if (!isOwner) return null;
+
+    // For owner, only show if enabled
     if (showLimiter) return speedLimit;
     return null;
-  }, [isOwner, speedCap, showLimiter, speedLimit]);
+  }, [isOwner, showLimiter, speedLimit]);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -207,7 +249,7 @@ const GPSStats = ({ stats, fileName, points, speedCap, isOwner = true, isPublic 
                       </div>
                       <div>
                         <div className="flex items-baseline gap-1">
-                          <span className="text-2xl font-normal tabular-nums">{formatDuration(stats.totalTime)}</span>
+                          <span className="text-2xl font-normal tabular-nums">{formatDuration(displayStats.totalTime)}</span>
                         </div>
                         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Elapsed Time</span>
                       </div>
@@ -226,7 +268,7 @@ const GPSStats = ({ stats, fileName, points, speedCap, isOwner = true, isPublic 
                         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Elevation Gained</span>
                       </div>
                       <div>
-                        <div className="text-2xl font-normal tabular-nums">{formatDuration(stats.movingTime)}</div>
+                        <div className="text-2xl font-normal tabular-nums">{formatDuration(displayStats.movingTime)}</div>
                         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Moving Time</span>
                       </div>
                       <div>
@@ -319,7 +361,7 @@ const GPSStats = ({ stats, fileName, points, speedCap, isOwner = true, isPublic 
                           value={[speedLimit]}
                           onValueChange={([val]) => setSpeedLimit(val)}
                           min={40}
-                          max={Math.max(Math.ceil(stats.maxSpeed / 10) * 10, 120)}
+                          max={speedCap ? Math.min(speedCap - 10, 200) : Math.max(Math.ceil(stats.maxSpeed / 10) * 10, 120)}
                           step={10}
                           className="flex-1 max-w-xs"
                         />
@@ -368,6 +410,7 @@ const GPSStats = ({ stats, fileName, points, speedCap, isOwner = true, isPublic 
                   onZoomChange={setZoomRange}
                   zoomRange={zoomRange}
                   speedLimit={effectiveChartSpeedLimit}
+                  speedCap={!isOwner ? speedCap : null}
                 />
               </div>
 

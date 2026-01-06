@@ -37,6 +37,7 @@ const ActivityPage = () => {
   const [loading, setLoading] = useState(!!id);
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [accessDenied, setAccessDenied] = useState(false);
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
 
   // Determine ownership
   const isOwner = user && metadata ? user.id === metadata.user_id : false;
@@ -60,18 +61,24 @@ const ActivityPage = () => {
             .single();
 
           if (dbError) {
-            // If error is "no rows returned" or permission denied, show access denied
             console.error("DB Error:", dbError);
-            if (dbError.code === 'PGRST116' || dbError.code === '42501') {
+            if (dbError.code === 'PGRST116') {
+              setErrorDetails("Activity not found in database.");
               setAccessDenied(true);
-              setLoading(false);
-              return;
+            } else if (dbError.code === '42501') {
+              setErrorDetails("Permission denied (Database RLS).");
+              setAccessDenied(true);
+            } else {
+              setErrorDetails(`Database Error: ${dbError.message} (${dbError.code})`);
+              setAccessDenied(true);
             }
-            throw dbError;
+            setLoading(false);
+            return;
           }
 
           // Check access: if not public and not owner, show access denied
           if (!record.public && (!user || user.id !== record.user_id)) {
+            setErrorDetails("This activity is private.");
             setAccessDenied(true);
             setLoading(false);
             return;
@@ -94,7 +101,11 @@ const ActivityPage = () => {
 
           if (storageError) {
             console.error("Storage Error:", storageError);
-            throw storageError;
+            setErrorDetails(`Storage Error: ${storageError.message}`);
+            // Don't throw, just handle it
+            setAccessDenied(true);
+            setLoading(false);
+            return;
           }
 
           // 3. Parse
@@ -110,8 +121,9 @@ const ActivityPage = () => {
             fileName: record.title
           });
 
-        } catch (err) {
+        } catch (err: any) {
           console.error("Error loading activity:", err);
+          setErrorDetails(err.message || "Unknown error occurred");
           setAccessDenied(true);
         } finally {
           setLoading(false);
@@ -141,13 +153,20 @@ const ActivityPage = () => {
   // Show access denied page instead of redirecting
   if (accessDenied || !data) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4 text-center px-4">
         <Lock className="w-12 h-12 text-muted-foreground" />
-        <h1 className="text-xl font-bold">Activity Not Found</h1>
-        <p className="text-muted-foreground text-sm">This activity doesn't exist or is private.</p>
-        <Button onClick={() => navigate("/")} variant="outline">
-          Go Home
-        </Button>
+        <h1 className="text-xl font-bold">Unable to Load Activity</h1>
+        <p className="text-muted-foreground text-sm max-w-md">
+          {errorDetails || "This activity looks private or doesn't exist."}
+        </p>
+        <div className="flex gap-2">
+          <Button onClick={() => window.location.reload()} variant="outline">
+            Retry
+          </Button>
+          <Button onClick={() => navigate("/")} variant="default">
+            Go Home
+          </Button>
+        </div>
       </div>
     );
   }
