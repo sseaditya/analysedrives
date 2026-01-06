@@ -9,6 +9,14 @@ import { supabase } from "@/lib/supabase";
 import ActivityMiniMap from "@/components/ActivityMiniMap";
 import { cn } from "@/lib/utils";
 import StravaImport from "@/components/StravaImport";
+import ProfileEditor from "@/components/ProfileEditor";
+
+interface Profile {
+    id: string;
+    display_name: string | null;
+    car: string | null;
+    avatar_url: string | null;
+}
 
 interface ActivityRecord {
     id: string;
@@ -26,6 +34,7 @@ const Dashboard = () => {
     const [activities, setActivities] = useState<ActivityRecord[]>([]);
     const [loadingActivities, setLoadingActivities] = useState(true);
     const [showUpload, setShowUpload] = useState(false);
+    const [profile, setProfile] = useState<Profile | null>(null);
 
     // Edit State
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -95,6 +104,7 @@ const Dashboard = () => {
     };
 
     useEffect(() => {
+        fetchProfile();
         fetchActivities();
 
         // Check for strava connection success param to auto-open upload
@@ -104,6 +114,22 @@ const Dashboard = () => {
             window.history.replaceState({}, '', '/dashboard'); // Clean URL
         }
     }, [user]);
+
+    const fetchProfile = async () => {
+        if (!user) return;
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('id, display_name, car, avatar_url')
+                .eq('id', user.id)
+                .single();
+
+            if (error && error.code !== 'PGRST116') throw error;
+            if (data) setProfile(data);
+        } catch (err) {
+            console.error("Error fetching profile:", err);
+        }
+    };
 
     const fetchActivities = async () => {
         if (!user) return;
@@ -217,18 +243,18 @@ const Dashboard = () => {
                     </div>
 
                     <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2">
-                            {user?.user_metadata?.avatar_url && (
+                        <ProfileEditor onProfileUpdate={(updatedProfile) => setProfile(updatedProfile)}>
+                            <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
                                 <img
-                                    src={user.user_metadata.avatar_url}
-                                    alt={user.email || "User"}
-                                    className="w-8 h-8 rounded-full border border-border"
+                                    src={profile?.avatar_url || user?.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.display_name || user?.email || "U")}&background=random`}
+                                    alt={profile?.display_name || user?.email || "User"}
+                                    className="w-8 h-8 rounded-full border border-border object-cover"
                                 />
-                            )}
-                            <span className="text-sm font-medium hidden md:block">
-                                {user?.user_metadata?.full_name || user?.email}
-                            </span>
-                        </div>
+                                <span className="text-sm font-medium hidden md:block">
+                                    {profile?.display_name || user?.user_metadata?.full_name || user?.email}
+                                </span>
+                            </div>
+                        </ProfileEditor>
                         <Button variant="ghost" size="sm" onClick={handleSignOut} className="text-muted-foreground hover:text-destructive">
                             <LogOut className="w-4 h-4 mr-2" />
                             Sign Out
