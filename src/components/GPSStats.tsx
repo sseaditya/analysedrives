@@ -451,10 +451,18 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                               }
                             </span>
                             {showLimiter && limitedStats && limitedStats.timeAdded > 0 && (
-                              <div className="flex flex-col items-start leading-none">
-                                <span className="text-2xl font-normal text-amber-500 tabular-nums animate-in fade-in slide-in-from-left-2">
-                                  {formatDuration(limitedStats.simulatedTime)}
-                                </span>
+                              <div className="flex flex-col items-start leading-none gap-0.5">
+                                {/* Simulated Time & Delta */}
+                                <div className="flex items-baseline gap-2">
+                                  <span className="text-2xl font-normal text-amber-500 tabular-nums animate-in fade-in slide-in-from-left-2">
+                                    {formatDuration(limitedStats.simulatedTime)}
+                                  </span>
+                                  <span className="flex items-center text-xs font-medium text-amber-500/80">
+                                    <TrendingUp className="w-3 h-3 mr-0.5" />
+                                    +{formatDuration(limitedStats.timeAdded)}
+                                  </span>
+                                </div>
+                                {/* Percentage Slower */}
                                 <span className="text-[10px] font-bold text-amber-500/80 uppercase tracking-wide">
                                   {((limitedStats.simulatedTime - displayStats.totalTime) / displayStats.totalTime * 100).toFixed(0)}% Slower
                                 </span>
@@ -476,9 +484,15 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                               }
                             </span>
                             {showLimiter && limitedStats && limitedStats.timeAdded > 0 && (
-                              <span className="text-2xl font-normal text-amber-500 tabular-nums animate-in fade-in slide-in-from-left-2">
-                                {formatSpeed(limitedStats.newAvgSpeed)}
-                              </span>
+                              <div className="flex flex-col items-start leading-none gap-0.5">
+                                <span className="text-2xl font-normal text-amber-500 tabular-nums animate-in fade-in slide-in-from-left-2">
+                                  {formatSpeed(limitedStats.newAvgSpeed)}
+                                </span>
+                                <span className="flex items-center text-xs font-medium text-amber-500/80">
+                                  <TrendingUp className="w-3 h-3 mr-0.5 rotate-180" />
+                                  -{formatSpeed((zoomRange && subsetStats ? subsetStats.avgSpeed : displayStats.avgSpeed) - limitedStats.newAvgSpeed)}
+                                </span>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -492,9 +506,10 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                   {showLimiter && (
                     <div className="absolute top-[10px] bottom-[30px] left-0 w-[60px] z-20 flex flex-col items-center justify-center animate-in fade-in zoom-in-95">
                       <Slider
+                        orientation="vertical"
                         min={0}
                         max={speedCap ? speedCap : Math.ceil(stats.maxSpeed / 10) * 10}
-                        step={1}
+                        step={10}
                         onValueChange={([val]) => {
                           const minLimit = 40;
                           setSpeedLimit(Math.max(minLimit, val));
