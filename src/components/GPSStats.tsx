@@ -117,7 +117,7 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
           </div>
         </aside>
 
-        {/* Main Content Area */}
+        {/* Main Content Areas */}
         <main className="flex-1 space-y-8 min-w-0">
 
           {/* OVERVIEW TAB */}
