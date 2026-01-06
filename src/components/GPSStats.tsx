@@ -396,34 +396,39 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
               <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
                 {/* Compact Header & Stats Row */}
                 <div className="flex flex-col gap-4 mb-2">
-                  <div className="flex items-center justify-between flex-wrap gap-4">
-                    <div className="flex items-center gap-4">
+                  <div className="flex items-center justify-between gap-6 mb-4">
+                    {/* Left: Title */}
+                    <div className="flex-shrink-0">
                       <h3 className="text-lg font-semibold text-foreground">Speed & Elevation Timeline</h3>
+                    </div>
 
-                      {/* Horizontal Speed Limiter Slider */}
-                      {showLimiter && (
-                        <div className="flex-1 max-w-[300px] px-4 animate-in fade-in slide-in-from-left-4">
-                          <Slider
-                            min={40}
-                            max={speedCap ? Math.min(speedCap - 10, 200) : Math.max(Math.ceil(stats.maxSpeed / 10) * 10, 120)}
-                            step={10}
-                            value={[speedLimit]}
-                            onValueChange={([val]) => setSpeedLimit(val)}
-                            className="w-full h-4"
-                            thumbClassName="h-5 w-5 border-2 border-white bg-amber-500 shadow-md ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 hover:scale-110 active:scale-110 transition-all"
-                            thumbChildren={
-                              <div className="absolute -top-7 left-1/2 -translate-x-1/2 flex flex-col items-center animate-in fade-in zoom-in-95 duration-200">
-                                <div className="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap">
-                                  {speedLimit} km/h
-                                </div>
-                                <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[4px] border-t-amber-500 -mt-[1px]" />
-                              </div>
-                            }
-                          />
-                        </div>
-                      )}
+                    {/* Middle: Slider (Centered & Flex-grow) */}
+                    {showLimiter && (
+                      <div className="flex-1 max-w-[400px] px-2 animate-in fade-in zoom-in-95 duration-200">
+                        <Slider
+                          min={40}
+                          max={speedCap ? Math.min(speedCap - 10, 200) : Math.max(Math.ceil(stats.maxSpeed / 10) * 10, 120)}
+                          step={10}
+                          value={[speedLimit]}
+                          onValueChange={([val]) => setSpeedLimit(val)}
+                          className="w-full relative py-3 cursor-grab active:cursor-grabbing"
 
-                      {/* Speed Limiter Toggle - Switch Design */}
+                          // Styles for "Proper" Visible Slider
+                          thumbClassName="h-5 w-5 rounded-full border-2 border-primary bg-background shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                          // No weird children, just a tooltip on top via internal logic or sibling if needed, 
+                          // but user asked for "standard". Let's use the thumbChildren for the value label carefully
+                          thumbChildren={
+                            <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-popover text-popover-foreground text-xs font-bold px-2 py-1 rounded shadow-md border whitespace-nowrap">
+                              {speedLimit} km/h
+                            </div>
+                          }
+                        />
+                      </div>
+                    )}
+
+                    {/* Right: Controls (Toggle + Reset) */}
+                    <div className="flex items-center gap-4 flex-shrink-0">
+                      {/* Speed Limiter Toggle */}
                       <div className="flex items-center gap-2 bg-muted/50 px-3 py-1.5 rounded-full border border-border/50">
                         <Switch
                           id="speed-limiter"
@@ -433,9 +438,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                         />
                         <Label htmlFor="speed-limiter" className="text-xs font-semibold cursor-pointer">Speed Limiter</Label>
                       </div>
-                    </div>
 
-                    <div className="flex items-center gap-4">
                       {zoomRange && (
                         <button
                           className="flex items-center gap-1.5 text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-md hover:bg-primary/20 transition-colors"
