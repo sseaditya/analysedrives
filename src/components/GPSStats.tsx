@@ -126,12 +126,12 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
               {/* Metadata & Hero Stats */}
               <div>
                 <div className="mb-10">
-                  <h1 className="text-4xl font-black text-foreground mb-2">Evening Ride</h1>
+                  <h1 className="text-4xl font-black text-foreground mb-2">{fileName}</h1>
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     {stats.startTime && (
                       <span className="flex items-center gap-1.5">
                         <Clock className="w-4 h-4" />
-                        {new Date(stats.startTime).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })} on {new Date(stats.startTime).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                        {new Date(stats.startTime).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })} on {new Date(stats.startTime).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
                       </span>
                     )}
                     <span className="w-1 h-1 rounded-full bg-border" />
@@ -143,18 +143,18 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
                 </div>
 
                 {/* Primary Row */}
-                <div className="flex flex-wrap gap-12 mb-10">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-x-10 gap-y-8 border-t border-border pt-8 max-w-full">
                   <div>
-                    <span className="block text-4xl font-normal text-foreground leading-none">{formatDistance(stats.totalDistance).replace(' km', '')}<span className="text-xl text-muted-foreground ml-1">km</span></span>
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Distance</span>
+                    <span className="block text-2xl font-normal text-foreground">{formatDistance(stats.totalDistance).replace(' km', '')}<span className="text-xl text-muted-foreground ml-1">km</span></span>
+                    <span className="text-xs text-muted-foreground mt-1 block">Distance</span>
                   </div>
                   <div>
-                    <span className="block text-4xl font-normal text-foreground leading-none">{formatDuration(stats.movingTime).replace('h ', ':').replace('m ', ':').replace('s', '')}</span>
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Moving Time</span>
+                    <span className="block text-2xl font-normal text-foreground">{formatDuration(stats.movingTime)}</span>
+                    <span className="text-xs text-muted-foreground mt-1 block">Moving Time</span>
                   </div>
                   <div>
-                    <span className="block text-4xl font-normal text-foreground leading-none">{stats.elevationGain.toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Elevation</span>
+                    <span className="block text-2xl font-normal text-foreground">{stats.elevationGain.toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
+                    <span className="text-xs text-muted-foreground mt-1 block">Elevation Gained</span>
                   </div>
                 </div>
 
@@ -162,15 +162,15 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-x-10 gap-y-8 border-t border-border pt-8 max-w-full">
                   <div>
                     <span className="block text-2xl font-normal text-foreground">{formatSpeed(stats.avgSpeed)}</span>
-                    <span className="text-xs text-muted-foreground mt-1 block">Avg Speed</span>
+                    <span className="text-xs text-muted-foreground mt-1 block">Average Speed</span>
                   </div>
                   <div>
                     <span className="block text-2xl font-normal text-foreground">{formatSpeed(stats.movingAvgSpeed)}</span>
-                    <span className="text-xs text-muted-foreground mt-1 block">Moving Avg</span>
+                    <span className="text-xs text-muted-foreground mt-1 block">Moving Average</span>
                   </div>
                   <div>
                     <span className="block text-2xl font-normal text-foreground">{formatSpeed(stats.maxSpeed)}</span>
-                    <span className="text-xs text-muted-foreground mt-1 block">Max Speed</span>
+                    <span className="text-xs text-muted-foreground mt-1 block">Top Speed</span>
                   </div>
                   <div>
                     <span className="block text-2xl font-normal text-foreground">{formatDuration(stats.totalTime)}</span>
@@ -188,7 +188,7 @@ const GPSStats = ({ stats, fileName, points }: GPSStatsProps) => {
               </div>
 
               {/* Map Section */}
-              <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+              <div className="bg-card border border-border rounded-2xl p-2 shadow-sm">
                 <h3 className="text-lg font-semibold mb-4 text-foreground">Route Map</h3>
                 <TrackMap points={points} hoveredPoint={hoveredPoint} zoomRange={zoomRange} stopPoints={stats.stopPoints} tightTurnPoints={stats.tightTurnPoints} />
               </div>
