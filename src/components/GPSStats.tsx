@@ -250,6 +250,48 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
     return null;
   }, [showLimiter, speedLimit]);
 
+  // Handle chart hover with privacy clamping
+  const handleHoverPoint = (point: GPXPoint | null) => {
+    if (!point) {
+      setHoveredPoint(null);
+      return;
+    }
+
+    if (isOwner) {
+      setHoveredPoint(point);
+      return;
+    }
+
+    // Privacy Logic for Public Viewers
+    if (!mapPoints || mapPoints.length === 0) {
+      setHoveredPoint(null);
+      return;
+    }
+
+    const safeStart = mapPoints[0];
+    const safeEnd = mapPoints[mapPoints.length - 1];
+
+    // Ensure we have valid time objects for comparison
+    if (!point.time || !safeStart.time || !safeEnd.time) {
+      setHoveredPoint(point); // Fallback if times missing
+      return;
+    }
+
+    // Clamp to Safe Boundaries based on Time
+    // Using getTime() for safe comparison
+    const pTime = point.time.getTime();
+    const startTime = safeStart.time.getTime();
+    const endTime = safeEnd.time.getTime();
+
+    if (pTime < startTime) {
+      setHoveredPoint(safeStart);
+    } else if (pTime > endTime) {
+      setHoveredPoint(safeEnd);
+    } else {
+      setHoveredPoint(point);
+    }
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col lg:flex-row gap-8">
@@ -518,7 +560,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                   <ResponsiveContainer width="100%" height="100%">
                     <SpeedElevationChart
                       points={points}
-                      onHover={setHoveredPoint}
+                      onHover={handleHoverPoint}
                       onZoomChange={setZoomRange}
                       zoomRange={zoomRange}
                       speedLimit={effectiveChartSpeedLimit}
