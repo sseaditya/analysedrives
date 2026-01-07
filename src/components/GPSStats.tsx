@@ -832,7 +832,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                       {[
                         { seconds: stats.timeClimbing, color: "bg-orange-500" },
                         { seconds: stats.timeDescending, color: "bg-blue-500" },
-                        { seconds: stats.totalTime - stats.timeClimbing - stats.timeDescending, color: "bg-muted-foreground/30" },
+                        { seconds: stats.timeLevel, color: "bg-muted-foreground/30" },
                       ].map((item, idx) => {
                         const width = (item.seconds / (stats.totalTime || 1)) * 100;
                         if (width <= 0) return null;
@@ -850,7 +850,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                       {[
                         { label: "Climbing", seconds: stats.timeClimbing, color: "bg-orange-500", desc: "Uphill battle" },
                         { label: "Descending", seconds: stats.timeDescending, color: "bg-blue-500", desc: "Gravity assisted" },
-                        { label: "Level Flight", seconds: Math.max(0, stats.totalTime - stats.timeClimbing - stats.timeDescending), color: "bg-muted-foreground/30", desc: "Flat terrain" },
+                        { label: "Level Flight", seconds: stats.timeLevel, color: "bg-muted-foreground/30", desc: "Flat terrain" },
                       ].map((item, idx) => {
                         const percentage = (item.seconds / (stats.totalTime || 1)) * 100;
                         return (

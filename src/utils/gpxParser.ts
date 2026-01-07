@@ -34,6 +34,7 @@ export interface GPXStats {
   steepestDescent: number; // percentage
   timeClimbing: number; // seconds
   timeDescending: number; // seconds
+  timeLevel: number; // seconds
   hillinessScore: number;
   climbDistance: number; // km
   // Geometry Metrics
@@ -227,6 +228,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
     steepestDescent: 0,
     timeClimbing: 0,
     timeDescending: 0,
+    timeLevel: 0,
     hillinessScore: 0,
     climbDistance: 0,
     totalHeadingChange: 0,
@@ -249,6 +251,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
   let steepestDescent = 0;
   let timeClimbing = 0;
   let timeDescending = 0;
+  let timeLevel = 0;
   let climbDistance = 0;
   let maxSpeed = 0;
   let lastBearing: number | null = null;
@@ -297,6 +300,8 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
   }
 
   // First pass: Calculate basic metrics using robust data
+  const rawGradients: number[] = [];
+
   for (let i = 0; i < robustSegments.length; i++) {
     const { speed, time: timeDiff, distance } = robustSegments[i];
     // Map back to original points logic. robustSegments[i] corresponds to segment between points[i] and points[i+1]
@@ -318,11 +323,16 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
       // Smoothed elevation ensures noise filtering without breaking net change relationship
       if (eleDiff > 0) {
         elevationGain += eleDiff;
-        timeClimbing += timeDiff;
-        climbDistance += distance;
       } else if (eleDiff < 0) {
         elevationLoss += Math.abs(eleDiff);
-        timeDescending += timeDiff;
+      }
+
+      // Calculate raw gradient for this segment
+      if (distance > 0.001) {
+        const gradientPercent = (eleDiff / (distance * 1000)) * 100;
+        rawGradients.push(gradientPercent);
+      } else {
+        rawGradients.push(0);
       }
 
       // Max/Min (use smoothed elevation)
@@ -335,6 +345,8 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
         if (gradient > steepestClimb) steepestClimb = gradient;
         if (gradient < steepestDescent) steepestDescent = gradient;
       }
+    } else {
+      rawGradients.push(0);
     }
 
     // Geometry Calculations
@@ -368,6 +380,42 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
     } else {
       // If stopped or jittering, don't update bearing but accumulate distance if moving slowly
       if (currentStraightDist > 0) currentStraightDist += distance;
+    }
+  }
+
+  // Smooth gradients to prevent oscillation in terrain classification
+  const GRADIENT_WINDOW_SIZE = 5;
+  const smoothedGradients: number[] = [];
+
+  for (let i = 0; i < rawGradients.length; i++) {
+    let sum = 0;
+    let count = 0;
+    const offset = Math.floor(GRADIENT_WINDOW_SIZE / 2);
+
+    for (let j = -offset; j <= offset; j++) {
+      const idx = i + j;
+      if (idx >= 0 && idx < rawGradients.length) {
+        sum += rawGradients[idx];
+        count++;
+      }
+    }
+    smoothedGradients.push(count > 0 ? sum / count : 0);
+  }
+
+  // Second pass: Classify terrain time using smoothed gradients
+  for (let i = 0; i < smoothedGradients.length; i++) {
+    const gradientPercent = smoothedGradients[i];
+    const timeDiff = timeDeltas[i];
+    const distance = robustSegments[i].distance;
+
+    // Thresholds: ±1% gradient to be considered climbing/descending
+    if (gradientPercent > 1.0) {
+      timeClimbing += timeDiff;
+      climbDistance += distance;
+    } else if (gradientPercent < -1.0) {
+      timeDescending += timeDiff;
+    } else {
+      timeLevel += timeDiff;
     }
   }
 
@@ -572,6 +620,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
     steepestDescent,
     timeClimbing,
     timeDescending,
+    timeLevel,
     hillinessScore,
     climbDistance,
     totalHeadingChange,
