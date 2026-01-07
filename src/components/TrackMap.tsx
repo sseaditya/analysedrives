@@ -41,6 +41,25 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
     return analyzeSegments(points);
   }, [points]);
 
+  // Calculate speed percentiles for 'speed' mode color distribution
+  const speedPercentiles = useMemo(() => {
+    if (mode !== 'speed' || segments.length === 0) return null;
+
+    // Create array of {speed, index}
+    const speedValues = segments.map((s, i) => ({ speed: s.speed, index: i }));
+
+    // Sort by speed ascending
+    speedValues.sort((a, b) => a.speed - b.speed);
+
+    // Map index -> percentile (0 to 1)
+    const percentiles = new Float32Array(segments.length);
+    speedValues.forEach((item, rank) => {
+      percentiles[item.index] = rank / (speedValues.length - 1 || 1);
+    });
+
+    return percentiles;
+  }, [segments, mode]);
+
   // Initialize Map
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
@@ -167,8 +186,8 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
       let maxBrake = 2.0;  // Fallback
 
       if (mode === 'speed') {
-        const speedValues = segments.map(s => s.speed);
-        maxSpeed = Math.max(...speedValues, 1);
+        // Percentiles are handled via the useMemo hook (speedPercentiles)
+        // No pre-calc needed here
       } else if (mode === 'acceleration') {
         // Calculate dynamic thresholds based on 90th percentile
         // This makes jerky rides more colorful, smooth rides more subtle
@@ -212,8 +231,10 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
           color = "hsl(24, 100%, 35%)"; // Rich Dark Orange
           weight = 6; // Thicker for better highlight visibility
         } else if (mode === 'speed') {
-          const ratio = Math.min(seg.speed / maxSpeed, 1);
-          const lightness = 90 - (ratio * 65);
+          // Percentile based coloring
+          const pct = speedPercentiles ? speedPercentiles[i] : 0;
+          // Lightness from 90% (slowest) to 25% (fastest) = Lighter to Darker/Saturated
+          const lightness = 90 - (pct * 65);
           color = `hsl(215, 95%, ${lightness}%)`;
         } else if (mode === 'acceleration') {
           const val = seg.acceleration;
