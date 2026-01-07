@@ -37,9 +37,14 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
   const [activeTab, setActiveTab] = useState("overview");
 
   // Filter points based on privacy radius
-  const { points, stats, privacyMask } = useMemo(() => {
+  const { points, stats, privacyMask, mapPoints } = useMemo(() => {
     if ((!hideRadius || hideRadius <= 0) && isOwner) {
-      return { points: initialPoints, stats: initialStats, privacyMask: null };
+      return {
+        points: initialPoints,
+        stats: initialStats,
+        privacyMask: null,
+        mapPoints: initialPoints
+      };
     }
 
     // Calculate cumulative distances to find cut-off points
@@ -78,24 +83,32 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
 
     // Safety check: if start crosses end, showing nothing or very little
     if (startIndex >= endIndex) {
-      // Should probably show empty or minimal?
-      // Let's just return everything if it fails to find safe bounds (fallback)
-      // Or return empty array?
-      if (!isOwner) return { points: [], stats: calculateStats([]), privacyMask: null };
-      return { points: initialPoints, stats: initialStats, privacyMask: { start: startIndex, end: endIndex } };
+      if (!isOwner) return { points: initialPoints, stats: initialStats, privacyMask: null, mapPoints: [] };
+      return {
+        points: initialPoints,
+        stats: initialStats,
+        privacyMask: { start: startIndex, end: endIndex },
+        mapPoints: initialPoints
+      };
     }
 
     if (!isOwner) {
-      // Public viewer: Slice the points physically
+      // Public viewer: Hide start/end on map Only
+      // Keep full data for charts/stats
       const slicedPoints = initialPoints.slice(startIndex, endIndex + 1);
-      const recalculatedStats = calculateStats(slicedPoints);
-      return { points: slicedPoints, stats: recalculatedStats, privacyMask: null };
+      return {
+        points: initialPoints,
+        stats: initialStats,
+        privacyMask: null,
+        mapPoints: slicedPoints
+      };
     } else {
       // Owner: Keep all points, but pass mask indices
       return {
         points: initialPoints,
         stats: initialStats,
-        privacyMask: { start: startIndex, end: endIndex }
+        privacyMask: { start: startIndex, end: endIndex },
+        mapPoints: initialPoints
       };
     }
   }, [initialPoints, initialStats, hideRadius, isOwner]);
@@ -384,7 +397,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
               <div className="bg-card border border-border rounded-2xl p-2 shadow-sm">
                 <h3 className="text-lg font-semibold mb-4 text-foreground">Route Map</h3>
                 <TrackMap
-                  points={points}
+                  points={mapPoints}
                   hoveredPoint={hoveredPoint}
                   zoomRange={zoomRange}
                   stopPoints={stats.stopPoints}
@@ -513,15 +526,6 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                       visualLimit={showLimiter ? speedLimit : undefined}
                     />
                   </ResponsiveContainer>
-                  {/* Range Slider for Zooming (Embedded) */}
-                  <div className="h-[40px] w-full mt-2 pl-[75px] pr-[75px]">
-                    <ChartRangeSlider
-                      points={points}
-                      zoomRange={zoomRange}
-                      onZoomChange={setZoomRange}
-                      height={40}
-                    />
-                  </div>
                 </div>
               </div>
 
