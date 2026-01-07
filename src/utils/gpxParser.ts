@@ -424,8 +424,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
   let turbulenceSum = 0;
 
   const STOP_THRESHOLD = 5.0; // km/h
-  const ACCEL_THRESHOLD = 0.5; // m/s^2 (Increased from 0.2 to filter noise)
-  const BRAKE_THRESHOLD = -0.5; // m/s^2 (Increased from -0.2)
+  const ACCEL_THRESHOLD = 0.2; // m/s^2 for "accelerating"
   const HARD_ACCEL_LIMIT = 2.5;
   const HARD_BRAKE_LIMIT = -3.0;
 
@@ -441,16 +440,17 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
   for (let i = 0; i < smoothedSpeeds.length; i++) {
     const speed = smoothedSpeeds[i];
     const time = timeDeltas[i];
-    const accel = smoothedAccelerations[i];
+    const smoothedAccel = smoothedAccelerations[i];
+    const rawAccel = rawAccelerations[i];
 
     // Turbulence: Change in acceleration
     if (i > 0) {
       const prevAccel = smoothedAccelerations[i - 1];
-      turbulenceSum += Math.abs(accel - prevAccel);
+      turbulenceSum += Math.abs(smoothedAccel - prevAccel);
     }
 
-    // --- Hard Point Event Detection (Smoothed) ---
-    if (accel > HARD_ACCEL_LIMIT) {
+    // --- Hard Point Event Detection (Uses Smoothed Acceleration) ---
+    if (smoothedAccel > HARD_ACCEL_LIMIT) {
       if (!inHardAccelEvent) {
         hardAccelerationCount++;
         inHardAccelEvent = true;
@@ -459,7 +459,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
       inHardAccelEvent = false;
     }
 
-    if (accel < HARD_BRAKE_LIMIT) {
+    if (smoothedAccel < HARD_BRAKE_LIMIT) {
       if (!inHardBrakeEvent) {
         hardBrakingCount++;
         inHardBrakeEvent = true;
@@ -468,7 +468,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
       inHardBrakeEvent = false;
     }
 
-    // --- Motion Profile Time Bucketing ---
+    // --- Motion Profile Time Bucketing (Uses Raw Acceleration) ---
     if (speed < STOP_THRESHOLD) {
       stoppedTime += time;
       potentialStopDuration += time;
@@ -477,9 +477,9 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
         potentialStopStartIndex = i;
       }
     } else {
-      // Use smoothed acceleration for improved motion categorization
-      if (accel > ACCEL_THRESHOLD) timeAccelerating += time;
-      else if (accel < BRAKE_THRESHOLD) timeBraking += time;
+      // Use raw acceleration for motion profile
+      if (rawAccel > ACCEL_THRESHOLD) timeAccelerating += time;
+      else if (rawAccel < -ACCEL_THRESHOLD) timeBraking += time;
       else timeCruising += time;
 
       if (isCurrentlyStoppedSegment) {
