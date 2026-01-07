@@ -15,6 +15,8 @@ interface ChartRangeSliderProps {
     zoomRange: [number, number] | null;
     onZoomChange: (range: [number, number] | null) => void;
     height?: number;
+    leftMargin?: number;
+    rightMargin?: number;
 }
 
 // Haversine formula
@@ -41,7 +43,9 @@ const ChartRangeSlider: React.FC<ChartRangeSliderProps> = ({
     points,
     zoomRange,
     onZoomChange,
-    height = 80
+    height = 80,
+    leftMargin = 0,
+    rightMargin = 0
 }) => {
     const chartData = useMemo(() => {
         let cumulativeDistance = 0;
@@ -87,11 +91,11 @@ const ChartRangeSlider: React.FC<ChartRangeSliderProps> = ({
             <ResponsiveContainer width="100%" height="100%">
                 <AreaChart
                     data={chartData}
-                    margin={{ top: 0, right: 30, left: 0, bottom: 0 }}
+                    margin={{ top: 0, right: rightMargin, left: leftMargin, bottom: 0 }}
                 >
                     <defs>
                         <linearGradient id="brushGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#8884d8" stopOpacity={0.3} />
+                            <stop offset="5%" stopColor="#8884d8" stopOpacity={0.4} />
                             <stop offset="95%" stopColor="#8884d8" stopOpacity={0.1} />
                         </linearGradient>
                     </defs>
@@ -99,18 +103,20 @@ const ChartRangeSlider: React.FC<ChartRangeSliderProps> = ({
                     <XAxis
                         dataKey="distance"
                         axisLine={false}
-                        tickLine={false}
+                        tickLine={{ stroke: '#9ca3af', height: 4 }}
                         tickFormatter={(val) => `${Math.round(val)} km`}
-                        minTickGap={50}
+                        minTickGap={30}
                         interval="preserveStartEnd"
-                        style={{ fontSize: '10px', userSelect: 'none', fill: '#6b7280' }}
+                        tick={{ fontSize: 10, fill: '#6b7280' }}
+                        dy={4}
                     />
+                    {/* Hidden YAxis to ensure chart renders correctly within margins */}
                     <YAxis hide domain={['dataMin', 'dataMax']} />
 
                     <Area
                         type="monotone"
                         dataKey="elevation"
-                        stroke="#8884d8"
+                        stroke="hsl(262, 83%, 58%)" // Primary purple-ish match
                         fill="url(#brushGradient)"
                         strokeWidth={1}
                         isAnimationActive={false}
@@ -121,8 +127,8 @@ const ChartRangeSlider: React.FC<ChartRangeSliderProps> = ({
                         height={height - 20}
                         y={0}
                         dataKey="index"
-                        stroke="#8884d8"
-                        fill="#f3f4f6"
+                        stroke="hsl(262, 83%, 58%)"
+                        fill="hsl(var(--background))"
                         tickFormatter={() => ''}
                         startIndex={zoomRange ? zoomRange[0] : 0}
                         endIndex={zoomRange ? zoomRange[1] : (points.length - 1)}

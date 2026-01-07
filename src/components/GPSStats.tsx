@@ -515,17 +515,18 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                       visualLimit={showLimiter ? speedLimit : undefined}
                     />
                   </ResponsiveContainer>
+                  {/* Range Slider for Zooming (Embedded) */}
+                  <div className="h-[44px] w-full mt-2">
+                    <ChartRangeSlider
+                      points={points}
+                      zoomRange={zoomRange}
+                      onZoomChange={setZoomRange}
+                      height={44}
+                      leftMargin={60}
+                      rightMargin={90}
+                    />
+                  </div>
                 </div>
-              </div>
-
-              {/* Range Slider for Zooming */}
-              <div className="mt-2 px-1">
-                <ChartRangeSlider
-                  points={points}
-                  zoomRange={zoomRange}
-                  onZoomChange={setZoomRange}
-                  height={80}
-                />
               </div>
 
               {/* Speed Distribution (Moved to Overview) */}
