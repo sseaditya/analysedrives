@@ -315,12 +315,12 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
     if (prevEle !== undefined && currEle !== undefined) {
       const eleDiff = currEle - prevEle;
 
-      // Apply threshold: Only count elevation changes > 1m to filter noise
-      if (eleDiff > 1.0) {
+      // Smoothed elevation ensures noise filtering without breaking net change relationship
+      if (eleDiff > 0) {
         elevationGain += eleDiff;
         timeClimbing += timeDiff;
         climbDistance += distance;
-      } else if (eleDiff < -1.0) {
+      } else if (eleDiff < 0) {
         elevationLoss += Math.abs(eleDiff);
         timeDescending += timeDiff;
       }
@@ -330,7 +330,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
       if (currEle < minElevation) minElevation = currEle;
 
       // Steepest sections (only for segments > 5m to filter GPS jitters)
-      if (distance > 0.005 && Math.abs(eleDiff) > 1.0) {
+      if (distance > 0.005 && Math.abs(eleDiff) > 0.5) {
         const gradient = (eleDiff / (distance * 1000)) * 100;
         if (gradient > steepestClimb) steepestClimb = gradient;
         if (gradient < steepestDescent) steepestDescent = gradient;
