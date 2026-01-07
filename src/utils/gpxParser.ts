@@ -271,11 +271,35 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
   // Pre-calculate robust speeds to filter GPS noise
   const robustSegments = calculateRobustSpeeds(points);
 
+  // Smooth elevation data to prevent noise inflation
+  const ELEVATION_WINDOW_SIZE = 5;
+  const smoothedElevations: (number | undefined)[] = [];
+
+  for (let i = 0; i < points.length; i++) {
+    if (points[i].ele === undefined) {
+      smoothedElevations.push(undefined);
+      continue;
+    }
+
+    let sum = 0;
+    let count = 0;
+    const offset = Math.floor(ELEVATION_WINDOW_SIZE / 2);
+
+    for (let j = -offset; j <= offset; j++) {
+      const idx = i + j;
+      if (idx >= 0 && idx < points.length && points[idx].ele !== undefined) {
+        sum += points[idx].ele!;
+        count++;
+      }
+    }
+
+    smoothedElevations.push(count > 0 ? sum / count : points[i].ele);
+  }
+
   // First pass: Calculate basic metrics using robust data
   for (let i = 0; i < robustSegments.length; i++) {
     const { speed, time: timeDiff, distance } = robustSegments[i];
-    // Map back to original points logic. robustSegments[i] corresponds to segment between points[i] and points[i+1] (indices 0 to length-2 in robust array matches 1 to length-1 in main loop?)
-    // Actually calculateRobustSpeeds iterates 1 to length. So robustSegments[0] is data for point[1].
+    // Map back to original points logic. robustSegments[i] corresponds to segment between points[i] and points[i+1]
 
     // We need i+1 to match points index
     const prev = points[i];
@@ -285,25 +309,28 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
     speeds.push(speed);
     timeDeltas.push(timeDiff);
 
-    if (prev.ele !== undefined && curr.ele !== undefined) {
-      const eleDiff = curr.ele - prev.ele;
+    const prevEle = smoothedElevations[i];
+    const currEle = smoothedElevations[i + 1];
 
-      // Basic Gain/Loss
-      if (eleDiff > 0) {
+    if (prevEle !== undefined && currEle !== undefined) {
+      const eleDiff = currEle - prevEle;
+
+      // Apply threshold: Only count elevation changes > 1m to filter noise
+      if (eleDiff > 1.0) {
         elevationGain += eleDiff;
         timeClimbing += timeDiff;
         climbDistance += distance;
-      } else if (eleDiff < 0) {
+      } else if (eleDiff < -1.0) {
         elevationLoss += Math.abs(eleDiff);
         timeDescending += timeDiff;
       }
 
-      // Max/Min
-      if (curr.ele > maxElevation) maxElevation = curr.ele;
-      if (curr.ele < minElevation) minElevation = curr.ele;
+      // Max/Min (use smoothed elevation)
+      if (currEle > maxElevation) maxElevation = currEle;
+      if (currEle < minElevation) minElevation = currEle;
 
       // Steepest sections (only for segments > 5m to filter GPS jitters)
-      if (distance > 0.005) {
+      if (distance > 0.005 && Math.abs(eleDiff) > 1.0) {
         const gradient = (eleDiff / (distance * 1000)) * 100;
         if (gradient > steepestClimb) steepestClimb = gradient;
         if (gradient < steepestDescent) steepestDescent = gradient;
@@ -318,15 +345,11 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
         if (delta > 180) delta = 360 - delta;
 
         totalHeadingChange += delta;
-
-        // Apply smoothing threshold: Only count turns > 10 degrees to filter GPS noise
-        if (delta > 10) {
-          if (delta > 45) {
-            tightTurnsCount++;
-            tightTurnPoints.push([curr.lat, curr.lon]);
-          }
-          if (delta > 135) hairpinCount++;
+        if (delta > 45) {
+          tightTurnsCount++;
+          tightTurnPoints.push([curr.lat, curr.lon]);
         }
+        if (delta > 135) hairpinCount++;
 
         // Straight section logic (threshold 5 degrees)
         if (delta < 5) {
