@@ -71,6 +71,23 @@ const ChartRangeSlider: React.FC<ChartRangeSliderProps> = ({
         return data;
     }, [points]);
 
+    const maxDistance = useMemo(() => {
+        if (chartData.length === 0) return 0;
+        return chartData[chartData.length - 1].distance;
+    }, [chartData]);
+
+    const ticks = useMemo(() => {
+        if (maxDistance <= 0) return [0];
+        // Generate 5 ticks: 0, 25%, 50%, 75%, 100%
+        return [
+            0,
+            maxDistance * 0.25,
+            maxDistance * 0.5,
+            maxDistance * 0.75,
+            maxDistance
+        ];
+    }, [maxDistance]);
+
     const handleBrushChange = (newIndex: any) => {
         if (newIndex && typeof newIndex.startIndex === 'number' && typeof newIndex.endIndex === 'number') {
             const { startIndex, endIndex } = newIndex;
@@ -99,12 +116,12 @@ const ChartRangeSlider: React.FC<ChartRangeSliderProps> = ({
                     <XAxis
                         dataKey="distance"
                         type="number"
-                        domain={['dataMin', 'dataMax']}
+                        domain={[0, maxDistance]}
+                        ticks={ticks}
                         axisLine={false}
                         tickLine={{ stroke: '#9ca3af', height: 4 }}
                         tickFormatter={(val) => `${Math.round(val)} km`}
-                        minTickGap={50}
-                        interval="preserveStartEnd"
+                        interval={0} // Force all ticks to show
                         tick={{ fontSize: 10, fill: '#6b7280' }}
                         dy={4}
                     />

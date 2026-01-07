@@ -501,8 +501,6 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                 </div>
 
                 <div className="relative h-[300px] w-full">
-                  {/* Speed Limiter Overlay Slider - Moved to Extreme Left over Y-Axis */}
-
 
                   <ResponsiveContainer width="100%" height="100%">
                     <SpeedElevationChart
@@ -516,12 +514,12 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                     />
                   </ResponsiveContainer>
                   {/* Range Slider for Zooming (Embedded) */}
-                  <div className="h-[44px] w-full mt-2 pl-[60px] pr-[90px]">
+                  <div className="h-[40px] w-full mt-2 pl-[75px] pr-[75px]">
                     <ChartRangeSlider
                       points={points}
                       zoomRange={zoomRange}
                       onZoomChange={setZoomRange}
-                      height={44}
+                      height={40}
                     />
                   </div>
                 </div>
