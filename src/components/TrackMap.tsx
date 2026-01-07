@@ -41,24 +41,7 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
     return analyzeSegments(points);
   }, [points]);
 
-  // Calculate speed percentiles for 'speed' mode color distribution
-  const speedPercentiles = useMemo(() => {
-    if (mode !== 'speed' || segments.length === 0) return null;
 
-    // Create array of {speed, index}
-    const speedValues = segments.map((s, i) => ({ speed: s.speed, index: i }));
-
-    // Sort by speed ascending
-    speedValues.sort((a, b) => a.speed - b.speed);
-
-    // Map index -> percentile (0 to 1)
-    const percentiles = new Float32Array(segments.length);
-    speedValues.forEach((item, rank) => {
-      percentiles[item.index] = rank / (speedValues.length - 1 || 1);
-    });
-
-    return percentiles;
-  }, [segments, mode]);
 
   // Initialize Map
   useEffect(() => {
@@ -231,10 +214,12 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
           color = "hsl(24, 100%, 35%)"; // Rich Dark Orange
           weight = 6; // Thicker for better highlight visibility
         } else if (mode === 'speed') {
-          // Percentile based coloring
-          const pct = speedPercentiles ? speedPercentiles[i] : 0;
-          // Lightness from 90% (slowest) to 25% (fastest) = Lighter to Darker/Saturated
-          const lightness = 90 - (pct * 65);
+          // Fixed scale: 0 to 150 km/h (approx 41.67 m/s)
+          const maxSpeedMps = 150 * 1000 / 3600;
+          const ratio = Math.min(seg.speed / maxSpeedMps, 1);
+
+          // Lightness from 90% (slowest) to 25% (fastest)
+          const lightness = 90 - (ratio * 65);
           color = `hsl(215, 95%, ${lightness}%)`;
         } else if (mode === 'acceleration') {
           const val = seg.acceleration;
