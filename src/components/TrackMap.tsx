@@ -190,9 +190,8 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
           color = "hsl(24, 100%, 35%)"; // Rich Dark Orange
           weight = 6; // Thicker for better highlight visibility
         } else if (mode === 'speed') {
-          // Fixed scale: 0 to 150 km/h (approx 41.67 m/s)
-          const maxSpeedMps = 150 * 1000 / 3600;
-          const ratio = Math.min(seg.speed / maxSpeedMps, 1);
+          // Fixed scale: 0 to 150 km/h
+          const ratio = Math.min(seg.speed / 150, 1);
 
           // Lightness from 90% (slowest) to 25% (fastest)
           const lightness = 90 - (ratio * 65);
