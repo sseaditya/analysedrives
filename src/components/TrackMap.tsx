@@ -163,9 +163,29 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
 
     if (shouldRenderSegments) {
       let maxSpeed = 1;
+      let maxAccel = 1.5;  // Fallback
+      let maxBrake = 2.0;  // Fallback
+
       if (mode === 'speed') {
         const speedValues = segments.map(s => s.speed);
         maxSpeed = Math.max(...speedValues, 1);
+      } else if (mode === 'acceleration') {
+        // Calculate dynamic thresholds based on 90th percentile
+        // This makes jerky rides more colorful, smooth rides more subtle
+        const accelValues = segments.map(s => s.acceleration).filter(a => a > 0.1);
+        const brakeValues = segments.map(s => Math.abs(s.acceleration)).filter(a => a > 0.1);
+
+        if (accelValues.length > 0) {
+          const sortedAccel = [...accelValues].sort((a, b) => a - b);
+          const p90Index = Math.floor(sortedAccel.length * 0.90);
+          maxAccel = Math.max(sortedAccel[p90Index] || 1.5, 1.0);
+        }
+
+        if (brakeValues.length > 0) {
+          const sortedBrake = [...brakeValues].sort((a, b) => a - b);
+          const p90Index = Math.floor(sortedBrake.length * 0.90);
+          maxBrake = Math.max(sortedBrake[p90Index] || 2.0, 1.0);
+        }
       }
 
       segments.forEach((seg, i) => {
@@ -197,20 +217,15 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
           color = `hsl(215, 95%, ${lightness}%)`;
         } else if (mode === 'acceleration') {
           const val = seg.acceleration;
-          // Realistic max values for 300hp car:
-          // Max accel: ~4.5 m/s² (0-100 in ~6s)
-          // Max brake: ~9.0 m/s² (full braking)
-          const MAX_ACCEL = 4.5;
-          const MAX_BRAKE = 9.0;
 
           if (val > 0.1) {
-            // Green gradient for acceleration
-            const ratio = Math.min(val / MAX_ACCEL, 1);
+            // Green gradient for acceleration - dynamic scale
+            const ratio = Math.min(val / maxAccel, 1);
             const lightness = 95 - (ratio * 50); // From very light green to deep green
             color = `hsl(142, 85%, ${lightness}%)`;
           } else if (val < -0.1) {
-            // Red gradient for braking
-            const ratio = Math.min(Math.abs(val) / MAX_BRAKE, 1);
+            // Red gradient for braking - dynamic scale
+            const ratio = Math.min(Math.abs(val) / maxBrake, 1);
             const lightness = 95 - (ratio * 50); // From very light red to deep red
             color = `hsl(0, 90%, ${lightness}%)`;
           } else {
