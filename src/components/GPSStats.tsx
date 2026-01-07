@@ -4,6 +4,7 @@ import { ResponsiveContainer } from "recharts";
 import TrackMap from "./TrackMap";
 import SpeedElevationChart from "./SpeedElevationChart";
 import SpeedDistributionChart from "./SpeedDistributionChart";
+import ChartRangeSlider from "./ChartRangeSlider";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -515,6 +516,16 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                     />
                   </ResponsiveContainer>
                 </div>
+              </div>
+
+              {/* Range Slider for Zooming */}
+              <div className="mt-2 px-1">
+                <ChartRangeSlider
+                  points={points}
+                  zoomRange={zoomRange}
+                  onZoomChange={setZoomRange}
+                  height={80}
+                />
               </div>
 
               {/* Speed Distribution (Moved to Overview) */}
