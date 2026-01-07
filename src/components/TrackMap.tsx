@@ -34,7 +34,6 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
   const [mode, setMode] = useState<'plain' | 'speed' | 'acceleration'>('plain');
   const [showStops, setShowStops] = useState(false);
   const [showTurns, setShowTurns] = useState(false);
-  const [showHardEvents, setShowHardEvents] = useState(false);
 
   // Pre-calculate segments for performance
   const segments = useMemo(() => {
@@ -198,20 +197,30 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
           color = `hsl(215, 95%, ${lightness}%)`;
         } else if (mode === 'acceleration') {
           const val = seg.acceleration;
+          // Realistic max values for 300hp car:
+          // Max accel: ~4.5 m/s² (0-100 in ~6s)
+          // Max brake: ~9.0 m/s² (full braking)
+          const MAX_ACCEL = 4.5;
+          const MAX_BRAKE = 9.0;
+
           if (val > 0.1) {
-            const ratio = Math.min(val / 2.0, 1);
-            const lightness = 85 - (ratio * 45);
+            // Green gradient for acceleration
+            const ratio = Math.min(val / MAX_ACCEL, 1);
+            const lightness = 95 - (ratio * 50); // From very light green to deep green
             color = `hsl(142, 85%, ${lightness}%)`;
           } else if (val < -0.1) {
-            const ratio = Math.min(Math.abs(val) / 2.0, 1);
-            const lightness = 85 - (ratio * 45);
+            // Red gradient for braking
+            const ratio = Math.min(Math.abs(val) / MAX_BRAKE, 1);
+            const lightness = 95 - (ratio * 50); // From very light red to deep red
             color = `hsl(0, 90%, ${lightness}%)`;
           } else {
-            color = 'transparent';
+            // White for cruising
+            color = 'hsl(0, 0%, 95%)';
+            opacity = 0.6;
           }
         }
 
-        if (color !== 'transparent') {
+        if (color !== 'transparent' || mode === 'acceleration') {
           L.polyline([[p1.lat, p1.lon], [p2.lat, p2.lon]], {
             color,
             weight,
@@ -307,8 +316,8 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
       layersRef.current.turnMarkers = turnMarkersLayer;
     }
 
-    // 5. Render Hard Acceleration Markers
-    if (showHardEvents && hardAccelPoints && hardAccelPoints.length > 0) {
+    // 5. Render Hard Acceleration Markers (Auto-show in acceleration mode)
+    if (mode === 'acceleration' && hardAccelPoints && hardAccelPoints.length > 0) {
       const hardAccelMarkersLayer = L.layerGroup();
       hardAccelPoints.forEach((point, index) => {
         const [lat, lon, accel] = point;
@@ -329,8 +338,8 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
       layersRef.current.hardAccelMarkers = hardAccelMarkersLayer;
     }
 
-    // 6. Render Hard Braking Markers
-    if (showHardEvents && hardBrakePoints && hardBrakePoints.length > 0) {
+    // 6. Render Hard Braking Markers (Auto-show in acceleration mode)
+    if (mode === 'acceleration' && hardBrakePoints && hardBrakePoints.length > 0) {
       const hardBrakeMarkersLayer = L.layerGroup();
       hardBrakePoints.forEach((point, index) => {
         const [lat, lon, accel] = point;
@@ -364,7 +373,7 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
       lastBoundsRef.current = { points, zoomRange };
     }
 
-  }, [points, zoomRange, stopPoints, tightTurnPoints, hardAccelPoints, hardBrakePoints, mode, showStops, showTurns, showHardEvents, segments]); // Re-run when points, zoom, mode, or markers change
+  }, [points, zoomRange, stopPoints, tightTurnPoints, hardAccelPoints, hardBrakePoints, mode, showStops, showTurns, segments]); // Re-run when points, zoom, mode, or markers change
 
   // Hover Effect (Separate Effect to avoid redrawing tracks)
   useEffect(() => {
@@ -451,14 +460,6 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
           >
             <div className={`w-2 h-2 rounded-full ${showTurns ? 'bg-white' : 'bg-purple-500'}`} />
             <span className="text-[10px] font-black uppercase tracking-tight hidden lg:inline">Turns</span>
-          </button>
-          <button
-            onClick={() => setShowHardEvents(!showHardEvents)}
-            className={`p-2 rounded-xl transition-all border flex items-center gap-2 ${showHardEvents ? 'bg-orange-500 text-white border-orange-500/50 shadow-lg shadow-orange-500/20' : 'bg-muted/40 text-muted-foreground border-transparent hover:bg-muted/60'}`}
-            title={showHardEvents ? "Hide Hard Events" : "Show Hard Events"}
-          >
-            <div className={`w-2 h-2 rounded-full ${showHardEvents ? 'bg-white' : 'bg-orange-500'}`} />
-            <span className="text-[10px] font-black uppercase tracking-tight hidden lg:inline">Events</span>
           </button>
         </div>
       </div>
