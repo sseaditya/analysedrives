@@ -88,33 +88,8 @@ export interface SpeedBucket {
 export function calculateSpeedDistribution(points: GPXPoint[], bucketSize: number = 10): SpeedBucket[] {
   if (points.length < 2) return [];
 
-  const segments: { distance: number; time: number; speed: number }[] = [];
-  const speeds: number[] = [];
-
-  // 1. Calculate Raw Segments
-  for (let i = 1; i < points.length; i++) {
-    const prev = points[i - 1];
-    const curr = points[i];
-
-    const dist = haversineDistance(prev.lat, prev.lon, curr.lat, curr.lon);
-    let timeHours = 0;
-
-    if (prev.time && curr.time) {
-      timeHours = (curr.time.getTime() - prev.time.getTime()) / 1000 / 3600;
-    }
-
-    // Avoid division by zero or negative time
-    let speed = 0;
-    if (timeHours > 0) {
-      speed = dist / timeHours;
-    }
-
-    // Filter unlikely speeds (GPS jumps/signal drops)
-    if (speed > 200) speed = i > 1 ? segments[i - 2].speed : 0;
-
-    segments.push({ distance: dist, time: timeHours, speed });
-    speeds.push(speed);
-  }
+  const robustSegments = calculateRobustSpeeds(points);
+  const speeds = robustSegments.map(s => s.speed);
 
   // 2. Smooth Speeds (Moving Average)
   const WINDOW_SIZE = 5;
@@ -139,7 +114,7 @@ export function calculateSpeedDistribution(points: GPXPoint[], bucketSize: numbe
   const buckets: Record<number, { time: number; distance: number }> = {};
   let maxBucketIndex = 0;
 
-  segments.forEach((seg, i) => {
+  robustSegments.forEach((seg, i) => {
     const speed = smoothedSpeeds[i];
     if (speed < 0.1) return; // Ignore stops
 
@@ -147,22 +122,37 @@ export function calculateSpeedDistribution(points: GPXPoint[], bucketSize: numbe
     if (!buckets[bucketIndex]) {
       buckets[bucketIndex] = { time: 0, distance: 0 };
     }
-    buckets[bucketIndex].time += seg.time * 60; // Convert to minutes
+    // seg.time is seconds. Convert to minutes.
+    buckets[bucketIndex].time += seg.time / 60;
     buckets[bucketIndex].distance += seg.distance;
 
     if (bucketIndex > maxBucketIndex) maxBucketIndex = bucketIndex;
   });
 
-  // 4. Format Output
+  // 4. Format Output with Tail Truncation (Remove high speed noise < 20s)
   const result: SpeedBucket[] = [];
-  // Iterate from 0 to maxBucket found (or a reasonable limit) to ensure continuity
-  // But typically we only want to show ranges that exist or up to the max.
-  // Let's fill gaps with 0
-  for (let i = 0; i <= maxBucketIndex; i += bucketSize) {
-    // Optional: Skip empty buckets at the very end if we wanted, but generally good to show scale
-    // Skip 0-0 bucket if mostly noise, but 0-5 is valid
+  let foundValidTop = false;
+
+  // Iterate backwards from max bucket to 0
+  for (let i = maxBucketIndex; i >= 0; i -= bucketSize) {
     const data = buckets[i] || { time: 0, distance: 0 };
-    result.push({
+
+    // Time in minutes. 20 seconds = 0.333 minutes.
+    const durationSeconds = data.time * 60;
+
+    // Logic: If we haven't found a valid top yet, check if this bucket is significant (>20s).
+    // If it is NOT significant, skip it (it's noise).
+    // Once we find a significant bucket, 'foundValidTop' becomes true, and we accept all lower buckets.
+    if (!foundValidTop) {
+      if (durationSeconds >= 20) {
+        foundValidTop = true;
+      } else {
+        // Skip this bucket as it's likely high-speed GPS noise
+        continue;
+      }
+    }
+
+    result.unshift({
       range: `${i}-${i + bucketSize}`,
       minSpeed: i,
       time: Number(data.time.toFixed(2)),
@@ -278,23 +268,20 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
     minElevation = points[0].ele;
   }
 
-  // First pass: Calculate raw speeds and basic metrics
-  for (let i = 1; i < points.length; i++) {
-    const prev = points[i - 1];
-    const curr = points[i];
+  // Pre-calculate robust speeds to filter GPS noise
+  const robustSegments = calculateRobustSpeeds(points);
 
-    const distance = haversineDistance(prev.lat, prev.lon, curr.lat, curr.lon);
+  // First pass: Calculate basic metrics using robust data
+  for (let i = 0; i < robustSegments.length; i++) {
+    const { speed, time: timeDiff, distance } = robustSegments[i];
+    // Map back to original points logic. robustSegments[i] corresponds to segment between points[i] and points[i+1] (indices 0 to length-2 in robust array matches 1 to length-1 in main loop?)
+    // Actually calculateRobustSpeeds iterates 1 to length. So robustSegments[0] is data for point[1].
+
+    // We need i+1 to match points index
+    const prev = points[i];
+    const curr = points[i + 1];
+
     totalDistance += distance;
-
-    let speed = 0;
-    let timeDiff = 0;
-    if (prev.time && curr.time) {
-      timeDiff = (curr.time.getTime() - prev.time.getTime()) / 1000;
-      if (timeDiff > 0) {
-        speed = distance / (timeDiff / 3600);
-        if (speed > 200) speed = i > 1 ? speeds[i - 2] : 0;
-      }
-    }
     speeds.push(speed);
     timeDeltas.push(timeDiff);
 
@@ -529,29 +516,9 @@ export function analyzeSegments(points: GPXPoint[]): TrackSegment[] {
   if (points.length < 2) return [];
 
   const segments: TrackSegment[] = [];
-  const speeds: number[] = [];
-  const timeDeltas: number[] = [];
-
-  // 1. Calculate Raw Speeds & Times
-  for (let i = 1; i < points.length; i++) {
-    const prev = points[i - 1];
-    const curr = points[i];
-
-    const dist = haversineDistance(prev.lat, prev.lon, curr.lat, curr.lon); // km
-    let timeDiff = 0;
-    let speed = 0;
-
-    if (prev.time && curr.time) {
-      timeDiff = (curr.time.getTime() - prev.time.getTime()) / 1000; // seconds
-      if (timeDiff > 0) {
-        speed = dist / (timeDiff / 3600); // km/h
-        // Outlier rejection
-        if (speed > 200) speed = i > 1 ? speeds[i - 2] : 0;
-      }
-    }
-    speeds.push(speed);
-    timeDeltas.push(timeDiff);
-  }
+  const robustSegments = calculateRobustSpeeds(points);
+  const speeds = robustSegments.map(s => s.speed);
+  const timeDeltas = robustSegments.map(s => s.time);
 
   // 2. Smooth Speeds (Moving Average)
   const smoothedSpeeds: number[] = [];
@@ -576,25 +543,9 @@ export function analyzeSegments(points: GPXPoint[]): TrackSegment[] {
   for (let i = 0; i < smoothedSpeeds.length; i++) {
     const currentSpeed = smoothedSpeeds[i]; // km/h
 
-    // Calculate accel
-    // a = delta_v / delta_t
-    // We need next speed to get delta, or simple calc: v_current - v_prev / t
-    // Let's use Forward Difference or Central Difference? 
-    // Simple: (Speed[i] - Speed[i-1]) / Time
-    // But we are at segment i. Let's use change from previous segment to current?
-    // Or just change over the segment?
-    // A segment connects P[i] and P[i+1]. It has an average speed. 
-    // Accel is change in speed between segments. 
-    // Let's define accel for segment i as (Speed[i+1] - Speed[i]) / ((Time[i] + Time[i+1])/2) ?
-
-    // Simpler: Accel at point i is (v[i] - v[i-1])/t.
-    // We map accel to the segment i. 
-
     let acceleration = 0;
     const time = timeDeltas[i];
 
-    // Need difference in speed. 
-    // If i > 0, we can compare with prev speed.
     if (i > 0 && time > 0) {
       const v1 = smoothedSpeeds[i - 1] / 3.6; // m/s
       const v2 = smoothedSpeeds[i] / 3.6;   // m/s
@@ -724,5 +675,59 @@ export function calculateLimitedStats(points: GPXPoint[], speedLimitKmh: number)
     cappedSegments,
     totalSegments
   };
+}
+
+/**
+ * Calculates robust speeds by clamping physically impossible acceleration.
+ * This filters out GPS jitter spikes.
+ */
+function calculateRobustSpeeds(points: GPXPoint[]): { speed: number; time: number; distance: number }[] {
+  if (points.length < 2) return [];
+
+  const results: { speed: number; time: number; distance: number }[] = [];
+  const MAX_ACCEL = 10; // m/s^2 (~36 km/h per second) - Aggressive but possible limit
+  // const MAX_DECEL = 15; // m/s^2
+
+  let prevSpeedMps = 0;
+
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1];
+    const curr = points[i];
+
+    const distKm = haversineDistance(prev.lat, prev.lon, curr.lat, curr.lon);
+    let timeSec = 0;
+
+    if (prev.time && curr.time) {
+      timeSec = (curr.time.getTime() - prev.time.getTime()) / 1000;
+    }
+
+    let speedKmh = 0;
+    let speedMps = 0;
+
+    if (timeSec > 0) {
+      const rawSpeedKmh = distKm / (timeSec / 3600);
+      const rawSpeedMps = rawSpeedKmh / 3.6;
+
+      // Check Accel
+      const accel = (rawSpeedMps - prevSpeedMps) / timeSec;
+
+      if (accel > MAX_ACCEL) {
+        // Clamp speed to max possible acceleration
+        speedMps = prevSpeedMps + (MAX_ACCEL * timeSec);
+        speedKmh = speedMps * 3.6;
+      } else {
+        speedKmh = rawSpeedKmh;
+        speedMps = rawSpeedMps;
+      }
+
+      // Hard sanity check (e.g. 350km/h)
+      if (speedKmh > 350) speedKmh = prevSpeedMps * 3.6; // Reuse prev speed if nonsense
+    }
+
+    results.push({ speed: speedKmh, time: timeSec, distance: distKm });
+    prevSpeedMps = speedKmh / 3.6;
+  }
+
+  return results;
 }
 

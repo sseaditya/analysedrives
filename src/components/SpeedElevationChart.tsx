@@ -65,6 +65,9 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
   // We need raw data for every point to perform accurate smoothing before sampling
   const rawData: { dist: number; speed: number; ele: number | null; time: Date | undefined }[] = [];
 
+  const MAX_ACCEL = 10; // m/s^2 matching gpxParser logic
+  let prevSpeedMps = 0;
+
   for (let i = 1; i < points.length; i++) {
     const prev = points[i - 1];
     const curr = points[i];
@@ -72,18 +75,38 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
     const distance = haversineDistance(prev.lat, prev.lon, curr.lat, curr.lon);
     cumulativeDistance += distance;
 
-    let speed = 0;
+    let speedKmh = 0;
+    let speedMps = 0;
+
     if (prev.time && curr.time) {
-      const timeDiff = (curr.time.getTime() - prev.time.getTime()) / 1000 / 3600;
+      const timeDiff = (curr.time.getTime() - prev.time.getTime()) / 1000;
       if (timeDiff > 0) {
-        speed = distance / timeDiff;
-        if (speed > 200) speed = 0;
+        const rawSpeedKmh = distance / (timeDiff / 3600);
+        const rawSpeedMps = rawSpeedKmh / 3.6;
+
+        // Check Accel
+        const accel = (rawSpeedMps - prevSpeedMps) / timeDiff;
+
+        if (accel > MAX_ACCEL) {
+          // Clamp
+          speedMps = prevSpeedMps + (MAX_ACCEL * timeDiff);
+          speedKmh = speedMps * 3.6;
+        } else {
+          speedKmh = rawSpeedKmh;
+          speedMps = rawSpeedMps;
+        }
+
+        // Outlier rejection (hard 350 cap)
+        if (speedKmh > 350) speedKmh = prevSpeedMps * 3.6;
       }
     }
 
+    // Update State
+    prevSpeedMps = speedMps;
+
     rawData.push({
       dist: parseFloat(cumulativeDistance.toFixed(2)),
-      speed,
+      speed: speedKmh,
       ele: curr.ele !== undefined ? curr.ele : null,
       time: curr.time
     });
