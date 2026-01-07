@@ -164,31 +164,7 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
     const shouldRenderSegments = (mode !== 'plain') || (mode === 'plain' && zoomRange);
 
     if (shouldRenderSegments) {
-      let maxSpeed = 1;
-      let maxAccel = 1.5;  // Fallback
-      let maxBrake = 2.0;  // Fallback
 
-      if (mode === 'speed') {
-        // Percentiles are handled via the useMemo hook (speedPercentiles)
-        // No pre-calc needed here
-      } else if (mode === 'acceleration') {
-        // Calculate dynamic thresholds based on 90th percentile
-        // This makes jerky rides more colorful, smooth rides more subtle
-        const accelValues = segments.map(s => s.acceleration).filter(a => a > 0.1);
-        const brakeValues = segments.map(s => Math.abs(s.acceleration)).filter(a => a > 0.1);
-
-        if (accelValues.length > 0) {
-          const sortedAccel = [...accelValues].sort((a, b) => a - b);
-          const p90Index = Math.floor(sortedAccel.length * 0.90);
-          maxAccel = Math.max(sortedAccel[p90Index] || 1.5, 1.0);
-        }
-
-        if (brakeValues.length > 0) {
-          const sortedBrake = [...brakeValues].sort((a, b) => a - b);
-          const p90Index = Math.floor(sortedBrake.length * 0.90);
-          maxBrake = Math.max(sortedBrake[p90Index] || 2.0, 1.0);
-        }
-      }
 
       segments.forEach((seg, i) => {
         const p1 = points[i];
@@ -225,13 +201,13 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
           const val = seg.acceleration;
 
           if (val > 0.1) {
-            // Green gradient for acceleration - dynamic scale
-            const ratio = Math.min(val / maxAccel, 1);
+            // Green gradient for acceleration - Fixed scale 2 m/s²
+            const ratio = Math.min(val / 2.0, 1);
             const lightness = 95 - (ratio * 50); // From very light green to deep green
             color = `hsl(142, 85%, ${lightness}%)`;
           } else if (val < -0.1) {
-            // Red gradient for braking - dynamic scale
-            const ratio = Math.min(Math.abs(val) / maxBrake, 1);
+            // Red gradient for braking - Fixed scale 3 m/s²
+            const ratio = Math.min(Math.abs(val) / 3.0, 1);
             const lightness = 95 - (ratio * 50); // From very light red to deep red
             color = `hsl(0, 90%, ${lightness}%)`;
           } else {
