@@ -46,6 +46,8 @@ export interface GPXStats {
   medianStraightLength: number; // km
   percentStraight: number;
   tightTurnPoints?: [number, number][];
+  hardAccelPoints?: [number, number, number][]; // [lat, lon, m/s²]
+  hardBrakePoints?: [number, number, number][]; // [lat, lon, m/s²]
 }
 
 // Haversine formula to calculate distance between two GPS points
@@ -511,6 +513,8 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
   // State for event-based counting
   let inHardAccelEvent = false;
   let inHardBrakeEvent = false;
+  const hardAccelPoints: [number, number, number][] = [];
+  const hardBrakePoints: [number, number, number][] = [];
 
   for (let i = 0; i < smoothedSpeeds.length; i++) {
     const speed = smoothedSpeeds[i];
@@ -529,6 +533,11 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
       if (!inHardAccelEvent) {
         hardAccelerationCount++;
         inHardAccelEvent = true;
+        // Record the point with its acceleration value
+        const point = points[i + 1]; // i+1 because segments are between points
+        if (point) {
+          hardAccelPoints.push([point.lat, point.lon, smoothedAccel]);
+        }
       }
     } else {
       inHardAccelEvent = false;
@@ -538,6 +547,11 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
       if (!inHardBrakeEvent) {
         hardBrakingCount++;
         inHardBrakeEvent = true;
+        // Record the point with its acceleration value
+        const point = points[i + 1]; // i+1 because segments are between points
+        if (point) {
+          hardBrakePoints.push([point.lat, point.lon, Math.abs(smoothedAccel)]);
+        }
       }
     } else {
       inHardBrakeEvent = false;
@@ -631,6 +645,8 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
     medianStraightLength,
     percentStraight,
     tightTurnPoints,
+    hardAccelPoints,
+    hardBrakePoints,
   };
 }
 
@@ -647,7 +663,7 @@ export function analyzeSegments(points: GPXPoint[]): TrackSegment[] {
   const speeds = robustSegments.map(s => s.speed);
   const timeDeltas = robustSegments.map(s => s.time);
 
-  // 2. Smooth Speeds (Moving Average)
+  // 1. Smooth Speeds (Moving Average)
   const smoothedSpeeds: number[] = [];
   const WINDOW_SIZE = 5;
 
@@ -666,22 +682,43 @@ export function analyzeSegments(points: GPXPoint[]): TrackSegment[] {
     smoothedSpeeds.push(count > 0 ? sum / count : 0);
   }
 
-  // 3. Calculate Acceleration and Build Segments
+  // 2. Calculate Raw Accelerations
+  const rawAccelerations: number[] = [];
   for (let i = 0; i < smoothedSpeeds.length; i++) {
-    const currentSpeed = smoothedSpeeds[i]; // km/h
-
-    let acceleration = 0;
     const time = timeDeltas[i];
-
     if (i > 0 && time > 0) {
       const v1 = smoothedSpeeds[i - 1] / 3.6; // m/s
       const v2 = smoothedSpeeds[i] / 3.6;   // m/s
-      acceleration = (v2 - v1) / time;
+      rawAccelerations.push((v2 - v1) / time);
+    } else {
+      rawAccelerations.push(0);
     }
+  }
 
+  // 3. Smooth Accelerations (Moving Average)
+  const ACCEL_WINDOW_SIZE = 5;
+  const smoothedAccelerations: number[] = [];
+
+  for (let i = 0; i < rawAccelerations.length; i++) {
+    let sum = 0;
+    let count = 0;
+    const offset = Math.floor(ACCEL_WINDOW_SIZE / 2);
+
+    for (let j = -offset; j <= offset; j++) {
+      const idx = i + j;
+      if (idx >= 0 && idx < rawAccelerations.length) {
+        sum += rawAccelerations[idx];
+        count++;
+      }
+    }
+    smoothedAccelerations.push(count > 0 ? sum / count : 0);
+  }
+
+  // 4. Build Segments with Smoothed Data
+  for (let i = 0; i < smoothedSpeeds.length; i++) {
     segments.push({
-      speed: currentSpeed,
-      acceleration
+      speed: smoothedSpeeds[i],
+      acceleration: smoothedAccelerations[i]
     });
   }
 

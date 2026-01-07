@@ -444,6 +444,8 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                   zoomRange={zoomRange}
                   stopPoints={stats.stopPoints}
                   tightTurnPoints={stats.tightTurnPoints}
+                  hardAccelPoints={stats.hardAccelPoints}
+                  hardBrakePoints={stats.hardBrakePoints}
                   privacyMask={privacyMask}
                 />
               </div>
