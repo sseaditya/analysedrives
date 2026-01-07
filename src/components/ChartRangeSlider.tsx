@@ -15,8 +15,6 @@ interface ChartRangeSliderProps {
     zoomRange: [number, number] | null;
     onZoomChange: (range: [number, number] | null) => void;
     height?: number;
-    leftMargin?: number;
-    rightMargin?: number;
 }
 
 // Haversine formula
@@ -43,9 +41,7 @@ const ChartRangeSlider: React.FC<ChartRangeSliderProps> = ({
     points,
     zoomRange,
     onZoomChange,
-    height = 80,
-    leftMargin = 0,
-    rightMargin = 0
+    height = 80
 }) => {
     const chartData = useMemo(() => {
         let cumulativeDistance = 0;
@@ -59,6 +55,10 @@ const ChartRangeSlider: React.FC<ChartRangeSliderProps> = ({
             });
         }
 
+        // Downsample if needed for performance, but need to be careful with index mapping.
+        // Recharts Brush works on indices of the provided data array.
+        // If we want accurate mapping, we should pass all points or a consistent subsample.
+        // For now, passing all points is safest for index alignment.
         for (let i = 1; i < points.length; i++) {
             const prev = points[i - 1];
             const curr = points[i];
@@ -91,7 +91,11 @@ const ChartRangeSlider: React.FC<ChartRangeSliderProps> = ({
             <ResponsiveContainer width="100%" height="100%">
                 <AreaChart
                     data={chartData}
-                    margin={{ top: 0, right: rightMargin, left: leftMargin, bottom: 0 }}
+                    // Match the margins of SpeedElevationChart: top: 10, right: 30, left: 0, bottom: 0 
+                    // SpeedElevationChart has 30px right margin. 
+                    // SpeedElevationChart has 0px left margin, but 60px Axis.
+                    // We must replicate this structure.
+                    margin={{ top: 0, right: 30, left: 0, bottom: 0 }}
                 >
                     <defs>
                         <linearGradient id="brushGradient" x1="0" y1="0" x2="0" y2="1">
@@ -102,21 +106,40 @@ const ChartRangeSlider: React.FC<ChartRangeSliderProps> = ({
 
                     <XAxis
                         dataKey="distance"
+                        type="number" // Ensure linear distribution by distance
+                        domain={['dataMin', 'dataMax']}
                         axisLine={false}
                         tickLine={{ stroke: '#9ca3af', height: 4 }}
                         tickFormatter={(val) => `${Math.round(val)} km`}
-                        minTickGap={30}
+                        minTickGap={50}
                         interval="preserveStartEnd"
                         tick={{ fontSize: 10, fill: '#6b7280' }}
                         dy={4}
                     />
-                    {/* Hidden YAxis to ensure chart renders correctly within margins */}
-                    <YAxis hide domain={['dataMin', 'dataMax']} />
+
+                    {/* Dummy Left Axis to match SpeedElevationChart spacing (width=60) */}
+                    <YAxis
+                        yAxisId="left"
+                        orientation="left"
+                        width={60}
+                        hide // It's invisible, just here for spacing
+                        domain={['dataMin', 'dataMax']}
+                    />
+
+                    {/* Dummy Right Axis to match SpeedElevationChart spacing (width=60) */}
+                    <YAxis
+                        yAxisId="right"
+                        orientation="right"
+                        width={60}
+                        hide
+                        domain={['dataMin', 'dataMax']}
+                    />
 
                     <Area
+                        yAxisId="left"
                         type="monotone"
                         dataKey="elevation"
-                        stroke="hsl(262, 83%, 58%)" // Primary purple-ish match
+                        stroke="hsl(262, 83%, 58%)"
                         fill="url(#brushGradient)"
                         strokeWidth={1}
                         isAnimationActive={false}

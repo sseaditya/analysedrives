@@ -285,7 +285,12 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
               dataKey="distance"
               type="number"
               domain={["dataMin", "dataMax"]}
-              hide // Hide the axis completely (slider serves as axis)
+              stroke="#9ca3af" // Restore stroke
+              fontSize={12}    // Restore font size
+              tickLine={false}
+              axisLine={false}
+              tickCount={8}
+              tickFormatter={(value) => `${Math.round(value)} km`}
               allowDataOverflow
             />
             {/* Left Y-axis for Speed (more prominent) */}

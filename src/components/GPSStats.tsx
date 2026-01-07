@@ -522,8 +522,6 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                       zoomRange={zoomRange}
                       onZoomChange={setZoomRange}
                       height={44}
-                      leftMargin={60}
-                      rightMargin={90}
                     />
                   </div>
                 </div>
