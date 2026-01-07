@@ -688,7 +688,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
               {/* Turn & Heading Summary */}
               {/* Geometry Overview Panel */}
               {/* Geometry Overview Panel - Clean Layout */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-16">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
                 <div>
                   <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-6">turning</h4>
                   <div className="flex gap-12">
@@ -716,24 +716,10 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                     </div>
                   </div>
                 </div>
-
-                <div>
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-6">straights</h4>
-                  <div className="flex gap-12">
-                    <div>
-                      <span className="block text-2xl font-normal text-foreground">{formatDistance(stats.longestStraightSection)}</span>
-                      <span className="text-xs text-muted-foreground mt-1 block">Longest</span>
-                    </div>
-                    <div>
-                      <span className="block text-2xl font-normal text-foreground">{stats.percentStraight.toFixed(1)}%</span>
-                      <span className="text-xs text-muted-foreground mt-1 block">Straight %</span>
-                    </div>
-                  </div>
-                </div>
               </div>
 
               {/* Advanced Geometry Analysis */}
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 gap-8">
                 {/* Straight vs Curvy Profile */}
                 <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
                   <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
@@ -781,32 +767,6 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                           </div>
                         );
                       })}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Turn Intensity Section */}
-                <div className="bg-card border border-border rounded-2xl p-6 shadow-sm flex flex-col justify-center text-center">
-                  <div className="mb-6">
-                    <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <RotateCcw className="w-8 h-8 text-primary" />
-                    </div>
-                    <h3 className="text-xl font-bold">Turn Intensity</h3>
-                    <p className="text-muted-foreground text-sm">Characterizing the technicality of the route</p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-8">
-                    <div>
-                      <p className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground mb-2">Turns / km</p>
-                      <p className="text-2xl font-normal text-foreground leading-none">
-                        {stats.totalDistance > 0 ? ((stats.tightTurnsCount / stats.totalDistance)).toFixed(1) : "0.0"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground mb-2">Complexity</p>
-                      <p className="text-2xl font-normal text-foreground uppercase leading-none">
-                        {stats.twistinessScore < 100 ? "Low" : stats.twistinessScore < 500 ? "Medium" : "High"}
-                      </p>
                     </div>
                   </div>
                 </div>

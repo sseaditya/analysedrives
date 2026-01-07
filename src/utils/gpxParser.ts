@@ -318,11 +318,15 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
         if (delta > 180) delta = 360 - delta;
 
         totalHeadingChange += delta;
-        if (delta > 45) {
-          tightTurnsCount++;
-          tightTurnPoints.push([curr.lat, curr.lon]);
+
+        // Apply smoothing threshold: Only count turns > 10 degrees to filter GPS noise
+        if (delta > 10) {
+          if (delta > 45) {
+            tightTurnsCount++;
+            tightTurnPoints.push([curr.lat, curr.lon]);
+          }
+          if (delta > 135) hairpinCount++;
         }
-        if (delta > 135) hairpinCount++;
 
         // Straight section logic (threshold 5 degrees)
         if (delta < 5) {
