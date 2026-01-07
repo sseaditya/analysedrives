@@ -685,8 +685,13 @@ function calculateRobustSpeeds(points: GPXPoint[]): { speed: number; time: numbe
   if (points.length < 2) return [];
 
   const results: { speed: number; time: number; distance: number }[] = [];
-  const MAX_ACCEL = 10; // m/s^2 (~36 km/h per second) - Aggressive but possible limit
-  // const MAX_DECEL = 15; // m/s^2
+  // Dynamic Acceleration Limit
+  // 9.0 m/s^2 at 0 km/h (launch)
+  // Decays by 1 m/s^2 every 25 km/h
+  // Min 2.0 m/s^2 at high speeds (>175 km/h)
+  const getMaxAccel = (speedKmh: number) => {
+    return Math.max(2.0, 9.0 - (speedKmh / 25.0));
+  };
 
   let prevSpeedMps = 0;
 
@@ -708,12 +713,16 @@ function calculateRobustSpeeds(points: GPXPoint[]): { speed: number; time: numbe
       const rawSpeedKmh = distKm / (timeSec / 3600);
       const rawSpeedMps = rawSpeedKmh / 3.6;
 
-      // Check Accel
+      // Check Accel against Dynamic Limit based on CURRENT Speed (or prev speed)
+      // Using Prev Speed is safer for causality
+      const prevSpeedKmh = prevSpeedMps * 3.6;
+      const maxAccel = getMaxAccel(prevSpeedKmh);
+
       const accel = (rawSpeedMps - prevSpeedMps) / timeSec;
 
-      if (accel > MAX_ACCEL) {
+      if (accel > maxAccel) {
         // Clamp speed to max possible acceleration
-        speedMps = prevSpeedMps + (MAX_ACCEL * timeSec);
+        speedMps = prevSpeedMps + (maxAccel * timeSec);
         speedKmh = speedMps * 3.6;
       } else {
         speedKmh = rawSpeedKmh;

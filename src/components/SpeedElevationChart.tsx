@@ -65,7 +65,11 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
   // We need raw data for every point to perform accurate smoothing before sampling
   const rawData: { dist: number; speed: number; ele: number | null; time: Date | undefined }[] = [];
 
-  const MAX_ACCEL = 10; // m/s^2 matching gpxParser logic
+  // Dynamic Acceleration Limit - Matching gpxParser logic
+  const getMaxAccel = (speedKmh: number) => {
+    return Math.max(2.0, 9.0 - (speedKmh / 25.0));
+  };
+
   let prevSpeedMps = 0;
 
   for (let i = 1; i < points.length; i++) {
@@ -84,12 +88,15 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
         const rawSpeedKmh = distance / (timeDiff / 3600);
         const rawSpeedMps = rawSpeedKmh / 3.6;
 
-        // Check Accel
+        // Check Accel against Dynamic Limit
+        const prevSpeedKmh = prevSpeedMps * 3.6;
+        const maxAccel = getMaxAccel(prevSpeedKmh);
+
         const accel = (rawSpeedMps - prevSpeedMps) / timeDiff;
 
-        if (accel > MAX_ACCEL) {
+        if (accel > maxAccel) {
           // Clamp
-          speedMps = prevSpeedMps + (MAX_ACCEL * timeDiff);
+          speedMps = prevSpeedMps + (maxAccel * timeDiff);
           speedKmh = speedMps * 3.6;
         } else {
           speedKmh = rawSpeedKmh;
