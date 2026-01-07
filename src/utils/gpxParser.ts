@@ -714,10 +714,10 @@ export function analyzeSegments(points: GPXPoint[]): TrackSegment[] {
     smoothedAccelerations.push(count > 0 ? sum / count : 0);
   }
 
-  // 4. Build Segments with Smoothed Data
+  // 4. Build Segments with Smoothed Data (Acceleration) but Raw/Robust Speed
   for (let i = 0; i < smoothedSpeeds.length; i++) {
     segments.push({
-      speed: smoothedSpeeds[i],
+      speed: speeds[i], // Use Robust Speed (not smoothed) as requested
       acceleration: smoothedAccelerations[i]
     });
   }
