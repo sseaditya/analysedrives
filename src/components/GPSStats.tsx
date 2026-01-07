@@ -516,7 +516,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                     />
                   </ResponsiveContainer>
                   {/* Range Slider for Zooming (Embedded) */}
-                  <div className="h-[44px] w-full mt-2">
+                  <div className="h-[44px] w-full mt-2 pl-[60px] pr-[90px]">
                     <ChartRangeSlider
                       points={points}
                       zoomRange={zoomRange}
