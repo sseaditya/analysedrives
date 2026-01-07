@@ -382,6 +382,37 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
     if (avg > maxSpeed && avg < 200) maxSpeed = avg;
   }
 
+  // --- NEW: Smoothed Acceleration Calculation for Robust Motion Stats ---
+
+  // 1. Calculate Raw Accelerations
+  const rawAccelerations: number[] = [];
+  for (let i = 0; i < smoothedSpeeds.length; i++) {
+    const time = timeDeltas[i];
+    if (i > 0 && time > 0) {
+      // (v2 - v1) / t, convert km/h to m/s
+      const accel = (smoothedSpeeds[i] / 3.6 - smoothedSpeeds[i - 1] / 3.6) / time;
+      rawAccelerations.push(accel);
+    } else {
+      rawAccelerations.push(0);
+    }
+  }
+
+  // 2. Smooth Accelerations (Moving Average)
+  const ACCEL_WINDOW_SIZE = 5;
+  const smoothedAccelerations: number[] = [];
+  for (let i = 0; i < rawAccelerations.length; i++) {
+    let sum = 0, count = 0;
+    const offset = Math.floor(ACCEL_WINDOW_SIZE / 2);
+    for (let j = -offset; j <= offset; j++) {
+      const idx = i + j;
+      if (idx >= 0 && idx < rawAccelerations.length) {
+        sum += rawAccelerations[idx];
+        count++;
+      }
+    }
+    smoothedAccelerations.push(count > 0 ? sum / count : 0);
+  }
+
   // Calculate Motion Stats
   let hardAccelerationCount = 0;
   let hardBrakingCount = 0;
@@ -393,32 +424,51 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
   let turbulenceSum = 0;
 
   const STOP_THRESHOLD = 5.0; // km/h
-  const ACCEL_THRESHOLD = 0.2; // m/s^2 for "accelerating"
-  const HARD_ACCEL = 2.5;
-  const HARD_BRAKE = -3.0;
+  const ACCEL_THRESHOLD = 0.5; // m/s^2 (Increased from 0.2 to filter noise)
+  const BRAKE_THRESHOLD = -0.5; // m/s^2 (Increased from -0.2)
+  const HARD_ACCEL_LIMIT = 2.5;
+  const HARD_BRAKE_LIMIT = -3.0;
 
   let isCurrentlyStoppedSegment = false;
   let potentialStopDuration = 0;
   let potentialStopStartIndex = -1;
   const stopPoints: [number, number][] = [];
 
+  // State for event-based counting
+  let inHardAccelEvent = false;
+  let inHardBrakeEvent = false;
+
   for (let i = 0; i < smoothedSpeeds.length; i++) {
     const speed = smoothedSpeeds[i];
     const time = timeDeltas[i];
+    const accel = smoothedAccelerations[i];
 
-    let accel = 0;
-    if (i > 0 && time > 0) {
-      accel = (smoothedSpeeds[i] / 3.6 - smoothedSpeeds[i - 1] / 3.6) / time;
-    }
-
-    if (i > 1) {
-      const prevAccel = (smoothedSpeeds[i - 1] / 3.6 - smoothedSpeeds[i - 2] / 3.6) / timeDeltas[i - 1];
+    // Turbulence: Change in acceleration
+    if (i > 0) {
+      const prevAccel = smoothedAccelerations[i - 1];
       turbulenceSum += Math.abs(accel - prevAccel);
     }
 
-    if (accel > HARD_ACCEL) hardAccelerationCount++;
-    if (accel < HARD_BRAKE) hardBrakingCount++;
+    // --- Hard Point Event Detection (Smoothed) ---
+    if (accel > HARD_ACCEL_LIMIT) {
+      if (!inHardAccelEvent) {
+        hardAccelerationCount++;
+        inHardAccelEvent = true;
+      }
+    } else {
+      inHardAccelEvent = false;
+    }
 
+    if (accel < HARD_BRAKE_LIMIT) {
+      if (!inHardBrakeEvent) {
+        hardBrakingCount++;
+        inHardBrakeEvent = true;
+      }
+    } else {
+      inHardBrakeEvent = false;
+    }
+
+    // --- Motion Profile Time Bucketing ---
     if (speed < STOP_THRESHOLD) {
       stoppedTime += time;
       potentialStopDuration += time;
@@ -427,8 +477,9 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
         potentialStopStartIndex = i;
       }
     } else {
+      // Use smoothed acceleration for improved motion categorization
       if (accel > ACCEL_THRESHOLD) timeAccelerating += time;
-      else if (accel < -ACCEL_THRESHOLD) timeBraking += time;
+      else if (accel < BRAKE_THRESHOLD) timeBraking += time;
       else timeCruising += time;
 
       if (isCurrentlyStoppedSegment) {
