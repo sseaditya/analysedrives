@@ -16,8 +16,10 @@ export const HARD_BRAKE_THRESHOLD = -3.0; // m/s^2
 export const CRUISING_THRESHOLD = 0.4;   // m/s^2 (±0.4 is cruising)
 
 // Gap Filtering
-export const MAX_VALID_GAP_PERCENTILE = 0.95; // Ignore acceleration on top 5% time gaps
+export const MAX_VALID_GAP_PERCENTILE = 0.90; // Ignore acceleration on top 10% time gaps
 export const MIN_GAP_DURATION = 5.0; // Only filter if gap is > 5 seconds
+export const GAP_BUFFER_SECONDS = 30.0; // Ignore events ±30s around large gaps
+export const CANCELLATION_WINDOW = 30.0; // Cancel Accel/Brake pairs within 30s
 
 export interface GPXStats {
   totalDistance: number; // in kilometers
@@ -225,6 +227,176 @@ export function parseGPX(gpxContent: string): GPXPoint[] {
   return points;
 }
 
+// --- SHARED FILTERING LOGIC ---
+interface FilterResult {
+  finalAccelerations: number[];
+  hardAccelPoints: [number, number, number][];
+  hardBrakePoints: [number, number, number][];
+  hardAccelerationCount: number;
+  hardBrakingCount: number;
+}
+
+function applyAdvancedFiltering(
+  smoothedAccelerations: number[],
+  timeDeltas: number[],
+  points: GPXPoint[],
+  isClampedArray: boolean[]
+): FilterResult {
+  const finalAccelerations = [...smoothedAccelerations];
+  let hardAccelerationCount = 0;
+  let hardBrakingCount = 0;
+  const hardAccelPoints: [number, number, number][] = [];
+  const hardBrakePoints: [number, number, number][] = [];
+
+  // Gap & Clamp Filtering Indices
+  const invalidIndices = new Set<number>();
+  const p95TimeGap = getPercentile(timeDeltas, MAX_VALID_GAP_PERCENTILE);
+  let currentTimeIterator = 0;
+
+  // Build time map for buffer checks
+  const timeMap = timeDeltas.map(t => {
+    const start = currentTimeIterator;
+    currentTimeIterator += t;
+    return { start, mid: start + t / 2, end: currentTimeIterator };
+  });
+
+  // 1. Identify Invalid Regions (Gaps > P90 or Clamped)
+  for (let i = 0; i < timeDeltas.length; i++) {
+    const time = timeDeltas[i];
+    const isLargeGap = time > p95TimeGap && time > MIN_GAP_DURATION;
+    const isClamped = isClampedArray[i];
+
+    if (isLargeGap || isClamped) {
+      // Mark this index invalid
+      invalidIndices.add(i);
+
+      // Mark surrounding indices within buffer invalid
+      const gapTime = timeMap[i].mid;
+      for (let j = 0; j < timeMap.length; j++) {
+        if (invalidIndices.has(j)) continue;
+        if (Math.abs(timeMap[j].mid - gapTime) <= GAP_BUFFER_SECONDS) {
+          invalidIndices.add(j);
+        }
+      }
+    }
+  }
+
+  // 2. Collect Candidates (ignoring invalid indices)
+  interface CandidateEvent {
+    index: number;
+    type: 'ACCEL' | 'BRAKE';
+    time: number;
+    lat: number;
+    lon: number;
+    magnitude: number;
+  }
+  let candidateEvents: CandidateEvent[] = [];
+
+  for (let i = 0; i < finalAccelerations.length; i++) {
+    // If invalid, force acceleration to 0 and skip event detection
+    if (invalidIndices.has(i)) {
+      finalAccelerations[i] = 0;
+      continue;
+    }
+
+    const val = finalAccelerations[i];
+    const t = timeMap[i].end; // usage timestamp
+
+    if (val > HARD_ACCEL_THRESHOLD) {
+      const p = points[i + 1];
+      if (p) candidateEvents.push({ index: i, type: 'ACCEL', time: t, lat: p.lat, lon: p.lon, magnitude: val });
+    } else if (val < HARD_BRAKE_THRESHOLD) {
+      const p = points[i + 1];
+      if (p) candidateEvents.push({ index: i, type: 'BRAKE', time: t, lat: p.lat, lon: p.lon, magnitude: Math.abs(val) });
+    }
+  }
+
+  // 3. Cluster Decelerations (Keep Max in 30s)
+  const brakeEvents = candidateEvents.filter(e => e.type === 'BRAKE');
+  const processedBrakeEvents: CandidateEvent[] = [];
+
+  if (brakeEvents.length > 0) {
+    let currentCluster: CandidateEvent[] = [brakeEvents[0]];
+    const CLUSTER_WINDOW = 30.0;
+
+    for (let i = 1; i < brakeEvents.length; i++) {
+      const prev = currentCluster[currentCluster.length - 1];
+      const curr = brakeEvents[i];
+
+      if (curr.time - prev.time <= CLUSTER_WINDOW) {
+        currentCluster.push(curr);
+      } else {
+        const maxEvent = currentCluster.reduce((max, e) => e.magnitude > max.magnitude ? e : max, currentCluster[0]);
+        processedBrakeEvents.push(maxEvent);
+        currentCluster = [curr];
+      }
+    }
+    if (currentCluster.length > 0) {
+      const maxEvent = currentCluster.reduce((max, e) => e.magnitude > max.magnitude ? e : max, currentCluster[0]);
+      processedBrakeEvents.push(maxEvent);
+    }
+  }
+
+  // 4. Cancellation (Accel/Brake Pair within 30s -> Remove Both)
+  const accelEvents = candidateEvents.filter(e => e.type === 'ACCEL');
+
+  const accelFlags = new Array(accelEvents.length).fill(true);
+  const brakeFlags = new Array(processedBrakeEvents.length).fill(true);
+
+  for (let i = 0; i < accelEvents.length; i++) {
+    for (let j = 0; j < processedBrakeEvents.length; j++) {
+      if (!accelFlags[i] || !brakeFlags[j]) continue;
+      const tDiff = Math.abs(accelEvents[i].time - processedBrakeEvents[j].time);
+      if (tDiff <= CANCELLATION_WINDOW) {
+        accelFlags[i] = false;
+        brakeFlags[j] = false;
+        // Also neutralize these events on the map!
+        finalAccelerations[accelEvents[i].index] = 0;
+        finalAccelerations[processedBrakeEvents[j].index] = 0;
+        break;
+      }
+    }
+  }
+
+  // 5. Final Output Compilation
+  for (let i = 0; i < accelEvents.length; i++) {
+    if (accelFlags[i]) {
+      hardAccelerationCount++;
+      hardAccelPoints.push([accelEvents[i].lat, accelEvents[i].lon, accelEvents[i].magnitude]);
+    } else {
+      // Ensure cancelled events are zeroed out (redundant check but safe)
+      finalAccelerations[accelEvents[i].index] = 0;
+    }
+  }
+  for (let i = 0; i < processedBrakeEvents.length; i++) {
+    if (brakeFlags[i]) {
+      hardBrakingCount++;
+      hardBrakePoints.push([processedBrakeEvents[i].lat, processedBrakeEvents[i].lon, processedBrakeEvents[i].magnitude]);
+    } else {
+      finalAccelerations[processedBrakeEvents[i].index] = 0;
+    }
+  }
+
+  // Zero out non-max clustered brakes?
+  // Logic: processedBrakeEvents contains only the Max events. All other brakes in the clusters were dropped.
+  // We should zero them out or leave them? User asked to "ignore" them.
+  // Ideally, zero them out so they don't show deep red on map.
+  const keptBrakeIndices = new Set(processedBrakeEvents.map(e => e.index));
+  brakeEvents.forEach(e => {
+    if (!keptBrakeIndices.has(e.index)) {
+      finalAccelerations[e.index] = 0;
+    }
+  });
+
+  return {
+    finalAccelerations,
+    hardAccelPoints,
+    hardBrakePoints,
+    hardAccelerationCount,
+    hardBrakingCount
+  };
+}
+
 export function calculateStats(points: GPXPoint[]): GPXStats {
   const emptyStats: GPXStats = {
     totalDistance: 0,
@@ -296,6 +468,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
 
   // Pre-calculate robust speeds to filter GPS noise
   const robustSegments = calculateRobustSpeeds(points);
+  const isClampedArray = robustSegments.map(s => s.isClamped);
 
   // Smooth elevation data to prevent noise inflation
   const ELEVATION_WINDOW_SIZE = 5;
@@ -463,7 +636,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
   }
 
   // Apply Smoothing (Moving Average)
-  const WINDOW_SIZE = 5;
+  const WINDOW_SIZE = SPEED_SMOOTHING_WINDOW;
   const smoothedSpeeds: number[] = [];
   for (let i = 0; i < speeds.length; i++) {
     let sum = 0, count = 0;
@@ -497,7 +670,6 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
   }
 
   // 2. Smooth Accelerations (Moving Average)
-  // 2. Smooth Accelerations (Moving Average)
   // Unified Window Size
   const ACCEL_WINDOW = ACCEL_SMOOTHING_WINDOW;
   const smoothedAccelerations: number[] = [];
@@ -514,8 +686,16 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
     smoothedAccelerations.push(count > 0 ? sum / count : 0);
   }
 
-  // Calculate Motion Stats
-  // Calculate Motion Stats
+  // APPLY SHARED FILTERING LOGIC
+  const {
+    finalAccelerations, // Has 0s for gaps/cancelled
+    hardAccelPoints,
+    hardBrakePoints,
+    hardAccelerationCount,
+    hardBrakingCount
+  } = applyAdvancedFiltering(smoothedAccelerations, timeDeltas, points, isClampedArray);
+
+  // Calculate Motion Stats using FINAL (Filtered) Accelerations
   let timeAccelerating = 0;
   let timeBraking = 0;
   let timeCruising = 0;
@@ -529,97 +709,23 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
   let potentialStopStartIndex = -1;
   const stopPoints: [number, number][] = [];
 
-  // --- NEW: Advanced Event Filtering System ---
-  interface CandidateEvent {
-    index: number;
-    type: 'ACCEL' | 'BRAKE';
-    time: number; // relative time in seconds from start
-    lat: number;
-    lon: number;
-    magnitude: number;
-  }
-  let candidateEvents: CandidateEvent[] = [];
-  let gapRegions: { startTime: number; endTime: number }[] = [];
-  let currentTimeIterator = 0;
-
-  // Calculate 95th percentile of time deltas for gap filtering
-  const p95TimeGap = getPercentile(timeDeltas, MAX_VALID_GAP_PERCENTILE);
-
-
-  // 1. First Pass: Collect Candidates & Gaps
-  let inHardAccelEvent = false;
-  let inHardBrakeEvent = false;
-
   for (let i = 0; i < smoothedSpeeds.length; i++) {
     const speed = smoothedSpeeds[i];
     const time = timeDeltas[i];
-    const smoothedAccel = smoothedAccelerations[i];
-    const rawAccel = rawAccelerations[i];
+    const finalAccel = finalAccelerations[i]; // Use filtered acceleration
+    const smoothedAccel = smoothedAccelerations[i]; // Keep original for turbulence? Or use filtered? 
+    // Filtered is cleaner for score.
 
-    // Accumulate time for event timestamping
-    currentTimeIterator += time;
-
-    // Detect Gaps
-    const isLargeGap = time > p95TimeGap && time > MIN_GAP_DURATION;
-    if (isLargeGap) {
-      gapRegions.push({
-        startTime: currentTimeIterator - time,
-        endTime: currentTimeIterator
-      });
-    }
-
-    // Turbulence: Change in acceleration
+    // Turbulence: Change in acceleration (using unfiltered for raw roughness, or filtered for clean score?)
+    // Let's use smoothed (unfiltered) to capture road bumps, OR final?
+    // User wants to ignore artifacts. Use Final.
     if (i > 0) {
-      const prevAccel = smoothedAccelerations[i - 1];
-      turbulenceSum += Math.abs(smoothedAccel - prevAccel);
+      const prevAccel = finalAccelerations[i - 1]; // Use final
+      turbulenceSum += Math.abs(finalAccel - prevAccel);
     }
 
-    // --- Hard Point Event Detection (Collect Candidates) ---
-    // Only count hard events if NOT a large gap (basic filter first)
-    if (!isLargeGap) {
-      if (smoothedAccel > HARD_ACCEL_THRESHOLD) {
-        if (!inHardAccelEvent) {
-          inHardAccelEvent = true;
-          const point = points[i + 1];
-          if (point) {
-            candidateEvents.push({
-              index: i,
-              type: 'ACCEL',
-              time: currentTimeIterator,
-              lat: point.lat,
-              lon: point.lon,
-              magnitude: smoothedAccel
-            });
-          }
-        }
-      } else {
-        inHardAccelEvent = false;
-      }
-
-      if (smoothedAccel < HARD_BRAKE_THRESHOLD) {
-        if (!inHardBrakeEvent) {
-          inHardBrakeEvent = true;
-          const point = points[i + 1];
-          if (point) {
-            candidateEvents.push({
-              index: i,
-              type: 'BRAKE',
-              time: currentTimeIterator,
-              lat: point.lat,
-              lon: point.lon,
-              magnitude: Math.abs(smoothedAccel)
-            });
-          }
-        }
-      } else {
-        inHardBrakeEvent = false;
-      }
-    } else {
-      inHardAccelEvent = false;
-      inHardBrakeEvent = false;
-    }
-
-    // --- Motion Profile Time Bucketing (Uses Raw Acceleration) ---
+    // --- Motion Profile Time Bucketing (Uses FILTERED Acceleration now) ---
+    // If it was cancelled/gap, finalAccel is 0 -> Cruising. Correct.
     if (speed < STOP_SPEED_THRESHOLD) {
       stoppedTime += time;
       potentialStopDuration += time;
@@ -628,14 +734,8 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
         potentialStopStartIndex = i;
       }
     } else {
-      // Use raw acceleration for motion profile, but respecting large gap filtering
-      let effectiveAccel = rawAccel;
-      if (isLargeGap) {
-        effectiveAccel = 0; // Treat large gaps as constant speed (Cruising) for stats
-      }
-
-      if (effectiveAccel > CRUISING_THRESHOLD) timeAccelerating += time;
-      else if (effectiveAccel < -CRUISING_THRESHOLD) timeBraking += time;
+      if (finalAccel > CRUISING_THRESHOLD) timeAccelerating += time;
+      else if (finalAccel < -CRUISING_THRESHOLD) timeBraking += time;
       else timeCruising += time;
 
       if (isCurrentlyStoppedSegment) {
@@ -660,85 +760,6 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
       stopPoints.push([p.lat, p.lon]);
     }
   }
-
-  // --- 2. Advanced Filtering ---
-
-  // Filter 1: Gap Safety Buffer (Ignore events ±5s around large gaps)
-  const GAP_BUFFER = 5.0;
-  candidateEvents = candidateEvents.filter(ev => {
-    for (const gap of gapRegions) {
-      if (ev.time >= gap.startTime - GAP_BUFFER && ev.time <= gap.endTime + GAP_BUFFER) {
-        return false;
-      }
-    }
-    return true;
-  });
-
-  // Filter 2: Deceleration Clustering (Multiple brakes in 30s -> keep Max)
-  // We will process BRAKE events separately to cluster them
-  const brakeEvents = candidateEvents.filter(e => e.type === 'BRAKE');
-  const accelEvents = candidateEvents.filter(e => e.type === 'ACCEL');
-
-  const processedBrakeEvents: CandidateEvent[] = [];
-  const CLUSTER_WINDOW = 30.0;
-
-  if (brakeEvents.length > 0) {
-    let currentCluster: CandidateEvent[] = [brakeEvents[0]];
-
-    for (let i = 1; i < brakeEvents.length; i++) {
-      const prev = currentCluster[currentCluster.length - 1];
-      const curr = brakeEvents[i];
-
-      if (curr.time - prev.time <= CLUSTER_WINDOW) {
-        currentCluster.push(curr);
-      } else {
-        // Process finished cluster: find max magnitude
-        const maxEvent = currentCluster.reduce((max, e) => e.magnitude > max.magnitude ? e : max, currentCluster[0]);
-        processedBrakeEvents.push(maxEvent);
-        // Start new cluster
-        currentCluster = [curr];
-      }
-    }
-    // Push last cluster leader
-    if (currentCluster.length > 0) {
-      const maxEvent = currentCluster.reduce((max, e) => e.magnitude > max.magnitude ? e : max, currentCluster[0]);
-      processedBrakeEvents.push(maxEvent);
-    }
-  }
-
-  // Filter 3: Cancellation (Accel/Brake Pair within 30s -> Remove Both)
-  const finalAccelEvents: CandidateEvent[] = [];
-  const finalBrakeEvents: CandidateEvent[] = [];
-  const CANCELLATION_WINDOW = 30.0;
-
-  const accelFlags = new Array(accelEvents.length).fill(true);
-  const brakeFlags = new Array(processedBrakeEvents.length).fill(true);
-
-  for (let i = 0; i < accelEvents.length; i++) {
-    for (let j = 0; j < processedBrakeEvents.length; j++) {
-      if (!accelFlags[i] || !brakeFlags[j]) continue;
-
-      const tDiff = Math.abs(accelEvents[i].time - processedBrakeEvents[j].time);
-      if (tDiff <= CANCELLATION_WINDOW) {
-        accelFlags[i] = false;
-        brakeFlags[j] = false;
-        break;
-      }
-    }
-  }
-
-  for (let i = 0; i < accelEvents.length; i++) {
-    if (accelFlags[i]) finalAccelEvents.push(accelEvents[i]);
-  }
-  for (let i = 0; i < processedBrakeEvents.length; i++) {
-    if (brakeFlags[i]) finalBrakeEvents.push(processedBrakeEvents[i]);
-  }
-
-  // --- 3. Export to API Format ---
-  const hardAccelerationCount = finalAccelEvents.length;
-  const hardBrakingCount = finalBrakeEvents.length;
-  const hardAccelPoints = finalAccelEvents.map(e => [e.lat, e.lon, e.magnitude] as [number, number, number]);
-  const hardBrakePoints = finalBrakeEvents.map(e => [e.lat, e.lon, e.magnitude] as [number, number, number]);
 
   let totalTime = 0;
   if (points[0].time && points[points.length - 1].time) {
@@ -808,6 +829,7 @@ export function analyzeSegments(points: GPXPoint[]): TrackSegment[] {
   const robustSegments = calculateRobustSpeeds(points);
   const speeds = robustSegments.map(s => s.speed);
   const timeDeltas = robustSegments.map(s => s.time);
+  const isClampedArray = robustSegments.map(s => s.isClamped);
 
   // 1. Smooth Speeds (Moving Average)
   const smoothedSpeeds: number[] = [];
@@ -861,19 +883,12 @@ export function analyzeSegments(points: GPXPoint[]): TrackSegment[] {
     smoothedAccelerations.push(count > 0 ? sum / count : 0);
   }
 
-  // GAP FILTERING
-  // Calculate 95th percentile of time deltas for gap filtering
-  const p95TimeGap = getPercentile(timeDeltas, MAX_VALID_GAP_PERCENTILE);
+  // GAP & ADVANCED FILTERING
+  const { finalAccelerations } = applyAdvancedFiltering(smoothedAccelerations, timeDeltas, points, isClampedArray);
 
   // 4. Build Segments with Smoothed Data (Acceleration) but Raw/Robust Speed
   for (let i = 0; i < smoothedSpeeds.length; i++) {
-    const time = timeDeltas[i];
-    let accel = smoothedAccelerations[i];
-
-    // Filter large gaps (Time > P95 AND Time > 5s)
-    if (time > p95TimeGap && time > MIN_GAP_DURATION) {
-      accel = 0; // Zero out acceleration for display if it's a gap
-    }
+    const accel = finalAccelerations[i]; // Use filtered acceleration
 
     segments.push({
       speed: speeds[i], // Use Robust Speed (not smoothed) as requested
@@ -1004,10 +1019,10 @@ export function calculateLimitedStats(points: GPXPoint[], speedLimitKmh: number)
  * Calculates robust speeds by clamping physically impossible acceleration.
  * This filters out GPS jitter spikes.
  */
-function calculateRobustSpeeds(points: GPXPoint[]): { speed: number; time: number; distance: number }[] {
+function calculateRobustSpeeds(points: GPXPoint[]): { speed: number; time: number; distance: number; isClamped: boolean }[] {
   if (points.length < 2) return [];
 
-  const results: { speed: number; time: number; distance: number }[] = [];
+  const results: { speed: number; time: number; distance: number; isClamped: boolean }[] = [];
   // Dynamic Acceleration Limit
   // 9.0 m/s^2 at 0 km/h (launch)
   // Decays by 1 m/s^2 every 25 km/h
@@ -1031,6 +1046,7 @@ function calculateRobustSpeeds(points: GPXPoint[]): { speed: number; time: numbe
 
     let speedKmh = 0;
     let speedMps = 0;
+    let isClamped = false;
 
     if (timeSec > 0) {
       const rawSpeedKmh = distKm / (timeSec / 3600);
@@ -1047,16 +1063,20 @@ function calculateRobustSpeeds(points: GPXPoint[]): { speed: number; time: numbe
         // Clamp speed to max possible acceleration
         speedMps = prevSpeedMps + (maxAccel * timeSec);
         speedKmh = speedMps * 3.6;
+        isClamped = true;
       } else {
         speedKmh = rawSpeedKmh;
         speedMps = rawSpeedMps;
       }
 
       // Hard sanity check (e.g. 350km/h)
-      if (speedKmh > 350) speedKmh = prevSpeedMps * 3.6; // Reuse prev speed if nonsense
+      if (speedKmh > 350) {
+        speedKmh = prevSpeedMps * 3.6; // Reuse prev speed if nonsense
+        isClamped = true;
+      }
     }
 
-    results.push({ speed: speedKmh, time: timeSec, distance: distKm });
+    results.push({ speed: speedKmh, time: timeSec, distance: distKm, isClamped });
     prevSpeedMps = speedKmh / 3.6;
   }
 
