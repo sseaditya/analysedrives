@@ -1,15 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { MapPin, LogOut, Upload, Activity, Calendar, Clock, ArrowRight, TrendingUp, Pencil, Trash2, Check, X } from "lucide-react";
+import { MapPin, LogOut, Upload, Activity, Calendar, Clock, ArrowRight, TrendingUp, Pencil, Trash2, Check, X, Search, SlidersHorizontal, ChevronDown, ChevronUp, BarChart3 } from "lucide-react";
 import FileUploader from "@/components/FileUploader";
-import { parseGPX, calculateStats, formatDistance, formatDuration, generatePreviewPolyline } from "@/utils/gpxParser";
+import { parseGPX, calculateStats, formatDistance, formatDuration, generatePreviewPolyline, calculateSpeedDistribution, SpeedBucket } from "@/utils/gpxParser";
 import { supabase } from "@/lib/supabase";
 import ActivityMiniMap from "@/components/ActivityMiniMap";
 import { cn } from "@/lib/utils";
 import StravaImport from "@/components/StravaImport";
 import ProfileEditor from "@/components/ProfileEditor";
+import { Slider } from "@/components/ui/slider";
+import SpeedDistributionChart from "@/components/SpeedDistributionChart";
 
 interface Profile {
     id: string;
@@ -26,6 +28,8 @@ interface ActivityRecord {
     stats: any;
 }
 
+type TimePeriod = 'week' | 'month' | 'year' | 'all';
+
 const Dashboard = () => {
     const { user, signOut } = useAuth();
     const navigate = useNavigate();
@@ -35,6 +39,14 @@ const Dashboard = () => {
     const [loadingActivities, setLoadingActivities] = useState(true);
     const [showUpload, setShowUpload] = useState(false);
     const [profile, setProfile] = useState<Profile | null>(null);
+
+    // Search and Filters
+    const [searchQuery, setSearchQuery] = useState("");
+    const [showFilters, setShowFilters] = useState(false);
+    const [timeFilter, setTimeFilter] = useState<[number, number]>([0, 24]); // Hours
+    const [distFilter, setDistFilter] = useState<[number, number]>([0, 1000]); // km
+    const [speedFilter, setSpeedFilter] = useState<[number, number]>([0, 200]); // km/h
+    const [timePeriod, setTimePeriod] = useState<TimePeriod>('all');
 
     // Edit State
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -147,12 +159,102 @@ const Dashboard = () => {
             });
 
             setActivities(sortedData);
+
+            // Initialize filter bounds based on data
+            if (sortedData.length > 0) {
+                const maxTime = Math.ceil(Math.max(...sortedData.map(a => (a.stats?.totalTime || 0) / 3600)) + 1);
+                const maxDist = Math.ceil(Math.max(...sortedData.map(a => (a.stats?.totalDistance || 0))) + 10);
+                const maxSpeed = Math.ceil(Math.max(...sortedData.map(a => (a.stats?.maxSpeed || 0))) + 10);
+
+                setTimeFilter([0, maxTime]);
+                setDistFilter([0, maxDist]);
+                setSpeedFilter([0, maxSpeed]);
+            }
         } catch (err) {
             console.error("Error fetching activities:", err);
         } finally {
             setLoadingActivities(false);
         }
     };
+
+    // --- Computed Data ---
+
+    const filteredActivities = useMemo(() => {
+        return activities.filter(activity => {
+            // 1. Search (Title)
+            if (searchQuery && !activity.title.toLowerCase().includes(searchQuery.toLowerCase())) {
+                return false;
+            }
+
+            const stats = activity.stats || {};
+            const timeHours = (stats.totalTime || 0) / 3600;
+            const distKm = stats.totalDistance || 0;
+            const avgSpeed = stats.avgSpeed || 0;
+
+            // 2. Filters
+            // Time: Check range. If slider is at max, treat as "and above" for the upper bound? 
+            // The user asked for "greater than". Range slider covers this if min is set high.
+            // Let's just use strict range for now, but ensure max is dynamic.
+            if (timeHours < timeFilter[0] || timeHours > timeFilter[1]) return false;
+            if (distKm < distFilter[0] || distKm > distFilter[1]) return false;
+            if (avgSpeed < speedFilter[0] || avgSpeed > speedFilter[1]) return false;
+
+            return true;
+        });
+    }, [activities, searchQuery, timeFilter, distFilter, speedFilter]);
+
+    const cumulativeStats = useMemo(() => {
+        // First filter by Time Period
+        const now = new Date();
+        const periodActivities = filteredActivities.filter(a => {
+            if (timePeriod === 'all') return true;
+            const date = new Date(a.stats?.startTime || a.created_at);
+            const diffTime = Math.abs(now.getTime() - date.getTime());
+            const diffDays = diffTime / (1000 * 60 * 60 * 24);
+
+            if (timePeriod === 'week') return diffDays <= 7;
+            if (timePeriod === 'month') return diffDays <= 30;
+            if (timePeriod === 'year') return diffDays <= 365;
+            return true;
+        });
+
+        const count = periodActivities.length;
+        const totalDist = periodActivities.reduce((acc, curr) => acc + (curr.stats?.totalDistance || 0), 0);
+        const totalTime = periodActivities.reduce((acc, curr) => acc + (curr.stats?.totalTime || 0), 0);
+        const totalElevation = periodActivities.reduce((acc, curr) => acc + (curr.stats?.elevationGain || 0), 0);
+        // Weighted Average Speed = Total Distance / Total Time
+        const avgSpeed = totalTime > 0 ? totalDist / (totalTime / 3600) : 0;
+        const maxSpeed = Math.max(...periodActivities.map(a => a.stats?.maxSpeed || 0), 0);
+
+        return {
+            count,
+            totalDist,
+            totalTime,
+            totalElevation,
+            avgSpeed,
+            maxSpeed,
+            activities: periodActivities // Pass for chart
+        };
+    }, [filteredActivities, timePeriod]);
+
+    const aggregatedSpeedDistribution = useMemo(() => {
+        // Aggregate buckets from all valid activities in the current period
+        const bucketMap = new Map<number, { minSpeed: number, time: number, distance: number }>();
+
+        cumulativeStats.activities.forEach(activity => {
+            const dist = activity.stats?.speedDistribution;
+            if (Array.isArray(dist)) {
+                dist.forEach((bucket: any) => {
+                    const existing = bucketMap.get(bucket.minSpeed) || { minSpeed: bucket.minSpeed, time: 0, distance: 0 };
+                    existing.time += bucket.time;
+                    existing.distance += bucket.distance;
+                    bucketMap.set(bucket.minSpeed, existing);
+                });
+            }
+        });
+
+        return Array.from(bucketMap.values()).sort((a, b) => a.minSpeed - b.minSpeed);
+    }, [cumulativeStats]);
 
     const handleSignOut = async () => {
         try {
@@ -237,12 +339,24 @@ const Dashboard = () => {
         <div className="min-h-screen bg-background flex flex-col">
             {/* Dashboard Header */}
             <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-                <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-2 flex-shrink-0">
                         <span className="font-bold text-xl text-foreground hidden md:block">AnalyseDrive</span>
                     </div>
 
-                    <div className="flex items-center gap-4">
+                    {/* Search Bar */}
+                    <div className="flex-1 max-w-md relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <input
+                            type="text"
+                            placeholder="Search drives..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full bg-muted/50 border border-border rounded-full pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                        />
+                    </div>
+
+                    <div className="flex items-center gap-4 flex-shrink-0">
                         <ProfileEditor onProfileUpdate={(updatedProfile) => setProfile(updatedProfile)}>
                             <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
                                 <img
@@ -264,38 +378,102 @@ const Dashboard = () => {
             </header>
 
             <main className="container mx-auto px-4 py-8 flex-1">
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-                    {/* Sidebar / Statistics */}
-                    <div className="hidden lg:block space-y-6">
-                        <div className="bg-card border border-border rounded-2xl p-6 sticky top-24">
-                            <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
-                                <TrendingUp className="w-5 h-5 text-primary" />
-                                Statistics
-                            </h3>
-                            <div className="space-y-4">
-                                <div className="flex justify-between items-center p-3 rounded-lg bg-muted/50">
-                                    <span className="text-sm text-muted-foreground">Total Activities</span>
-                                    <span className="font-bold">{activities.length}</span>
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                    {/* Left Sidebar: Cumulative Stats (3 cols) */}
+                    <div className="hidden lg:block lg:col-span-3 space-y-6">
+                        <div className="bg-card border border-border rounded-2xl p-6 sticky top-24 space-y-8">
+                            <div>
+                                <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
+                                    <TrendingUp className="w-5 h-5 text-primary" />
+                                    Your Progress
+                                </h3>
+
+                                {/* Time Period Tabs */}
+                                <div className="grid grid-cols-4 bg-muted/50 p-1 rounded-lg mb-6">
+                                    {(['week', 'month', 'year', 'all'] as TimePeriod[]).map((p) => (
+                                        <button
+                                            key={p}
+                                            onClick={() => setTimePeriod(p)}
+                                            className={cn(
+                                                "text-[10px] py-1.5 rounded-md font-medium capitalize transition-all",
+                                                timePeriod === p ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                                            )}
+                                        >
+                                            {p}
+                                        </button>
+                                    ))}
                                 </div>
-                                <div className="flex justify-between items-center p-3 rounded-lg bg-muted/50">
-                                    <span className="text-sm text-muted-foreground">Total Distance</span>
-                                    <span className="font-bold">
-                                        {formatDistance(activities.reduce((acc, curr) => acc + (curr.stats?.totalDistance || 0), 0))}
-                                    </span>
+
+                                {/* Main Stats */}
+                                <div className="space-y-4">
+                                    <div className="p-4 rounded-xl bg-orange-500/5 border border-orange-500/10">
+                                        <span className="text-xs text-orange-600 font-semibold uppercase tracking-wider">Total Distance</span>
+                                        <div className="text-2xl font-bold mt-1 text-orange-700">{formatDistance(cumulativeStats.totalDist)}</div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="p-3 rounded-xl bg-blue-500/5 border border-blue-500/10">
+                                            <span className="text-[10px] text-blue-600 font-semibold uppercase">Total Time</span>
+                                            <div className="text-lg font-bold mt-1 text-blue-700">{Math.round(cumulativeStats.totalTime / 3600)}h</div>
+                                        </div>
+                                        <div className="p-3 rounded-xl bg-green-500/5 border border-green-500/10">
+                                            <span className="text-[10px] text-green-600 font-semibold uppercase">Activities</span>
+                                            <div className="text-lg font-bold mt-1 text-green-700">{cumulativeStats.count}</div>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="p-3 rounded-xl bg-purple-500/5 border border-purple-500/10">
+                                            <span className="text-[10px] text-purple-600 font-semibold uppercase">Avg Speed</span>
+                                            <div className="text-lg font-bold mt-1 text-purple-700">{cumulativeStats.avgSpeed.toFixed(1)} <span className="text-xs">km/h</span></div>
+                                        </div>
+                                        <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/10">
+                                            <span className="text-[10px] text-amber-600 font-semibold uppercase">Max Speed</span>
+                                            <div className="text-lg font-bold mt-1 text-amber-700">{cumulativeStats.maxSpeed.toFixed(0)} <span className="text-xs">km/h</span></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Aggregated Speed Chart */}
+                            <div className="pt-6 border-t border-border">
+                                <h4 className="text-sm font-semibold mb-4 flex items-center gap-2">
+                                    <BarChart3 className="w-4 h-4 text-muted-foreground" />
+                                    Speed Profile
+                                </h4>
+                                <div className="h-40 -ml-4">
+                                    <SpeedDistributionChart buckets={aggregatedSpeedDistribution} />
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* Main Feed */}
-                    <div className="lg:col-span-3 space-y-6">
+                    {/* Main Feed (9 cols) */}
+                    <div className="col-span-1 lg:col-span-9 space-y-6">
 
-                        {/* Header & Upload Button */}
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-2xl font-bold flex items-center gap-2">
-                                <Activity className="w-6 h-6" />
-                                My Activities
-                            </h2>
+                        {/* Controls Header */}
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div className="flex items-center gap-4">
+                                <h2 className="text-2xl font-bold flex items-center gap-2">
+                                    <Activity className="w-6 h-6" />
+                                    My Activities
+                                </h2>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setShowFilters(!showFilters)}
+                                    className={cn("gap-2", showFilters && "bg-muted text-foreground")}
+                                >
+                                    <SlidersHorizontal className="w-4 h-4" />
+                                    Filters
+                                    {(showFilters || (filteredActivities.length !== activities.length)) && (
+                                        <span className="bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded-full">
+                                            {filteredActivities.length}
+                                        </span>
+                                    )}
+                                </Button>
+                            </div>
+
                             <Button
                                 size="sm"
                                 onClick={() => setShowUpload(!showUpload)}
@@ -305,6 +483,66 @@ const Dashboard = () => {
                                 {showUpload ? "Cancel Upload" : "Add Activity"}
                             </Button>
                         </div>
+
+                        {/* Collapsible Filter Panel */}
+                        {showFilters && (
+                            <div className="bg-card border border-border rounded-2xl p-6 animate-in slide-in-from-top-2">
+                                <h3 className="text-sm font-semibold mb-6">Filter Activities</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                    {/* Time Filter */}
+                                    <div className="space-y-4">
+                                        <div className="flex justify-between text-xs">
+                                            <span className="font-medium text-muted-foreground">Duration</span>
+                                            <span className="font-mono">{timeFilter[0]}h - {timeFilter[1]}h+</span>
+                                        </div>
+                                        <Slider
+                                            value={timeFilter}
+                                            min={0}
+                                            max={24} // Should be dynamic max but 24 is reasonable base
+                                            step={0.5}
+                                            onValueChange={(val: [number, number]) => setTimeFilter(val)}
+                                        />
+                                    </div>
+                                    {/* Distance Filter */}
+                                    <div className="space-y-4">
+                                        <div className="flex justify-between text-xs">
+                                            <span className="font-medium text-muted-foreground">Distance</span>
+                                            <span className="font-mono">{distFilter[0]}km - {distFilter[1]}km</span>
+                                        </div>
+                                        <Slider
+                                            value={distFilter}
+                                            min={0}
+                                            max={1000} // Dynamic or fixed large?
+                                            step={10}
+                                            onValueChange={(val: [number, number]) => setDistFilter(val)}
+                                        />
+                                    </div>
+                                    {/* Speed Filter */}
+                                    <div className="space-y-4">
+                                        <div className="flex justify-between text-xs">
+                                            <span className="font-medium text-muted-foreground">Avg Speed</span>
+                                            <span className="font-mono">{speedFilter[0]} - {speedFilter[1]} km/h</span>
+                                        </div>
+                                        <Slider
+                                            value={speedFilter}
+                                            min={0}
+                                            max={200}
+                                            step={5}
+                                            onValueChange={(val: [number, number]) => setSpeedFilter(val)}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="mt-6 flex justify-end">
+                                    <Button variant="ghost" size="sm" onClick={() => {
+                                        setTimeFilter([0, 24]);
+                                        setDistFilter([0, 1000]);
+                                        setSpeedFilter([0, 200]);
+                                    }} className="text-xs text-muted-foreground hover:text-foreground">
+                                        Reset Filters
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Collapsible Upload Section */}
                         <div className={cn(
@@ -359,13 +597,14 @@ const Dashboard = () => {
                                 <div className="text-center py-12">
                                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
                                 </div>
-                            ) : activities.length === 0 ? (
+                            ) : filteredActivities.length === 0 ? (
                                 <div className="text-center py-12 bg-muted/30 rounded-2xl border border-dashed border-border">
-                                    <p className="text-muted-foreground">No activities found. Upload to start tracking!</p>
+                                    <p className="text-muted-foreground">No activities found matching your criteria.</p>
+                                    <Button variant="link" onClick={() => { setSearchQuery(''); setShowFilters(false); }}>Clear filters</Button>
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                    {activities.map((activity) => (
+                                    {filteredActivities.map((activity) => (
                                         <div
                                             key={activity.id}
                                             onClick={() => navigate(`/activity/${activity.id}`)}
@@ -448,6 +687,13 @@ const Dashboard = () => {
                                                         <span className="text-sm font-bold flex items-center gap-1">
                                                             <Clock className="w-3 h-3 text-primary" />
                                                             {formatDuration(activity.stats?.totalTime || 0)}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex flex-col col-span-2 mt-2 pt-2 border-t border-dashed border-border/50">
+                                                        <span className="text-[10px] uppercase text-muted-foreground font-medium">Avg Speed</span>
+                                                        <span className="text-sm font-bold flex items-center gap-1">
+                                                            <Activity className="w-3 h-3 text-primary" />
+                                                            {activity.stats?.avgSpeed ? `${activity.stats.avgSpeed.toFixed(1)} km/h` : '-'}
                                                         </span>
                                                     </div>
                                                 </div>

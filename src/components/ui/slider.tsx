@@ -18,15 +18,21 @@ const Slider = React.forwardRef<
   >
     <SliderPrimitive.Track
       className={cn(
-        "relative shrink-0 overflow-hidden rounded-full bg-secondary",
+        "relative shrink-0 overflow-hidden rounded-full bg-muted",
         props.orientation === "vertical" ? "h-full w-2" : "h-2 w-full"
       )}
     >
       <SliderPrimitive.Range className={cn("absolute bg-primary", props.orientation === "vertical" ? "w-full" : "h-full")} />
     </SliderPrimitive.Track>
-    <SliderPrimitive.Thumb className={cn("block h-5 w-5 rounded-full border-2 border-primary bg-background ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:scale-110 transition-transform", thumbClassName)}>
-      {thumbChildren}
-    </SliderPrimitive.Thumb>
+    {/* Always render at least one thumb. If array provided, render matching number */}
+    {(Array.isArray(props.value) || Array.isArray(props.defaultValue) ? (props.value || props.defaultValue) : [0]).map((_, i) => (
+      <SliderPrimitive.Thumb
+        key={i}
+        className={cn("block h-5 w-5 rounded-full border-2 border-primary bg-background ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:scale-110 transition-transform", thumbClassName)}
+      >
+        {thumbChildren}
+      </SliderPrimitive.Thumb>
+    ))}
   </SliderPrimitive.Root>
 ));
 Slider.displayName = SliderPrimitive.Root.displayName;

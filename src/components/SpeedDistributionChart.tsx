@@ -11,13 +11,21 @@ import {
 import { GPXPoint, calculateSpeedDistribution, SpeedBucket } from "@/utils/gpxParser";
 
 interface SpeedDistributionChartProps {
-    points: GPXPoint[];
+    points?: GPXPoint[];
     speedLimit?: number | null;
+    buckets?: SpeedBucket[];
 }
 
-const SpeedDistributionChart = ({ points, speedLimit }: SpeedDistributionChartProps) => {
+const SpeedDistributionChart = ({ points, speedLimit, buckets }: SpeedDistributionChartProps) => {
     // Force bucket size of 10 and ensure range starts at 0
     const data = useMemo(() => {
+        // If pre-calculated buckets are provided, use them directly (filtering by speedLimit handled by caller or valid here too)
+        if (buckets) {
+            return buckets;
+        }
+
+        if (!points) return [];
+
         const rawData = calculateSpeedDistribution(points, 10);
 
         if (!speedLimit || speedLimit <= 0 || !rawData || rawData.length === 0) {
