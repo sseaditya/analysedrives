@@ -3,7 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { ThemeProvider } from "next-themes";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import Index from "./pages/Index";
 import Activity from "./pages/Activity";
 import NotFound from "./pages/NotFound";
@@ -18,7 +18,7 @@ import Dashboard from "./pages/Dashboard";
 import Analytics from "./pages/Analytics";
 
 const App = () => (
-  <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+  <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>

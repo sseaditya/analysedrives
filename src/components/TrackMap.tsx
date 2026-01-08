@@ -3,6 +3,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { GPXPoint, analyzeSegments, TrackSegment } from "@/utils/gpxParser";
 import { Layers, Activity, Zap, Maximize2, Map } from "lucide-react";
+import { useTheme } from "@/components/ThemeProvider";
 
 interface TrackMapProps {
   points: GPXPoint[];
@@ -31,6 +32,7 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
   const [mode, setMode] = useState<'plain' | 'speed' | 'acceleration'>('plain');
   const [showStops, setShowStops] = useState(false);
   const [showTurns, setShowTurns] = useState(false);
+  const { theme } = useTheme();
 
   // Pre-calculate segments for performance
   const segments = useMemo(() => {
@@ -54,7 +56,11 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
 
     mapInstanceRef.current = map;
 
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+    const tileUrl = theme === 'dark'
+      ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+      : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+
+    L.tileLayer(tileUrl, {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
     }).addTo(map);
 
@@ -62,7 +68,7 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
       map.remove();
       mapInstanceRef.current = null;
     };
-  }, []);
+  }, [theme]);
 
   // Update Tracks and Markers
   useEffect(() => {
@@ -97,12 +103,13 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
     }
 
     // 0. Base Continuous Line (Visual Foundation)
-    let currentBaseColor = "hsl(24, 80%, 70%)"; // Default Light Orange
+    let currentBaseColor = "hsl(40, 20%, 80%)"; // Subtle Stone
     let currentBaseOpacity = 0.4;
     let currentBaseWeight = 4;
 
     if (mode === 'plain' && !zoomRange) {
-      currentBaseColor = "hsl(37, 92%, 50%)"; // Original Dark Orange
+      currentBaseColor = "hsl(16, 65%, 57%)"; // Terracotta
+
       currentBaseOpacity = 0.8;
       currentBaseWeight = 5;
     } else if (mode !== 'plain') {
@@ -182,7 +189,8 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
         let opacity = 1.0;
 
         if (mode === 'plain') {
-          color = "hsl(24, 100%, 35%)"; // Rich Dark Orange
+          color = "hsl(16, 75%, 45%)"; // Richer Terracotta
+
           weight = 6; // Thicker for better highlight visibility
         } else if (mode === 'speed') {
           // Fixed scale: 0 to 150 km/h
@@ -337,7 +345,7 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
     if (hoveredPoint) {
       const hoverIcon = L.divIcon({
         className: "custom-marker-hover",
-        html: `<div style="background-color: hsl(37, 92%, 50%); width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center;">
+        html: `<div style="background-color: hsl(16, 65%, 57%); width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center;">
           <div style="width: 8px; height: 8px; background-color: white; border-radius: 50%;"></div>
         </div>`,
         iconSize: [20, 20],

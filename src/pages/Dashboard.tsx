@@ -12,6 +12,7 @@ import StravaImport from "@/components/StravaImport";
 import ProfileEditor from "@/components/ProfileEditor";
 import { Slider } from "@/components/ui/slider";
 import SpeedDistributionChart from "@/components/SpeedDistributionChart";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 interface Profile {
     id: string;
@@ -371,6 +372,9 @@ const Dashboard = () => {
                             <BarChart3 className="w-4 h-4" />
                             <span className="hidden md:inline">Analytics</span>
                         </Button>
+                        <div className="mr-2">
+                            <ThemeToggle />
+                        </div>
                         <ProfileEditor onProfileUpdate={(updatedProfile) => setProfile(updatedProfile)}>
                             <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
                                 <img

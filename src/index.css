@@ -1,151 +1,96 @@
 @import url("https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Source+Serif+Pro:wght@400;600;700&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;700&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
-
 @layer base {
   :root {
-    --background: 60 4% 95%;
-    --foreground: 24 9% 10%;
+    /* ANTHROPIC LIGHT THEME (Warm / Earthy) */
+    /* Background: Warm Beige/Cream */
+    --background: 40 25% 97%;
+    /* Foreground: Soft Charcoal (not pure black) */
+    --foreground: 25 10% 20%;
 
-    --card: 60 9% 97%;
-    --card-foreground: 24 9% 10%;
+    /* Card: White or very light warm gray */
+    --card: 0 0% 100%;
+    --card-foreground: 25 10% 20%;
 
-    --popover: 20 5% 90%;
-    --popover-foreground: 24 9% 10%;
+    /* Popover: Same as card */
+    --popover: 0 0% 100%;
+    --popover-foreground: 25 10% 20%;
 
-    --primary: 37 92% 50%;
-    --primary-foreground: 47 100% 96%;
+    /* Primary: Terracotta / Clay */
+    --primary: 16 65% 57%;
+    --primary-foreground: 40 25% 97%;
 
-    --secondary: 24 5% 44%;
-    --secondary-foreground: 60 9% 97%;
+    /* Secondary: Warm Gray / Stone */
+    --secondary: 40 10% 90%;
+    --secondary-foreground: 25 10% 20%;
 
-    --muted: 23 5% 82%;
-    --muted-foreground: 24 9% 10%;
+    /* Muted: Soft Beige */
+    --muted: 40 15% 92%;
+    --muted-foreground: 25 5% 45%;
 
-    --accent: 47 100% 96%;
-    --accent-foreground: 37 92% 50%;
+    /* Accent: Light Stone */
+    --accent: 40 15% 92%;
+    --accent-foreground: 16 65% 57%;
 
-    --destructive: 0 72% 50%;
-    --destructive-foreground: 0 85% 97%;
+    /* Destructive: Muted Red */
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 23 5% 82%;
-    --input: 23 5% 82%;
-    --ring: 37 92% 50%;
+    /* Border: Warm Gray */
+    --border: 40 10% 88%;
+    --input: 40 10% 88%;
+    --ring: 16 65% 57%;
+    /* Primary color for focus rings */
 
-    --radius: 1rem;
-
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 24 9% 10%;
-
-    --sidebar-primary: 37 92% 50%;
-
-    --sidebar-primary-foreground: 47 100% 96%;
-
-    --sidebar-accent: 24 5% 44%;
-
-    --sidebar-accent-foreground: 60 9% 97%;
-
-    --sidebar-border: 23 5% 82%;
-
-    --sidebar-ring: 37 92% 50%;
-
-    --chart-1: 45 96% 64%;
-
-    --chart-2: 47 95% 53%;
-
-    --chart-3: 43 96% 56%;
-
-    --chart-4: 37 92% 50%;
-
-    --chart-5: 24 5% 44%;
-
-    --sidebar: 60 9% 97%;
-
-    --font-sans: 'Source Sans Pro', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
-
-    --font-serif: 'Source Serif Pro', ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
-
-    --font-mono: 'Source Code Pro', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-
-    --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-
-    --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-
-    --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
-
-    --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
-
-    --shadow-md: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 2px 4px -1px hsl(0 0% 0% / 0.1);
-
-    --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 4px 6px -1px hsl(0 0% 0% / 0.1);
-
-    --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 8px 10px -1px hsl(0 0% 0% / 0.1);
-
-    --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
-
-    --tracking-normal: 0em;
-
-    --spacing: 0.25rem;
+    --radius: 0.75rem;
+    /* Slightly reduced radius for cleaner look */
   }
 
   .dark {
-    --background: 24 9% 10%;
-    --foreground: 60 9% 97%;
+    /* ANTHROPIC DARK THEME (Deep Earthy / Warm) */
+    /* Background: Deep Warm Gray (almost brown-black) */
+    --background: 28 10% 12%;
+    /* Foreground: Soft Off-White */
+    --foreground: 36 20% 94%;
 
-    --card: 12 6% 15%;
-    --card-foreground: 60 9% 97%;
+    /* Card: Slightly lighter warm gray */
+    --card: 28 8% 16%;
+    --card-foreground: 36 20% 94%;
 
-    --popover: 30 6% 25%;
-    --popover-foreground: 60 9% 97%;
+    /* Popover */
+    --popover: 28 8% 16%;
+    --popover-foreground: 36 20% 94%;
 
-    --primary: 43 96% 56%;
-    --primary-foreground: 20 91% 14%;
+    /* Primary: Bright Terracotta (Lightened for dark mode) */
+    --primary: 16 75% 65%;
+    --primary-foreground: 28 10% 12%;
 
-    --secondary: 24 5% 44%;
-    --secondary-foreground: 60 9% 97%;
+    /* Secondary: Dark Stone */
+    --secondary: 28 8% 22%;
+    --secondary-foreground: 36 20% 94%;
 
-    --muted: 24 5% 44%;
-    --muted-foreground: 60 9% 97%;
+    /* Muted: Darker Stone */
+    --muted: 28 8% 20%;
+    --muted-foreground: 36 10% 65%;
 
-    --accent: 25 83% 14%;
-    --accent-foreground: 47 95% 53%;
+    /* Accent: Dark Stone Highlight */
+    --accent: 28 8% 22%;
+    --accent-foreground: 16 75% 65%;
 
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 85% 97%;
+    /* Destructive */
+    --destructive: 0 70% 60%;
+    --destructive-foreground: 36 20% 94%;
 
-    --border: 33 5% 32%;
-    --input: 33 5% 32%;
-    --ring: 43 96% 56%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 60 9% 97%;
-    --sidebar-primary: 43 96% 56%;
-    --sidebar-primary-foreground: 20 91% 14%;
-    --sidebar-accent: 47 95% 53%;
-    --sidebar-accent-foreground: 25 83% 14%;
-    --sidebar-border: 33 5% 32%;
-    --sidebar-ring: 43 96% 56%;
-    --chart-1: 45 96% 64%;
-    --chart-2: 48 96% 76%;
-    --chart-3: 43 96% 56%;
-    --chart-4: 37 92% 50%;
-    --chart-5: 33 5% 32%;
-    --sidebar: 12 6% 15%;
-    --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-    --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
-    --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
-    --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
-    --shadow-md: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 2px 4px -1px hsl(0 0% 0% / 0.1);
-    --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 4px 6px -1px hsl(0 0% 0% / 0.1);
-    --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 8px 10px -1px hsl(0 0% 0% / 0.1);
-    --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+    /* Border */
+    --border: 28 8% 24%;
+    --input: 28 8% 24%;
+    --ring: 16 75% 65%;
   }
 }
 
@@ -157,18 +102,31 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Apply Serif to Headings globally for Anthropic feel */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-serif;
+  }
 }
 
-/* Hover marker animation for interactive speed projection */
+/* Hover marker animation */
 .custom-marker-hover div {
   animation: pulse-marker 1.5s ease-in-out infinite;
 }
 
 @keyframes pulse-marker {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: scale(1);
     opacity: 1;
   }
+
   50% {
     transform: scale(1.15);
     opacity: 0.9;

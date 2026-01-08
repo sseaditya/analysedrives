@@ -306,8 +306,8 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
           >
             <defs>
               <linearGradient id="speedGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="hsl(37, 92%, 50%)" stopOpacity={0.6} />
-                <stop offset="95%" stopColor="hsl(37, 92%, 50%)" stopOpacity={0} />
+                <stop offset="5%" stopColor="hsl(16, 65%, 57%)" stopOpacity={0.6} />
+                <stop offset="95%" stopColor="hsl(16, 65%, 57%)" stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(23, 5%, 82%)" opacity={0.5} />
@@ -327,12 +327,12 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
             {hasSpeed && (
               <YAxis
                 yAxisId="speed"
-                stroke="hsl(37, 92%, 50%)"
+                stroke="hsl(16, 65%, 57%)"
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
                 tickFormatter={(value) => Math.round(value).toString()}
-                label={{ value: "Speed (km/h)", angle: -90, position: "insideLeft", fontSize: 12, fill: "hsl(37, 92%, 50%)" }}
+                label={{ value: "Speed (km/h)", angle: -90, position: "insideLeft", fontSize: 12, fill: "hsl(16, 65%, 57%)" }}
                 width={60}
                 // Domain: If speedCap exists, use that + buffer. 
                 // If NO speedCap, use the true max speed of the track (calculated before clipping).
@@ -375,7 +375,7 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
                 yAxisId="speed"
                 type="monotone"
                 dataKey="speed"
-                stroke="hsl(37, 92%, 50%)"
+                stroke="hsl(16, 65%, 57%)"
                 strokeWidth={3}
                 fill="url(#speedGradient)"
                 name="speed"
@@ -403,7 +403,7 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
                 x1={refAreaLeft}
                 x2={refAreaRight}
                 strokeOpacity={0.3}
-                fill="hsl(37, 92%, 50%)"
+                fill="hsl(16, 65%, 57%)"
                 fillOpacity={0.3}
               />
             )}
@@ -413,13 +413,13 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
               <ReferenceLine
                 yAxisId="speed"
                 y={speedLimit}
-                stroke="hsl(37, 92%, 50%)" // Match the speed color
+                stroke="hsl(16, 65%, 57%)" // Match the speed color
                 strokeWidth={3}
                 strokeOpacity={0.8}
                 label={{
                   value: `Limit: ${speedLimit} km/h`,
                   position: 'insideRight',
-                  fill: 'hsl(37, 92%, 50%)',
+                  fill: 'hsl(16, 65%, 57%)',
                   fontSize: 12,
                   fontWeight: 600,
                   dy: -10
