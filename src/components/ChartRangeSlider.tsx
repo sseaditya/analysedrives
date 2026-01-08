@@ -108,8 +108,8 @@ const ChartRangeSlider: React.FC<ChartRangeSliderProps> = ({
                 >
                     <defs>
                         <linearGradient id="brushGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#8884d8" stopOpacity={0.4} />
-                            <stop offset="95%" stopColor="#8884d8" stopOpacity={0.1} />
+                            <stop offset="5%" stopColor="hsl(15, 52%, 58%)" stopOpacity={0.4} />
+                            <stop offset="95%" stopColor="hsl(15, 52%, 58%)" stopOpacity={0.1} />
                         </linearGradient>
                     </defs>
 
@@ -131,7 +131,7 @@ const ChartRangeSlider: React.FC<ChartRangeSliderProps> = ({
                     <Area
                         type="monotone"
                         dataKey="elevation"
-                        stroke="hsl(262, 83%, 58%)"
+                        stroke="hsl(15, 52%, 58%)"
                         fill="url(#brushGradient)"
                         strokeWidth={1}
                         isAnimationActive={false}
@@ -142,7 +142,7 @@ const ChartRangeSlider: React.FC<ChartRangeSliderProps> = ({
                         height={height - 20}
                         y={0}
                         dataKey="index"
-                        stroke="hsl(262, 83%, 58%)"
+                        stroke="hsl(15, 52%, 58%)"
                         fill="hsl(var(--background))"
                         tickFormatter={() => ''}
                         startIndex={zoomRange ? zoomRange[0] : 0}

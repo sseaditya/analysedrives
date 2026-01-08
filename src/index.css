@@ -8,89 +8,102 @@
 
 @layer base {
   :root {
-    /* ANTHROPIC LIGHT THEME (Warm / Earthy) */
-    /* Background: Warm Beige/Cream */
-    --background: 40 25% 97%;
-    /* Foreground: Soft Charcoal (not pure black) */
-    --foreground: 25 10% 20%;
+    /* ANTHROPIC LIGHT THEME (Strict) */
+    /* Background: Ivory Medium (Pleasant, not too bright) */
+    /* #F0F0EB -> HSL(60, 9%, 94%) */
+    --background: 60 9% 94%;
+    /* Foreground: Slate Dark (Soft Black) */
+    /* #191919 -> HSL(0, 0%, 10%) */
+    --foreground: 0 0% 10%;
 
-    /* Card: White or very light warm gray */
-    --card: 0 0% 100%;
-    --card-foreground: 25 10% 20%;
+    /* Card: Ivory Light (Slightly lighter than bg for depth) */
+    /* #FAFAF7 -> HSL(60, 14%, 97%) */
+    --card: 60 14% 97%;
+    --card-foreground: 0 0% 10%;
 
     /* Popover: Same as card */
-    --popover: 0 0% 100%;
-    --popover-foreground: 25 10% 20%;
+    --popover: 60 14% 97%;
+    --popover-foreground: 0 0% 10%;
 
-    /* Primary: Terracotta / Clay */
-    --primary: 16 65% 57%;
-    --primary-foreground: 40 25% 97%;
+    /* Primary: Book Cloth (Earthy Orange/Red) */
+    /* #CC785C -> HSL(15, 52%, 58%) */
+    --primary: 15 52% 58%;
+    --primary-foreground: 60 14% 97%;
 
-    /* Secondary: Warm Gray / Stone */
-    --secondary: 40 10% 90%;
-    --secondary-foreground: 25 10% 20%;
+    /* Secondary: Manilla (Muted Beigey/Yellow) */
+    /* #EBD8BC -> HSL(36, 52%, 83%) */
+    --secondary: 36 52% 83%;
+    --secondary-foreground: 0 0% 10%;
 
-    /* Muted: Soft Beige */
-    --muted: 40 15% 92%;
-    --muted-foreground: 25 5% 45%;
+    /* Muted: Ivory Dark (Faded Manilla look) */
+    /* #E5E4DF -> HSL(60, 10%, 89%) */
+    --muted: 60 10% 89%;
+    --muted-foreground: 0 0% 40%;
+    /* Softened text */
 
-    /* Accent: Light Stone */
-    --accent: 40 15% 92%;
-    --accent-foreground: 16 65% 57%;
+    /* Accent: Faded Manilla / Ivory Dark */
+    --accent: 60 10% 89%;
+    --accent-foreground: 15 52% 58%;
 
-    /* Destructive: Muted Red */
-    --destructive: 0 70% 50%;
-    --destructive-foreground: 0 0% 98%;
+    /* Destructive: Error Red (Pastel ver) */
+    /* #BF4D43 -> HSL(5, 53%, 51%) */
+    --destructive: 5 53% 51%;
+    --destructive-foreground: 60 14% 97%;
 
-    /* Border: Warm Gray */
-    --border: 40 10% 88%;
-    --input: 40 10% 88%;
-    --ring: 16 65% 57%;
-    /* Primary color for focus rings */
+    /* Border: Slightly darker Ivory */
+    --border: 60 5% 85%;
+    --input: 60 5% 85%;
+    --ring: 15 52% 58%;
+    /* Book Cloth Ring */
 
     --radius: 0.75rem;
-    /* Slightly reduced radius for cleaner look */
   }
 
   .dark {
-    /* ANTHROPIC DARK THEME (Deep Earthy / Warm) */
-    /* Background: Deep Warm Gray (almost brown-black) */
-    --background: 28 10% 12%;
-    /* Foreground: Soft Off-White */
-    --foreground: 36 20% 94%;
+    /* ANTHROPIC DARK THEME (Strict) */
+    /* Background: Slate Dark */
+    /* #191919 -> HSL(0, 0%, 10%) */
+    --background: 0 0% 10%;
 
-    /* Card: Slightly lighter warm gray */
-    --card: 28 8% 16%;
-    --card-foreground: 36 20% 94%;
+    /* Foreground: Ivory Light */
+    /* #FAFAF7 -> HSL(60, 14%, 97%) */
+    --foreground: 60 14% 97%;
+
+    /* Card: Slate Medium */
+    /* #262625 -> HSL(60, 1% 15%) */
+    --card: 60 1% 15%;
+    --card-foreground: 60 14% 97%;
 
     /* Popover */
-    --popover: 28 8% 16%;
-    --popover-foreground: 36 20% 94%;
+    --popover: 60 1% 15%;
+    --popover-foreground: 60 14% 97%;
 
-    /* Primary: Bright Terracotta (Lightened for dark mode) */
-    --primary: 16 75% 65%;
-    --primary-foreground: 28 10% 12%;
+    /* Primary: Book Cloth (Same, pops well on dark) */
+    /* #CC785C -> HSL(15, 52%, 58%) */
+    --primary: 15 52% 58%;
+    --primary-foreground: 0 0% 10%;
 
-    /* Secondary: Dark Stone */
-    --secondary: 28 8% 22%;
-    --secondary-foreground: 36 20% 94%;
+    /* Secondary: Slate light or muted Slate */
+    /* Using Slate Medium as base, lighter for secondary */
+    --secondary: 60 1% 20%;
+    --secondary-foreground: 60 14% 97%;
 
-    /* Muted: Darker Stone */
-    --muted: 28 8% 20%;
-    --muted-foreground: 36 10% 65%;
+    /* Muted: Dark Gray */
+    --muted: 60 1% 20%;
+    --muted-foreground: 60 5% 60%;
 
-    /* Accent: Dark Stone Highlight */
-    --accent: 28 8% 22%;
-    --accent-foreground: 16 75% 65%;
+    /* Accent: Dark Gray Highlight */
+    --accent: 60 1% 22%;
+    --accent-foreground: 15 52% 58%;
 
     /* Destructive */
-    --destructive: 0 70% 60%;
-    --destructive-foreground: 36 20% 94%;
+    --destructive: 5 53% 51%;
+    --destructive-foreground: 60 14% 97%;
 
     /* Border */
-    --border: 28 8% 24%;
-    --input: 28 8% 24%;
-    --ring: 16 75% 65%;
+    --border: 60 1% 20%;
+    --input: 60 1% 20%;
+    --ring: 15 52% 58%;
   }
 }
 

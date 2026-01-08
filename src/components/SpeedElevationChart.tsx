@@ -306,8 +306,8 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
           >
             <defs>
               <linearGradient id="speedGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="hsl(16, 65%, 57%)" stopOpacity={0.6} />
-                <stop offset="95%" stopColor="hsl(16, 65%, 57%)" stopOpacity={0} />
+                <stop offset="5%" stopColor="hsl(15, 52%, 58%)" stopOpacity={0.6} />
+                <stop offset="95%" stopColor="hsl(15, 52%, 58%)" stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(23, 5%, 82%)" opacity={0.5} />
@@ -327,12 +327,12 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
             {hasSpeed && (
               <YAxis
                 yAxisId="speed"
-                stroke="hsl(16, 65%, 57%)"
+                stroke="hsl(15, 52%, 58%)"
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
                 tickFormatter={(value) => Math.round(value).toString()}
-                label={{ value: "Speed (km/h)", angle: -90, position: "insideLeft", fontSize: 12, fill: "hsl(16, 65%, 57%)" }}
+                label={{ value: "Speed (km/h)", angle: -90, position: "insideLeft", fontSize: 12, fill: "hsl(15, 52%, 58%)" }}
                 width={60}
                 // Domain: If speedCap exists, use that + buffer. 
                 // If NO speedCap, use the true max speed of the track (calculated before clipping).
@@ -345,20 +345,20 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
               <YAxis
                 yAxisId="elevation"
                 orientation="right"
-                stroke="hsl(142, 76%, 36%)"
+                stroke="hsl(140, 30%, 55%)"
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
                 tickFormatter={(value) => Math.round(value).toString()}
-                label={{ value: "Elevation (m)", angle: 90, position: "insideRight", fontSize: 12, fill: "hsl(142, 76%, 36%)" }}
+                label={{ value: "Elevation (m)", angle: 90, position: "insideRight", fontSize: 12, fill: "hsl(140, 30%, 55%)" }}
                 width={60}
                 domain={[minElevation - elevationRange * 0.1, maxElevation + elevationRange * 0.1]}
               />
             )}
             <Tooltip
               contentStyle={{
-                backgroundColor: "hsl(60, 9%, 97%)",
-                border: "1px solid hsl(23, 5%, 82%)",
+                backgroundColor: "hsl(60, 9%, 94%)",
+                border: "1px solid hsl(60, 5%, 85%)",
                 borderRadius: "12px",
                 boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
               }}
@@ -375,7 +375,7 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
                 yAxisId="speed"
                 type="monotone"
                 dataKey="speed"
-                stroke="hsl(16, 65%, 57%)"
+                stroke="hsl(15, 52%, 58%)"
                 strokeWidth={3}
                 fill="url(#speedGradient)"
                 name="speed"
@@ -388,7 +388,7 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
                 yAxisId="elevation"
                 type="monotone"
                 dataKey="elevation"
-                stroke="hsl(142, 76%, 36%)"
+                stroke="hsl(140, 30%, 55%)"
                 strokeWidth={2}
                 strokeDasharray="5 5"
                 dot={false}
@@ -403,7 +403,7 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
                 x1={refAreaLeft}
                 x2={refAreaRight}
                 strokeOpacity={0.3}
-                fill="hsl(16, 65%, 57%)"
+                fill="hsl(15, 52%, 58%)"
                 fillOpacity={0.3}
               />
             )}
@@ -413,13 +413,13 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
               <ReferenceLine
                 yAxisId="speed"
                 y={speedLimit}
-                stroke="hsl(16, 65%, 57%)" // Match the speed color
+                stroke="hsl(5, 53%, 51%)" // Pastel Error Red
                 strokeWidth={3}
                 strokeOpacity={0.8}
                 label={{
                   value: `Limit: ${speedLimit} km/h`,
                   position: 'insideRight',
-                  fill: 'hsl(16, 65%, 57%)',
+                  fill: 'hsl(5, 53%, 51%)',
                   fontSize: 12,
                   fontWeight: 600,
                   dy: -10
