@@ -340,50 +340,9 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                       )}
                     </div>
 
-                    {/* GPX Quality Score */}
-                    {stats.gpxQualityScore !== undefined && (
-                      <div className="mt-6 pt-6 border-t border-border/50">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Signal Quality</span>
-                          <span className={cn(
-                            "text-sm font-bold px-2 py-0.5 rounded-full border",
-                            stats.gpxQualityScore >= 90 ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" :
-                              stats.gpxQualityScore >= 70 ? "bg-amber-500/10 text-amber-500 border-amber-500/20" :
-                                "bg-red-500/10 text-red-500 border-red-500/20"
-                          )}>
-                            {stats.gpxQualityScore}/100
-                          </span>
-                        </div>
 
-                        {/* Quality Breakdown Mini-List */}
-                        <div className="space-y-1.5">
-                          <div className="flex justify-between items-center text-[10px]">
-                            <span className="text-muted-foreground">Sampling Rate</span>
-                            <div className="flex items-center gap-1.5">
-                              <div className="w-16 h-1 bg-muted rounded-full overflow-hidden">
-                                <div className="h-full bg-primary/50" style={{ width: `${stats.qualityDetails?.samplingRateScore || 0}%` }} />
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex justify-between items-center text-[10px]">
-                            <span className="text-muted-foreground">Signal Noise</span>
-                            <div className="flex items-center gap-1.5">
-                              <div className="w-16 h-1 bg-muted rounded-full overflow-hidden">
-                                <div className="h-full bg-primary/50" style={{ width: `${stats.qualityDetails?.noiseScore || 0}%` }} />
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex justify-between items-center text-[10px]">
-                            <span className="text-muted-foreground">Data Coverage</span>
-                            <div className="flex items-center gap-1.5">
-                              <div className="w-16 h-1 bg-muted rounded-full overflow-hidden">
-                                <div className="h-full bg-primary/50" style={{ width: `${stats.qualityDetails?.coverageScore || 0}%` }} />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
+
+
                   </div>
 
                   {/* RIGHT SIDE: Data Grid (The Strava Data Layout) */}
@@ -461,8 +420,6 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                   zoomRange={zoomRange}
                   stopPoints={stats.stopPoints}
                   tightTurnPoints={stats.tightTurnPoints}
-                  hardAccelPoints={stats.hardAccelPoints}
-                  hardBrakePoints={stats.hardBrakePoints}
                   privacyMask={privacyMask}
                 />
               </div>

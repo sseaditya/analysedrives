@@ -10,12 +10,11 @@ interface TrackMapProps {
   zoomRange?: [number, number] | null;
   stopPoints?: [number, number][];
   tightTurnPoints?: [number, number][];
-  hardAccelPoints?: [number, number, number][]; // [lat, lon, m/s²]
-  hardBrakePoints?: [number, number, number][]; // [lat, lon, m/s²]
   privacyMask?: { start: number; end: number } | null;
+
 }
 
-const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints, hardAccelPoints, hardBrakePoints, privacyMask }: TrackMapProps) => {
+const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints, privacyMask }: TrackMapProps) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const layersRef = useRef<{
@@ -25,8 +24,6 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
     endMarker?: L.Marker;
     stopMarkers?: L.LayerGroup;
     turnMarkers?: L.LayerGroup;
-    hardAccelMarkers?: L.LayerGroup;
-    hardBrakeMarkers?: L.LayerGroup;
   }>({});
   const hoverMarkerRef = useRef<L.Marker | null>(null);
   const lastBoundsRef = useRef<{ points: GPXPoint[], zoomRange?: [number, number] | null } | null>(null);
@@ -79,8 +76,6 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
     if (layersRef.current.endMarker) map.removeLayer(layersRef.current.endMarker);
     if (layersRef.current.stopMarkers) map.removeLayer(layersRef.current.stopMarkers);
     if (layersRef.current.turnMarkers) map.removeLayer(layersRef.current.turnMarkers);
-    if (layersRef.current.hardAccelMarkers) map.removeLayer(layersRef.current.hardAccelMarkers);
-    if (layersRef.current.hardBrakeMarkers) map.removeLayer(layersRef.current.hardBrakeMarkers);
 
     // Create a LayerGroup for the track to manage cleanup easily
     if (!layersRef.current.fullTrackGroup) {
@@ -312,49 +307,7 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
       layersRef.current.turnMarkers = turnMarkersLayer;
     }
 
-    // 5. Render Hard Acceleration Markers (Auto-show in acceleration mode)
-    if (mode === 'acceleration' && hardAccelPoints && hardAccelPoints.length > 0) {
-      const hardAccelMarkersLayer = L.layerGroup();
-      hardAccelPoints.forEach((point, index) => {
-        const [lat, lon, accel] = point;
-        const accelIcon = L.divIcon({
-          className: "hard-accel-marker",
-          html: `<div style="background-color: #10b981; width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center;">
-            <div style="width: 6px; height: 6px; background-color: white; border-radius: 50%;"></div>
-          </div>`,
-          iconSize: [16, 16],
-          iconAnchor: [8, 8],
-        });
 
-        L.marker([lat, lon], { icon: accelIcon })
-          .bindPopup(`<b>Hard Accel</b><br>${accel.toFixed(2)} m/s²`)
-          .addTo(hardAccelMarkersLayer);
-      });
-      hardAccelMarkersLayer.addTo(map);
-      layersRef.current.hardAccelMarkers = hardAccelMarkersLayer;
-    }
-
-    // 6. Render Hard Braking Markers (Auto-show in acceleration mode)
-    if (mode === 'acceleration' && hardBrakePoints && hardBrakePoints.length > 0) {
-      const hardBrakeMarkersLayer = L.layerGroup();
-      hardBrakePoints.forEach((point, index) => {
-        const [lat, lon, accel] = point;
-        const brakeIcon = L.divIcon({
-          className: "hard-brake-marker",
-          html: `<div style="background-color: #ef4444; width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center;">
-            <div style="width: 6px; height: 6px; background-color: white; border-radius: 50%;"></div>
-          </div>`,
-          iconSize: [16, 16],
-          iconAnchor: [8, 8],
-        });
-
-        L.marker([lat, lon], { icon: brakeIcon })
-          .bindPopup(`<b>Hard Brake</b><br>${accel.toFixed(2)} m/s²`)
-          .addTo(hardBrakeMarkersLayer);
-      });
-      hardBrakeMarkersLayer.addTo(map);
-      layersRef.current.hardBrakeMarkers = hardBrakeMarkersLayer;
-    }
 
     // Fit Bounds - ONLY if coordinates or zoom range changed
     // Determine if we should re-fit bounds
@@ -369,7 +322,7 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
       lastBoundsRef.current = { points, zoomRange };
     }
 
-  }, [points, zoomRange, stopPoints, tightTurnPoints, hardAccelPoints, hardBrakePoints, mode, showStops, showTurns, segments]); // Re-run when points, zoom, mode, or markers change
+  }, [points, zoomRange, stopPoints, tightTurnPoints, mode, showStops, showTurns, segments]); // Re-run when points, zoom, mode, or markers change
 
   // Hover Effect (Separate Effect to avoid redrawing tracks)
   useEffect(() => {

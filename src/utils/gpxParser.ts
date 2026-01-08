@@ -64,12 +64,6 @@ export interface GPXStats {
   tightTurnPoints?: [number, number][];
   hardAccelPoints?: [number, number, number][]; // [lat, lon, m/s²]
   hardBrakePoints?: [number, number, number][]; // [lat, lon, m/s²]
-  gpxQualityScore: number; // 0-100
-  qualityDetails: {
-    samplingRateScore: number;
-    noiseScore: number;
-    coverageScore: number;
-  };
 }
 
 // Haversine formula to calculate distance between two GPS points
@@ -454,12 +448,6 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
     longestStraightSection: 0,
     medianStraightLength: 0,
     percentStraight: 0,
-    gpxQualityScore: 0,
-    qualityDetails: {
-      samplingRateScore: 0,
-      noiseScore: 0,
-      coverageScore: 0
-    }
   };
 
   if (points.length < 2) return emptyStats;
@@ -802,42 +790,6 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
   // Hilliness Score: Elevation gain per kilometer
   const hillinessScore = totalDistance > 0 ? elevationGain / totalDistance : 0;
 
-  // --- 4. GPX Quality Score Calculation ---
-  // A. Sampling Rate Score (Consistency of Time Deltas)
-  // Calculate Standard Deviation of timeDeltas
-  // Expected is 1s. High variance or high mean is bad.
-  // CV (Coefficient of Variation) = StdDev / Mean
-  let timeMean = 0;
-  let timeVarSum = 0;
-  if (timeDeltas.length > 0) {
-    timeMean = timeDeltas.reduce((a, b) => a + b, 0) / timeDeltas.length;
-    timeVarSum = timeDeltas.reduce((a, b) => a + Math.pow(b - timeMean, 2), 0);
-  }
-  const timeStdDev = timeDeltas.length > 0 ? Math.sqrt(timeVarSum / timeDeltas.length) : 0;
-  const timeCV = timeMean > 0 ? timeStdDev / timeMean : 0;
-  // Penalty: -20 per 1.0 CV. (CV=0 is perfect 1s spacing. CV=1 means StdDev=Mean, very erratic)
-  const samplingScoreRaw = 100 - (timeCV * 40); // Weight 40% roughly
-  const samplingRateScore = Math.max(0, Math.min(100, samplingScoreRaw));
-
-  // B. Noise Score (Physics Violations / Clamped)
-  // % of segments that were collapsed or clamped
-  // We can use the clampedCount from validation
-  const totalSegments = timeDeltas.length;
-  const clampedRatio = totalSegments > 0 ? qualityValidation.clampedCount / totalSegments : 0;
-  // Penalty: -2 points per 1% clamped. (e.g. 10% clamped = -20 points)
-  const noiseScoreRaw = 100 - (clampedRatio * 100 * 2.5); // Steep penalty
-  const noiseScore = Math.max(0, Math.min(100, noiseScoreRaw));
-
-  // C. Coverage Score (Gaps)
-  // % of time spent in "Large Gaps"
-  const gapRatio = totalTime > 0 ? qualityValidation.gapTime / totalTime : 0;
-  // Penalty: -1.5 points per 1% gap time. (e.g. 20% gap = -30 points)
-  const coverageScoreRaw = 100 - (gapRatio * 100 * 1.5);
-  const coverageScore = Math.max(0, Math.min(100, coverageScoreRaw));
-
-  // Weighted Average
-  const gpxQualityScore = (samplingRateScore * 0.3) + (noiseScore * 0.4) + (coverageScore * 0.3);
-
   return {
     totalDistance,
     totalTime,
@@ -878,12 +830,6 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
     tightTurnPoints,
     hardAccelPoints,
     hardBrakePoints,
-    gpxQualityScore: Math.round(gpxQualityScore),
-    qualityDetails: {
-      samplingRateScore: Math.round(samplingRateScore),
-      noiseScore: Math.round(noiseScore),
-      coverageScore: Math.round(coverageScore)
-    }
   };
 }
 
@@ -920,14 +866,14 @@ export function analyzeSegments(points: GPXPoint[]): TrackSegment[] {
     smoothedSpeeds.push(count > 0 ? sum / count : 0);
   }
 
-  // 2. Calculate Raw Accelerations (From Robust Speeds, not Smoothed)
-  // This ensures the acceleration map matches the sharp speed changes
+  // 2. Calculate Raw Accelerations (From Smoothed Speeds)
+  // This ensures the acceleration map matches the visual timeline chart (which is smoothed)
   const rawAccelerations: number[] = [];
-  for (let i = 0; i < speeds.length; i++) {
+  for (let i = 0; i < smoothedSpeeds.length; i++) {
     const time = timeDeltas[i];
     if (i > 0 && time > 0) {
-      const v1 = speeds[i - 1] / 3.6; // m/s (Robust)
-      const v2 = speeds[i] / 3.6;   // m/s (Robust)
+      const v1 = smoothedSpeeds[i - 1] / 3.6; // m/s (Smoothed)
+      const v2 = smoothedSpeeds[i] / 3.6;   // m/s (Smoothed)
       rawAccelerations.push((v2 - v1) / time);
     } else {
       rawAccelerations.push(0);
