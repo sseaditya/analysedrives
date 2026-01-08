@@ -8,7 +8,7 @@ import SpeedDistributionChart from "@/components/SpeedDistributionChart";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import React from "react";
-import { SpeedBucket, parseGPX, calculateStats } from "@/utils/gpxParser";
+import { SpeedBucket, parseGPX, calculateStats, generatePreviewPolyline } from "@/utils/gpxParser";
 import { toast } from "sonner";
 
 const Analytics = () => {
@@ -80,10 +80,18 @@ const Analytics = () => {
                     const points = parseGPX(text);
                     const newStats = calculateStats(points);
 
+                    // Generate Preview Polyline (Critical for Map Previews & Heatmap)
+                    const previewCoordinates = generatePreviewPolyline(points);
+
+                    const finalStats = {
+                        ...newStats,
+                        previewCoordinates
+                    };
+
                     // 3. Update DB
                     const { error: updateError } = await supabase
                         .from('activities')
-                        .update({ stats: newStats })
+                        .update({ stats: finalStats })
                         .eq('id', activity.id);
 
                     if (updateError) throw updateError;

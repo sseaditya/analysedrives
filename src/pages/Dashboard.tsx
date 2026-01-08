@@ -362,6 +362,15 @@ const Dashboard = () => {
                     </div>
 
                     <div className="flex items-center gap-4 flex-shrink-0">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => navigate('/analytics')}
+                            className="text-muted-foreground hover:text-primary gap-2 mr-2"
+                        >
+                            <BarChart3 className="w-4 h-4" />
+                            <span className="hidden md:inline">Analytics</span>
+                        </Button>
                         <ProfileEditor onProfileUpdate={(updatedProfile) => setProfile(updatedProfile)}>
                             <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
                                 <img
@@ -440,16 +449,7 @@ const Dashboard = () => {
                                 </div>
                             </div>
 
-                            {/* Aggregated Speed Chart */}
-                            <div className="pt-6 border-t border-border">
-                                <h4 className="text-sm font-semibold mb-4 flex items-center gap-2">
-                                    <BarChart3 className="w-4 h-4 text-muted-foreground" />
-                                    Speed Profile
-                                </h4>
-                                <div className="h-40 -ml-4">
-                                    <SpeedDistributionChart buckets={aggregatedSpeedDistribution} />
-                                </div>
-                            </div>
+
                         </div>
                     </div>
 
