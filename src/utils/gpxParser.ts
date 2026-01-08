@@ -502,8 +502,8 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
   let stopCount = 0;
   let turbulenceSum = 0;
 
-  const STOP_THRESHOLD = 5.0; // km/h
-  const ACCEL_THRESHOLD = 0.2; // m/s^2 for "accelerating"
+  const STOP_THRESHOLD = 3.0; // km/h
+  const ACCEL_THRESHOLD = 0.4; // m/s^2 for "accelerating"
   const HARD_ACCEL_LIMIT = 2.5;
   const HARD_BRAKE_LIMIT = -3.0;
 
