@@ -5,6 +5,20 @@ export interface GPXPoint {
   time?: Date;
 }
 
+// --- CONFIGURATION CONSTANTS ---
+export const SPEED_SMOOTHING_WINDOW = 5;
+export const ACCEL_SMOOTHING_WINDOW = 3; // Unified from 5/3 to 3 for responsiveness
+
+// Thresholds
+export const STOP_SPEED_THRESHOLD = 3.0; // km/h
+export const HARD_ACCEL_THRESHOLD = 2.5; // m/s^2
+export const HARD_BRAKE_THRESHOLD = -3.0; // m/s^2
+export const CRUISING_THRESHOLD = 0.4;   // m/s^2 (±0.4 is cruising)
+
+// Gap Filtering
+export const MAX_VALID_GAP_PERCENTILE = 0.95; // Ignore acceleration on top 5% time gaps
+export const MIN_GAP_DURATION = 5.0; // Only filter if gap is > 5 seconds
+
 export interface GPXStats {
   totalDistance: number; // in kilometers
   totalTime: number; // in seconds
@@ -79,6 +93,13 @@ export function calculateBearing(lat1: number, lon1: number, lat2: number, lon2:
   const x = Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(deltaLambda);
   const theta = Math.atan2(y, x);
   return ((theta * 180) / Math.PI + 360) % 360;
+}
+
+function getPercentile(values: number[], percentile: number): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const index = Math.ceil(percentile * sorted.length) - 1;
+  return sorted[Math.max(0, Math.min(index, sorted.length - 1))];
 }
 
 export interface SpeedBucket {
@@ -476,16 +497,17 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
   }
 
   // 2. Smooth Accelerations (Moving Average)
-  // Reduced to 3 for sharper stats
-  const ACCEL_WINDOW_SIZE = 5;
+  // 2. Smooth Accelerations (Moving Average)
+  // Unified Window Size
+  const ACCEL_WINDOW = ACCEL_SMOOTHING_WINDOW;
   const smoothedAccelerations: number[] = [];
   for (let i = 0; i < rawAccelerations.length; i++) {
     let sum = 0, count = 0;
-    const offset = Math.floor(ACCEL_WINDOW_SIZE / 2);
+    const offset = Math.floor(ACCEL_WINDOW / 2);
     for (let j = -offset; j <= offset; j++) {
       const idx = i + j;
       if (idx >= 0 && idx < rawAccelerations.length) {
-        sum += rawAccelerations[idx];
+        sum += rawAccelerations[idx]; // Use raw only
         count++;
       }
     }
@@ -502,11 +524,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
   let stopCount = 0;
   let turbulenceSum = 0;
 
-  const STOP_THRESHOLD = 3.0; // km/h
-  const ACCEL_THRESHOLD = 0.4; // m/s^2 for "accelerating"
-  const HARD_ACCEL_LIMIT = 2.5;
-  const HARD_BRAKE_LIMIT = -3.0;
-
+  // State for loop
   let isCurrentlyStoppedSegment = false;
   let potentialStopDuration = 0;
   let potentialStopStartIndex = -1;
@@ -518,11 +536,17 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
   const hardAccelPoints: [number, number, number][] = [];
   const hardBrakePoints: [number, number, number][] = [];
 
+  // Calculate 95th percentile of time deltas for gap filtering
+  const p95TimeGap = getPercentile(timeDeltas, MAX_VALID_GAP_PERCENTILE);
+
   for (let i = 0; i < smoothedSpeeds.length; i++) {
     const speed = smoothedSpeeds[i];
     const time = timeDeltas[i];
     const smoothedAccel = smoothedAccelerations[i];
     const rawAccel = rawAccelerations[i];
+
+    // Filter large gaps (Time > P95 AND Time > 5s) - Ignore acceleration events here
+    const isLargeGap = time > p95TimeGap && time > MIN_GAP_DURATION;
 
     // Turbulence: Change in acceleration
     if (i > 0) {
@@ -531,36 +555,44 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
     }
 
     // --- Hard Point Event Detection (Uses Smoothed Acceleration) ---
-    if (smoothedAccel > HARD_ACCEL_LIMIT) {
-      if (!inHardAccelEvent) {
-        hardAccelerationCount++;
-        inHardAccelEvent = true;
-        // Record the point with its acceleration value
-        const point = points[i + 1]; // i+1 because segments are between points
-        if (point) {
-          hardAccelPoints.push([point.lat, point.lon, smoothedAccel]);
+    // Only count hard events if NOT a large gap
+    if (!isLargeGap) {
+      if (smoothedAccel > HARD_ACCEL_THRESHOLD) {
+        if (!inHardAccelEvent) {
+          hardAccelerationCount++;
+          inHardAccelEvent = true;
+          // Record the point with its acceleration value
+          const point = points[i + 1]; // i+1 because segments are between points
+          if (point) {
+            hardAccelPoints.push([point.lat, point.lon, smoothedAccel]);
+          }
         }
+      } else {
+        // Hysteresis or simple exit
+        inHardAccelEvent = false;
       }
-    } else {
-      inHardAccelEvent = false;
-    }
 
-    if (smoothedAccel < HARD_BRAKE_LIMIT) {
-      if (!inHardBrakeEvent) {
-        hardBrakingCount++;
-        inHardBrakeEvent = true;
-        // Record the point with its acceleration value
-        const point = points[i + 1]; // i+1 because segments are between points
-        if (point) {
-          hardBrakePoints.push([point.lat, point.lon, Math.abs(smoothedAccel)]);
+      if (smoothedAccel < HARD_BRAKE_THRESHOLD) {
+        if (!inHardBrakeEvent) {
+          hardBrakingCount++;
+          inHardBrakeEvent = true;
+          // Record the point with its acceleration value
+          const point = points[i + 1]; // i+1 because segments are between points
+          if (point) {
+            hardBrakePoints.push([point.lat, point.lon, Math.abs(smoothedAccel)]);
+          }
         }
+      } else {
+        inHardBrakeEvent = false;
       }
     } else {
+      // If large gap, reset event flags to avoid carrying over state
+      inHardAccelEvent = false;
       inHardBrakeEvent = false;
     }
 
     // --- Motion Profile Time Bucketing (Uses Raw Acceleration) ---
-    if (speed < STOP_THRESHOLD) {
+    if (speed < STOP_SPEED_THRESHOLD) {
       stoppedTime += time;
       potentialStopDuration += time;
       if (!isCurrentlyStoppedSegment) {
@@ -568,9 +600,18 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
         potentialStopStartIndex = i;
       }
     } else {
-      // Use raw acceleration for motion profile
-      if (rawAccel > ACCEL_THRESHOLD) timeAccelerating += time;
-      else if (rawAccel < -ACCEL_THRESHOLD) timeBraking += time;
+      // Use raw acceleration for motion profile, but respecting large gap filtering
+      // If large gap, we can attribute it to "Cruising" or proportional split, 
+      // but usually cruising is safest assumption for missing data, or just rawAccel if acceptable.
+      // Current logical instruction: "be vary of high accelerations".
+
+      let effectiveAccel = rawAccel;
+      if (isLargeGap) {
+        effectiveAccel = 0; // Treat large gaps as constant speed (Cruising) for stats
+      }
+
+      if (effectiveAccel > CRUISING_THRESHOLD) timeAccelerating += time;
+      else if (effectiveAccel < -CRUISING_THRESHOLD) timeBraking += time;
       else timeCruising += time;
 
       if (isCurrentlyStoppedSegment) {
@@ -667,7 +708,7 @@ export function analyzeSegments(points: GPXPoint[]): TrackSegment[] {
 
   // 1. Smooth Speeds (Moving Average)
   const smoothedSpeeds: number[] = [];
-  const WINDOW_SIZE = 5;
+  const WINDOW_SIZE = SPEED_SMOOTHING_WINDOW;
 
   for (let i = 0; i < speeds.length; i++) {
     let sum = 0;
@@ -699,14 +740,13 @@ export function analyzeSegments(points: GPXPoint[]): TrackSegment[] {
   }
 
   // 3. Smooth Accelerations (Light Moving Average)
-  // Reduced from 5 to 3 to be more reactive but still filter differentiation noise
-  const ACCEL_WINDOW_SIZE = 3;
+  const ACCEL_WINDOW = ACCEL_SMOOTHING_WINDOW;
   const smoothedAccelerations: number[] = [];
 
   for (let i = 0; i < rawAccelerations.length; i++) {
     let sum = 0;
     let count = 0;
-    const offset = Math.floor(ACCEL_WINDOW_SIZE / 2);
+    const offset = Math.floor(ACCEL_WINDOW / 2);
 
     for (let j = -offset; j <= offset; j++) {
       const idx = i + j;
@@ -718,11 +758,23 @@ export function analyzeSegments(points: GPXPoint[]): TrackSegment[] {
     smoothedAccelerations.push(count > 0 ? sum / count : 0);
   }
 
+  // GAP FILTERING
+  // Calculate 95th percentile of time deltas for gap filtering
+  const p95TimeGap = getPercentile(timeDeltas, MAX_VALID_GAP_PERCENTILE);
+
   // 4. Build Segments with Smoothed Data (Acceleration) but Raw/Robust Speed
   for (let i = 0; i < smoothedSpeeds.length; i++) {
+    const time = timeDeltas[i];
+    let accel = smoothedAccelerations[i];
+
+    // Filter large gaps (Time > P95 AND Time > 5s)
+    if (time > p95TimeGap && time > MIN_GAP_DURATION) {
+      accel = 0; // Zero out acceleration for display if it's a gap
+    }
+
     segments.push({
       speed: speeds[i], // Use Robust Speed (not smoothed) as requested
-      acceleration: smoothedAccelerations[i]
+      acceleration: accel
     });
   }
 
