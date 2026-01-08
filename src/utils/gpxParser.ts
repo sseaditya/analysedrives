@@ -477,7 +477,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
 
   // 2. Smooth Accelerations (Moving Average)
   // Reduced to 3 for sharper stats
-  const ACCEL_WINDOW_SIZE = 3;
+  const ACCEL_WINDOW_SIZE = 5;
   const smoothedAccelerations: number[] = [];
   for (let i = 0; i < rawAccelerations.length; i++) {
     let sum = 0, count = 0;
