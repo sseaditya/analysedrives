@@ -461,13 +461,14 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
 
   // --- NEW: Smoothed Acceleration Calculation for Robust Motion Stats ---
 
-  // 1. Calculate Raw Accelerations
+  // 1. Calculate Raw Accelerations (From Robust Speeds for consistency)
   const rawAccelerations: number[] = [];
-  for (let i = 0; i < smoothedSpeeds.length; i++) {
+  for (let i = 0; i < speeds.length; i++) {
     const time = timeDeltas[i];
     if (i > 0 && time > 0) {
       // (v2 - v1) / t, convert km/h to m/s
-      const accel = (smoothedSpeeds[i] / 3.6 - smoothedSpeeds[i - 1] / 3.6) / time;
+      // Using speeds[i] (Robust) instead of smoothedSpeeds to match map responsiveness
+      const accel = (speeds[i] / 3.6 - speeds[i - 1] / 3.6) / time;
       rawAccelerations.push(accel);
     } else {
       rawAccelerations.push(0);
@@ -475,7 +476,8 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
   }
 
   // 2. Smooth Accelerations (Moving Average)
-  const ACCEL_WINDOW_SIZE = 5;
+  // Reduced to 3 for sharper stats
+  const ACCEL_WINDOW_SIZE = 3;
   const smoothedAccelerations: number[] = [];
   for (let i = 0; i < rawAccelerations.length; i++) {
     let sum = 0, count = 0;
@@ -682,21 +684,23 @@ export function analyzeSegments(points: GPXPoint[]): TrackSegment[] {
     smoothedSpeeds.push(count > 0 ? sum / count : 0);
   }
 
-  // 2. Calculate Raw Accelerations
+  // 2. Calculate Raw Accelerations (From Robust Speeds, not Smoothed)
+  // This ensures the acceleration map matches the sharp speed changes
   const rawAccelerations: number[] = [];
-  for (let i = 0; i < smoothedSpeeds.length; i++) {
+  for (let i = 0; i < speeds.length; i++) {
     const time = timeDeltas[i];
     if (i > 0 && time > 0) {
-      const v1 = smoothedSpeeds[i - 1] / 3.6; // m/s
-      const v2 = smoothedSpeeds[i] / 3.6;   // m/s
+      const v1 = speeds[i - 1] / 3.6; // m/s (Robust)
+      const v2 = speeds[i] / 3.6;   // m/s (Robust)
       rawAccelerations.push((v2 - v1) / time);
     } else {
       rawAccelerations.push(0);
     }
   }
 
-  // 3. Smooth Accelerations (Moving Average)
-  const ACCEL_WINDOW_SIZE = 5;
+  // 3. Smooth Accelerations (Light Moving Average)
+  // Reduced from 5 to 3 to be more reactive but still filter differentiation noise
+  const ACCEL_WINDOW_SIZE = 3;
   const smoothedAccelerations: number[] = [];
 
   for (let i = 0; i < rawAccelerations.length; i++) {
