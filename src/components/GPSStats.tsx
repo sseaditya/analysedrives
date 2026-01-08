@@ -127,7 +127,6 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
 
   const tabs = [
     { id: "overview", label: "Overview", icon: MapPin },
-    { id: "physics", label: "Motion & Physics", icon: Activity },
     { id: "structure", label: "Route Structure", icon: Spline },
   ];
 
@@ -624,38 +623,6 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
             </div>
           )}
 
-          {/* MOTION TAB (Physics Only) */}
-          {activeTab === "physics" && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              {/* Dynamics Dashboard */}
-              <div>
-                <h3 className="text-xl font-bold mb-10">Dynamics Overview</h3>
-                <div className="flex flex-wrap gap-16">
-                  <div>
-                    <span className="block text-2xl font-normal text-foreground leading-none">{stats.hardAccelerationCount}</span>
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Hard Accels</span>
-                    <span className="text-[10px] text-muted-foreground mt-1 block">&gt; 2.5 m/s²</span>
-                  </div>
-                  <div>
-                    <span className="block text-2xl font-normal text-foreground leading-none">{stats.hardBrakingCount}</span>
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Hard Braking</span>
-                    <span className="text-[10px] text-muted-foreground mt-1 block">&lt; -3.0 m/s²</span>
-                  </div>
-                  <div>
-                    <span className="block text-2xl font-normal text-foreground leading-none">{stats.turbulenceScore.toFixed(1)}</span>
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Turbulence</span>
-                    <span className="text-[10px] text-muted-foreground mt-1 block">Score</span>
-                  </div>
-                  <div>
-                    <span className="block text-2xl font-normal text-foreground leading-none">{stats.accelBrakeRatio.toFixed(2)}</span>
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Accel Ratio</span>
-                    <span className="text-[10px] text-muted-foreground mt-1 block">Balance</span>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          )}
 
           {/* ROUTE STRUCTURE TAB (Merged Geometry + Elevation) */}
           {activeTab === "structure" && (
