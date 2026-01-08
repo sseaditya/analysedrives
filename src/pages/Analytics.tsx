@@ -152,25 +152,69 @@ const Analytics = () => {
             }));
     }, [activities]);
 
+    const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+
+    useEffect(() => {
+        // Detect theme from class or local storage to set initial map tile
+        if (document.documentElement.classList.contains('dark')) {
+            setTheme('dark');
+        } else {
+            setTheme('light');
+        }
+
+        // Observer for theme changes
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.attributeName === 'class') {
+                    if (document.documentElement.classList.contains('dark')) {
+                        setTheme('dark');
+                    } else {
+                        setTheme('light');
+                    }
+                }
+            });
+        });
+        observer.observe(document.documentElement, { attributes: true });
+        return () => observer.disconnect();
+    }, []);
+
     // Initialize Map
     useEffect(() => {
         if (!mapRef.current || mapInstanceRef.current) return;
 
         const map = L.map(mapRef.current).setView([0, 0], 2);
 
-        L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-        }).addTo(map);
-
+        mapInstanceRef.current = map;
         const layerGroup = L.layerGroup().addTo(map);
         layerGroupRef.current = layerGroup;
-        mapInstanceRef.current = map;
 
         return () => {
             map.remove();
             mapInstanceRef.current = null;
         };
     }, []);
+
+    // Update Tiles when Theme Changes
+    useEffect(() => {
+        if (!mapInstanceRef.current) return;
+        const map = mapInstanceRef.current;
+
+        // Remove existing tile layers
+        map.eachLayer((layer) => {
+            if (layer instanceof L.TileLayer) {
+                map.removeLayer(layer);
+            }
+        });
+
+        const tileUrl = theme === 'dark'
+            ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+            : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+
+        L.tileLayer(tileUrl, {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        }).addTo(map);
+
+    }, [theme]);
 
     // Update Map Layers
     useEffect(() => {

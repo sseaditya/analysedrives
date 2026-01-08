@@ -133,8 +133,8 @@ const SpeedDistributionChart = ({ points, speedLimit, buckets }: SpeedDistributi
                         <stop offset="95%" stopColor="hsl(15, 52%, 58%)" stopOpacity={0.1} />
                     </linearGradient>
                     <linearGradient id="colorDist" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(140, 30%, 55%)" stopOpacity={0.8} />
-                        <stop offset="95%" stopColor="hsl(140, 30%, 55%)" stopOpacity={0.1} />
+                        <stop offset="5%" stopColor="hsl(var(--foreground))" stopOpacity={0.8} />
+                        <stop offset="95%" stopColor="hsl(var(--foreground))" stopOpacity={0.1} />
                     </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} opacity={0.3} />
@@ -197,7 +197,7 @@ const SpeedDistributionChart = ({ points, speedLimit, buckets }: SpeedDistributi
                     dataKey="distance"
                     name="Distance (km)"
                     fill="url(#colorDist)"
-                    stroke="hsl(140, 30%, 55%)"
+                    stroke="hsl(var(--foreground))"
                     strokeWidth={1}
                     radius={[4, 4, 0, 0]}
                     maxBarSize={40}

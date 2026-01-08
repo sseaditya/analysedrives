@@ -424,30 +424,30 @@ const Dashboard = () => {
 
                                 {/* Main Stats */}
                                 <div className="space-y-4">
-                                    <div className="p-4 rounded-xl bg-orange-500/5 border border-orange-500/10">
-                                        <span className="text-xs text-orange-600 font-semibold uppercase tracking-wider">Total Distance</span>
-                                        <div className="text-2xl font-bold mt-1 text-orange-700">{formatDistance(cumulativeStats.totalDist)}</div>
+                                    <div className="p-4 rounded-xl bg-muted/40 border border-border">
+                                        <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Total Distance</span>
+                                        <div className="text-2xl font-bold mt-1 text-primary">{formatDistance(cumulativeStats.totalDist)}</div>
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-4">
-                                        <div className="p-3 rounded-xl bg-blue-500/5 border border-blue-500/10">
-                                            <span className="text-[10px] text-blue-600 font-semibold uppercase">Total Time</span>
-                                            <div className="text-lg font-bold mt-1 text-blue-700">{Math.round(cumulativeStats.totalTime / 3600)}h</div>
+                                        <div className="p-3 rounded-xl bg-foreground/5 border border-foreground/10">
+                                            <span className="text-[10px] text-muted-foreground font-semibold uppercase">Total Time</span>
+                                            <div className="text-lg font-bold mt-1 text-foreground">{Math.round(cumulativeStats.totalTime / 3600)}h</div>
                                         </div>
-                                        <div className="p-3 rounded-xl bg-green-500/5 border border-green-500/10">
-                                            <span className="text-[10px] text-green-600 font-semibold uppercase">Activities</span>
-                                            <div className="text-lg font-bold mt-1 text-green-700">{cumulativeStats.count}</div>
+                                        <div className="p-3 rounded-xl bg-foreground/5 border border-foreground/10">
+                                            <span className="text-[10px] text-muted-foreground font-semibold uppercase">Activities</span>
+                                            <div className="text-lg font-bold mt-1 text-foreground">{cumulativeStats.count}</div>
                                         </div>
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-4">
-                                        <div className="p-3 rounded-xl bg-purple-500/5 border border-purple-500/10">
-                                            <span className="text-[10px] text-purple-600 font-semibold uppercase">Avg Speed</span>
-                                            <div className="text-lg font-bold mt-1 text-purple-700">{cumulativeStats.avgSpeed.toFixed(1)} <span className="text-xs">km/h</span></div>
+                                        <div className="p-3 rounded-xl bg-foreground/5 border border-foreground/10">
+                                            <span className="text-[10px] text-muted-foreground font-semibold uppercase">Avg Speed</span>
+                                            <div className="text-lg font-bold mt-1 text-foreground">{cumulativeStats.avgSpeed.toFixed(1)} <span className="text-xs">km/h</span></div>
                                         </div>
-                                        <div className="p-3 rounded-xl bg-amber-500/5 border border-amber-500/10">
-                                            <span className="text-[10px] text-amber-600 font-semibold uppercase">Max Speed</span>
-                                            <div className="text-lg font-bold mt-1 text-amber-700">{cumulativeStats.maxSpeed.toFixed(0)} <span className="text-xs">km/h</span></div>
+                                        <div className="p-3 rounded-xl bg-foreground/5 border border-foreground/10">
+                                            <span className="text-[10px] text-muted-foreground font-semibold uppercase">Max Speed</span>
+                                            <div className="text-lg font-bold mt-1 text-foreground">{cumulativeStats.maxSpeed.toFixed(0)} <span className="text-xs">km/h</span></div>
                                         </div>
                                     </div>
                                 </div>

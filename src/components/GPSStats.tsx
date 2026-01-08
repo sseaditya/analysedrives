@@ -584,7 +584,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                         <div className="h-3 w-full bg-muted rounded-full overflow-hidden flex shadow-inner">
                           {[
                             { seconds: effectiveStats.timeAccelerating, color: "bg-emerald-500" },
-                            { seconds: effectiveStats.timeCruising, color: "bg-blue-500" },
+                            { seconds: effectiveStats.timeCruising, color: "bg-foreground" }, // Black (Cruise)
                             { seconds: effectiveStats.timeBraking, color: "bg-red-500" },
                             { seconds: effectiveStats.stoppedTime, color: "bg-muted-foreground/30" },
                           ].map((item, idx) => {
@@ -604,7 +604,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                         <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs">
                           {[
                             { label: "Accel", seconds: effectiveStats.timeAccelerating, color: "bg-emerald-500" },
-                            { label: "Cruise", seconds: effectiveStats.timeCruising, color: "bg-blue-500" },
+                            { label: "Cruise", seconds: effectiveStats.timeCruising, color: "bg-foreground" },
                             { label: "Brake", seconds: effectiveStats.timeBraking, color: "bg-red-500" },
                             { label: "Stop", seconds: effectiveStats.stoppedTime, color: "bg-muted-foreground/30" },
                           ].map(item => (
@@ -677,8 +677,8 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                       {/* Visual Stacked Bar */}
                       <div className="h-4 w-full bg-muted rounded-full overflow-hidden flex shadow-inner">
                         {[
-                          { dist: stats.totalDistance * (stats.percentStraight / 100), color: "bg-blue-500" },
-                          { dist: stats.totalDistance * ((100 - stats.percentStraight) / 100), color: "bg-purple-500" },
+                          { dist: stats.totalDistance * (stats.percentStraight / 100), color: "bg-primary" },
+                          { dist: stats.totalDistance * ((100 - stats.percentStraight) / 100), color: "bg-foreground/80" }, // Curves -> Dark/Blackish
                         ].map((item, idx) => {
                           const width = (item.dist / (stats.totalDistance || 1)) * 100;
                           if (width <= 0) return null;
@@ -694,8 +694,8 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
 
                       <div className="space-y-4">
                         {[
-                          { label: "Straight Sections", dist: stats.totalDistance * (stats.percentStraight / 100), color: "bg-blue-500", desc: "Sustained heading" },
-                          { label: "Corners & Curves", dist: stats.totalDistance * ((100 - stats.percentStraight) / 100), color: "bg-purple-500", desc: "Frequent turns" },
+                          { label: "Straight Sections", dist: stats.totalDistance * (stats.percentStraight / 100), color: "bg-primary", desc: "Sustained heading" },
+                          { label: "Corners & Curves", dist: stats.totalDistance * ((100 - stats.percentStraight) / 100), color: "bg-foreground/80", desc: "Frequent turns" },
                         ].map((item, idx) => {
                           const percentage = (item.dist / (stats.totalDistance || 1)) * 100;
                           return (
@@ -771,8 +771,8 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                       {/* Visual Stacked Bar */}
                       <div className="h-4 w-full bg-muted rounded-full overflow-hidden flex shadow-inner">
                         {[
-                          { seconds: stats.timeClimbing, color: "bg-orange-500" },
-                          { seconds: stats.timeDescending, color: "bg-blue-500" },
+                          { seconds: stats.timeClimbing, color: "bg-primary" },
+                          { seconds: stats.timeDescending, color: "bg-foreground/80" },
                           { seconds: stats.timeLevel, color: "bg-muted-foreground/30" },
                         ].map((item, idx) => {
                           const width = (item.seconds / (stats.totalTime || 1)) * 100;
@@ -789,8 +789,8 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
 
                       <div className="space-y-4">
                         {[
-                          { label: "Climbing", seconds: stats.timeClimbing, color: "bg-orange-500", desc: "Uphill battle" },
-                          { label: "Descending", seconds: stats.timeDescending, color: "bg-blue-500", desc: "Gravity assisted" },
+                          { label: "Climbing", seconds: stats.timeClimbing, color: "bg-primary", desc: "Uphill battle" },
+                          { label: "Descending", seconds: stats.timeDescending, color: "bg-foreground/80", desc: "Gravity assisted" },
                           { label: "Level Flight", seconds: stats.timeLevel, color: "bg-muted-foreground/30", desc: "Flat terrain" },
                         ].map((item, idx) => {
                           const percentage = (item.seconds / (stats.totalTime || 1)) * 100;

@@ -203,19 +203,31 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
           const val = seg.acceleration;
 
           if (val > 0.1) {
-            // Green gradient for acceleration - Fixed scale 2 m/s²
-            const ratio = Math.min(val / 2.0, 1);
-            const lightness = 95 - (ratio * 50); // From very light green to deep green
-            color = `hsl(142, 85%, ${lightness}%)`;
+            // Green gradient for acceleration - Make it POP
+            // Use HSL(142, 100%, X%) for maximum vibrancy
+            const ratio = Math.min(val / 2.5, 1); // Expanded scale slightly
+            // Lightness from 90% (start) to 40% (deep vibrant green) for Light Mode
+            // For visibility on white/manilla, we need it to get DARKER/STRONGER as accel increases.
+            // On map, transparency helps blend.
+
+            // Standardizing for visibility on both:
+            // High saturation, modulating lightness.
+            const lightness = 80 - (ratio * 40); // 80 -> 40
+            color = `hsl(142, 100%, ${lightness}%)`;
           } else if (val < -0.1) {
-            // Red gradient for braking - Fixed scale 3 m/s²
+            // Red gradient for braking - Make it POP
             const ratio = Math.min(Math.abs(val) / 3.0, 1);
-            const lightness = 95 - (ratio * 50); // From very light red to deep red
-            color = `hsl(0, 90%, ${lightness}%)`;
+            const lightness = 80 - (ratio * 40); // 80 -> 40
+            color = `hsl(0, 100%, ${lightness}%)`;
           } else {
-            // White for cruising
-            color = 'hsl(0, 0%, 95%)';
-            opacity = 0.6;
+            // Cruising Color - Black for Light Mode, White for Dark Mode
+            if (theme === 'dark') {
+              color = 'hsl(0, 0%, 95%)'; // White for dark map
+              opacity = 0.6;
+            } else {
+              color = 'hsl(0, 0%, 0%)'; // Black for light map
+              opacity = 0.8; // Higher opacity for thin black line visibility
+            }
           }
         }
 
@@ -433,7 +445,7 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
           ) : (
             <div className="flex items-center gap-3">
               <span className="text-[9px] font-black uppercase tracking-tighter text-muted-foreground text-red-500">Braking</span>
-              <div className="h-1.5 w-[120px] rounded-full bg-gradient-to-r from-red-500 via-muted-foreground/20 to-emerald-500" />
+              <div className="h-1.5 w-[120px] rounded-full bg-gradient-to-r from-[hsl(0,100%,50%)] via-foreground/20 to-[hsl(142,100%,40%)]" />
               <span className="text-[9px] font-black uppercase tracking-tighter text-muted-foreground text-emerald-500">Accel</span>
             </div>
           )}
