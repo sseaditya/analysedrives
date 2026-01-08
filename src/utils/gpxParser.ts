@@ -64,6 +64,7 @@ export interface GPXStats {
   tightTurnPoints?: [number, number][];
   hardAccelPoints?: [number, number, number][]; // [lat, lon, m/s²]
   hardBrakePoints?: [number, number, number][]; // [lat, lon, m/s²]
+  speedDistribution?: SpeedBucket[];
 }
 
 // Haversine formula to calculate distance between two GPS points
@@ -790,6 +791,8 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
   // Hilliness Score: Elevation gain per kilometer
   const hillinessScore = totalDistance > 0 ? elevationGain / totalDistance : 0;
 
+  const speedDistribution = calculateSpeedDistribution(points);
+
   return {
     totalDistance,
     totalTime,
@@ -830,6 +833,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
     tightTurnPoints,
     hardAccelPoints,
     hardBrakePoints,
+    speedDistribution,
   };
 }
 

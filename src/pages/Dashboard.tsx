@@ -253,7 +253,12 @@ const Dashboard = () => {
             }
         });
 
-        return Array.from(bucketMap.values()).sort((a, b) => a.minSpeed - b.minSpeed);
+        return Array.from(bucketMap.values())
+            .sort((a, b) => a.minSpeed - b.minSpeed)
+            .map(b => ({
+                ...b,
+                range: `${b.minSpeed}-${b.minSpeed + 10}`
+            }));
     }, [cumulativeStats]);
 
     const handleSignOut = async () => {
@@ -674,9 +679,9 @@ const Dashboard = () => {
                                                     </p>
                                                 </div>
 
-                                                <div className="grid grid-cols-2 gap-2 mt-auto pt-4 border-t border-border/50">
+                                                <div className="grid grid-cols-3 gap-2 mt-auto pt-4 border-t border-border/50">
                                                     <div className="flex flex-col">
-                                                        <span className="text-[10px] uppercase text-muted-foreground font-medium">Distance</span>
+                                                        <span className="text-[10px] uppercase text-muted-foreground font-medium">Dist</span>
                                                         <span className="text-sm font-bold flex items-center gap-1">
                                                             <MapPin className="w-3 h-3 text-primary" />
                                                             {formatDistance(activity.stats?.totalDistance || 0)}
@@ -689,11 +694,11 @@ const Dashboard = () => {
                                                             {formatDuration(activity.stats?.totalTime || 0)}
                                                         </span>
                                                     </div>
-                                                    <div className="flex flex-col col-span-2 mt-2 pt-2 border-t border-dashed border-border/50">
-                                                        <span className="text-[10px] uppercase text-muted-foreground font-medium">Avg Speed</span>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[10px] uppercase text-muted-foreground font-medium">Avg</span>
                                                         <span className="text-sm font-bold flex items-center gap-1">
                                                             <Activity className="w-3 h-3 text-primary" />
-                                                            {activity.stats?.avgSpeed ? `${activity.stats.avgSpeed.toFixed(1)} km/h` : '-'}
+                                                            {activity.stats?.avgSpeed ? `${activity.stats.avgSpeed.toFixed(1)}` : '-'}
                                                         </span>
                                                     </div>
                                                 </div>
