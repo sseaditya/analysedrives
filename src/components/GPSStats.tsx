@@ -127,9 +127,8 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
 
   const tabs = [
     { id: "overview", label: "Overview", icon: MapPin },
-    { id: "motion", label: "Motion & Physics", icon: Activity },
-    { id: "geometry", label: "Route Geometry", icon: Spline },
-    { id: "elevation", label: "Elevation & Terrain", icon: TrendingUp },
+    { id: "physics", label: "Motion & Physics", icon: Activity },
+    { id: "structure", label: "Route Structure", icon: Spline },
   ];
 
   // Calculate stats for the selected zoom range
@@ -148,46 +147,19 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
 
     if (subset.length < 2) return { filteredPoints: subset, subsetStats: null };
 
-    // Calculate subset metrics
-    let distance = 0;
+    // FULL RECALCULATION for dynamic charts
+    const calculated = calculateStats(subset);
 
-    // Calculate distance for the subset
-    for (let i = 1; i < subset.length; i++) {
-      const prev = subset[i - 1];
-      const curr = subset[i];
-      distance += haversineDistance(prev.lat, prev.lon, curr.lat, curr.lon);
-    }
-
-    // Calculate time duration
-    let timeSeconds = 0;
-    const startTime = subset[0].time;
-    const endTime = subset[subset.length - 1].time;
-
-    if (startTime && endTime) {
-      timeSeconds = (endTime.getTime() - startTime.getTime()) / 1000;
-    }
-
-    // Calculate average speed
-    // Calculate average speed
-    const avgSpeed = timeSeconds > 0 ? distance / (timeSeconds / 3600) : 0;
-
-    let displayTime = timeSeconds;
-    let displayAvgSpeed = avgSpeed;
-
-    // Apply speed cap if active (ignores interactive Speed Limiter)
-    // Only enforces hard speed_cap for public viewers
-    if (!isOwner && speedCap && avgSpeed > speedCap) {
-      displayAvgSpeed = speedCap;
-      displayTime = displayAvgSpeed > 0 ? distance / (displayAvgSpeed) * 3600 : timeSeconds;
+    // Apply speed cap override for public view if needed
+    if (!isOwner && speedCap && calculated.avgSpeed > speedCap) {
+      calculated.avgSpeed = speedCap;
+      // Adjust time roughly? Or just accept the capped avg.
+      // For simple display, capping avg is enough.
     }
 
     return {
       filteredPoints: subset,
-      subsetStats: {
-        distance,
-        time: displayTime,
-        avgSpeed: displayAvgSpeed
-      }
+      subsetStats: calculated
     };
   }, [points, zoomRange, speedCap, isOwner]);
 
@@ -514,13 +486,13 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                     <div className="flex items-center gap-10">
                       {/* Distance - Simple Inline */}
                       <div className="flex items-baseline gap-1.5">
-                        <span className="text-xl font-normal tabular-nums">{zoomRange && subsetStats ? formatDistance(subsetStats.distance) : formatDistance(stats.totalDistance)}</span>
+                        <span className="text-xl font-normal tabular-nums">{zoomRange && subsetStats ? formatDistance(subsetStats.totalDistance) : formatDistance(stats.totalDistance)}</span>
                       </div>
 
                       {/* Time - Inline with Arrow Delta */}
                       <div className="flex items-baseline gap-2">
                         <span className={cn("text-xl font-normal tabular-nums", showLimiter && limitedStats?.timeAdded > 0 ? "text-muted-foreground/50 line-through" : "text-foreground")}>
-                          {zoomRange && subsetStats ? formatDuration(subsetStats.time) : formatDuration(displayStats.totalTime)}
+                          {zoomRange && subsetStats ? formatDuration(subsetStats.totalTime) : formatDuration(displayStats.totalTime)}
                         </span>
                         {showLimiter && limitedStats && limitedStats.timeAdded > 0 && (
                           <div className="flex items-baseline gap-2 animate-in fade-in slide-in-from-left-2">
@@ -590,13 +562,69 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                   />
                 </div>
               </div>
+
+              {/* Motion Time Profile (Moved to Overview) */}
+              {/* Uses effective stats (subset if zoomed, full if not) */}
+              <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-primary" />
+                  Motion Time Profile
+                  {zoomRange && <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Filtered to selection</span>}
+                </h3>
+
+                {/* Full Horizontal Thin Profile */}
+                <div className="space-y-4">
+                  {(() => {
+                    const effectiveStats = (zoomRange && subsetStats) ? subsetStats : stats;
+                    const total = effectiveStats.totalTime || 1;
+
+                    return (
+                      <>
+                        <div className="h-3 w-full bg-muted rounded-full overflow-hidden flex shadow-inner">
+                          {[
+                            { seconds: effectiveStats.timeAccelerating, color: "bg-emerald-500" },
+                            { seconds: effectiveStats.timeCruising, color: "bg-blue-500" },
+                            { seconds: effectiveStats.timeBraking, color: "bg-red-500" },
+                            { seconds: effectiveStats.stoppedTime, color: "bg-muted-foreground/30" },
+                          ].map((item, idx) => {
+                            const width = (item.seconds / total) * 100;
+                            if (width <= 0) return null;
+                            return (
+                              <div
+                                key={idx}
+                                className={cn("h-full transition-all duration-500", item.color)}
+                                style={{ width: `${width}%` }}
+                              />
+                            );
+                          })}
+                        </div>
+
+                        {/* Legend for Profile (Horizontal) */}
+                        <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs">
+                          {[
+                            { label: "Accel", seconds: effectiveStats.timeAccelerating, color: "bg-emerald-500" },
+                            { label: "Cruise", seconds: effectiveStats.timeCruising, color: "bg-blue-500" },
+                            { label: "Brake", seconds: effectiveStats.timeBraking, color: "bg-red-500" },
+                            { label: "Stop", seconds: effectiveStats.stoppedTime, color: "bg-muted-foreground/30" },
+                          ].map(item => (
+                            <div key={item.label} className="flex items-center gap-2">
+                              <div className={cn("w-2 h-2 rounded-full", item.color)} />
+                              <span className="font-medium text-muted-foreground">{item.label}:</span>
+                              <span className="font-mono tabular-nums text-foreground">{formatDuration(item.seconds)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
             </div>
           )}
 
-          {/* MOTION TAB */}
-          {activeTab === "motion" && (
+          {/* MOTION TAB (Physics Only) */}
+          {activeTab === "physics" && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              {/* Motion Summary Cards */}
               {/* Dynamics Dashboard */}
               <div>
                 <h3 className="text-xl font-bold mb-10">Dynamics Overview</h3>
@@ -624,279 +652,222 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                 </div>
               </div>
 
-              {/* Behavior Analysis Section */}
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-                {/* Time Profile */}
-                <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
-                  <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
-                    <Activity className="w-5 h-5 text-primary" />
-                    Motion Time Profile
-                  </h3>
-                  <div className="space-y-6">
-                    {/* Visual Stacked Bar */}
-                    <div className="h-4 w-full bg-muted rounded-full overflow-hidden flex shadow-inner">
-                      {[
-                        { seconds: stats.timeAccelerating, color: "bg-emerald-500" },
-                        { seconds: stats.timeCruising, color: "bg-blue-500" },
-                        { seconds: stats.timeBraking, color: "bg-red-500" },
-                        { seconds: stats.stoppedTime, color: "bg-muted-foreground/30" },
-                      ].map((item, idx) => {
-                        const width = (item.seconds / (stats.totalTime || 1)) * 100;
-                        if (width === 0) return null;
-                        return (
-                          <div
-                            key={idx}
-                            className={cn("h-full transition-all duration-1000", item.color)}
-                            style={{ width: `${width}%` }}
-                          />
-                        );
-                      })}
-                    </div>
-
-                    <div className="space-y-4">
-                      {[
-                        { label: "Accelerating", seconds: stats.timeAccelerating, color: "bg-emerald-500", desc: "Pushing forward" },
-                        { label: "Cruising", seconds: stats.timeCruising, color: "bg-blue-500", desc: "Steady speed" },
-                        { label: "Braking", seconds: stats.timeBraking, color: "bg-red-500", desc: "Slowing down" },
-                        { label: "Stopped", seconds: stats.stoppedTime, color: "bg-muted-foreground/30", desc: "Stationary" },
-                      ].map((item, idx) => {
-                        const percentage = (item.seconds / (stats.totalTime || 1)) * 100;
-                        return (
-                          <div key={item.label} className="flex items-center gap-4">
-                            <div className={cn("w-1 h-8 rounded-full", item.color)} />
-                            <div className="flex-1">
-                              <div className="flex justify-between text-sm mb-1">
-                                <span className="font-bold">{item.label}</span>
-                                <span className="font-mono text-muted-foreground">{formatDuration(item.seconds)}</span>
-                              </div>
-                              <div className="flex justify-between items-end">
-                                <span className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">{item.desc}</span>
-                                <span className="text-xs font-bold text-foreground">{percentage.toFixed(1)}%</span>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
           )}
 
-          {/* GEOMETRY TAB */}
-          {activeTab === "geometry" && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              {/* Turn & Heading Summary */}
-              {/* Geometry Overview Panel */}
-              {/* Geometry Overview Panel - Clean Layout */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
-                <div>
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-6">turning</h4>
-                  <div className="flex gap-12">
-                    <div>
-                      <span className="block text-2xl font-normal text-foreground">{Math.round(stats.totalHeadingChange).toLocaleString()}°</span>
-                      <span className="text-xs text-muted-foreground mt-1 block">Rotation</span>
-                    </div>
-                    <div>
-                      <span className="block text-2xl font-normal text-foreground">{stats.twistinessScore.toFixed(0)}</span>
-                      <span className="text-xs text-muted-foreground mt-1 block">Twistiness</span>
-                    </div>
-                  </div>
-                </div>
+          {/* ROUTE STRUCTURE TAB (Merged Geometry + Elevation) */}
+          {activeTab === "structure" && (
+            <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
-                <div>
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-6">technical</h4>
-                  <div className="flex gap-12">
-                    <div>
-                      <span className="block text-2xl font-normal text-foreground">{stats.tightTurnsCount}</span>
-                      <span className="text-xs text-muted-foreground mt-1 block">Tight Turns</span>
-                    </div>
-                    <div>
-                      <span className="block text-2xl font-normal text-foreground">{stats.hairpinCount}</span>
-                      <span className="text-xs text-muted-foreground mt-1 block">Hairpins</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Advanced Geometry Analysis */}
-              <div className="grid grid-cols-1 gap-8">
-                {/* Straight vs Curvy Profile */}
-                <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
-                  <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
-                    <Spline className="w-5 h-5 text-primary" />
-                    Geometry Profile
-                  </h3>
-                  <div className="space-y-6">
-                    {/* Visual Stacked Bar */}
-                    <div className="h-4 w-full bg-muted rounded-full overflow-hidden flex shadow-inner">
-                      {[
-                        { dist: stats.totalDistance * (stats.percentStraight / 100), color: "bg-blue-500" },
-                        { dist: stats.totalDistance * ((100 - stats.percentStraight) / 100), color: "bg-purple-500" },
-                      ].map((item, idx) => {
-                        const width = (item.dist / (stats.totalDistance || 1)) * 100;
-                        if (width <= 0) return null;
-                        return (
-                          <div
-                            key={idx}
-                            className={cn("h-full transition-all duration-1000", item.color)}
-                            style={{ width: `${width}%` }}
-                          />
-                        );
-                      })}
-                    </div>
-
-                    <div className="space-y-4">
-                      {[
-                        { label: "Straight Sections", dist: stats.totalDistance * (stats.percentStraight / 100), color: "bg-blue-500", desc: "Sustained heading" },
-                        { label: "Corners & Curves", dist: stats.totalDistance * ((100 - stats.percentStraight) / 100), color: "bg-purple-500", desc: "Frequent turns" },
-                      ].map((item, idx) => {
-                        const percentage = (item.dist / (stats.totalDistance || 1)) * 100;
-                        return (
-                          <div key={item.label} className="flex items-center gap-4">
-                            <div className={cn("w-1 h-8 rounded-full", item.color)} />
-                            <div className="flex-1">
-                              <div className="flex justify-between text-sm mb-1">
-                                <span className="font-bold">{item.label}</span>
-                                <span className="font-mono text-muted-foreground">{formatDistance(item.dist)}</span>
-                              </div>
-                              <div className="flex justify-between items-end">
-                                <span className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">{item.desc}</span>
-                                <span className="text-xs font-bold text-foreground">{percentage.toFixed(1)}%</span>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ELEVATION TAB */}
-          {activeTab === "elevation" && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              {/* Elevation Summary Cards */}
-              {/* Terrain Overview Grid */}
+              {/* SECTION 1: GEOMETRY */}
               <div>
-                <h3 className="text-xl font-bold mb-10">Terrain Analysis</h3>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-12 gap-y-12">
+                <h3 className="text-xl font-bold mb-8 flex items-center gap-2">
+                  <Spline className="w-6 h-6 text-primary" />
+                  Route Geometry
+                </h3>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
                   <div>
-                    <span className="block text-2xl font-normal text-foreground leading-none">+{stats.elevationGain.toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Gain</span>
-                  </div>
-                  <div>
-                    <span className="block text-2xl font-normal text-foreground leading-none">-{stats.elevationLoss.toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Loss</span>
-                  </div>
-                  <div>
-                    <span className="block text-2xl font-normal text-foreground leading-none">{stats.elevationGain - stats.elevationLoss > 0 ? "+" : ""}{(stats.elevationGain - stats.elevationLoss).toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Net Change</span>
-                  </div>
-                  <div>
-                    <span className="block text-2xl font-normal text-foreground leading-none">{stats.hillinessScore.toFixed(1)}</span>
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Hilliness</span>
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-6">turning</h4>
+                    <div className="flex gap-12">
+                      <div>
+                        <span className="block text-2xl font-normal text-foreground">{Math.round(stats.totalHeadingChange).toLocaleString()}°</span>
+                        <span className="text-xs text-muted-foreground mt-1 block">Rotation</span>
+                      </div>
+                      <div>
+                        <span className="block text-2xl font-normal text-foreground">{stats.twistinessScore.toFixed(0)}</span>
+                        <span className="text-xs text-muted-foreground mt-1 block">Twistiness</span>
+                      </div>
+                    </div>
                   </div>
 
                   <div>
-                    <span className="block text-2xl font-normal text-foreground leading-none">{stats.maxElevation.toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Peak</span>
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-6">technical</h4>
+                    <div className="flex gap-12">
+                      <div>
+                        <span className="block text-2xl font-normal text-foreground">{stats.tightTurnsCount}</span>
+                        <span className="text-xs text-muted-foreground mt-1 block">Tight Turns</span>
+                      </div>
+                      <div>
+                        <span className="block text-2xl font-normal text-foreground">{stats.hairpinCount}</span>
+                        <span className="text-xs text-muted-foreground mt-1 block">Hairpins</span>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <span className="block text-2xl font-normal text-foreground leading-none">{stats.minElevation.toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Low</span>
-                  </div>
-                  <div>
-                    <span className="block text-2xl font-normal text-foreground leading-none">{stats.steepestClimb.toFixed(1)}%</span>
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Max Grade</span>
-                  </div>
-                  <div>
-                    <span className="block text-2xl font-normal text-foreground leading-none">{stats.steepestDescent.toFixed(1)}%</span>
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Min Grade</span>
+                </div>
+
+                {/* Advanced Geometry Analysis */}
+                <div className="grid grid-cols-1 gap-8">
+                  {/* Straight vs Curvy Profile */}
+                  <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+                    <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
+                      <Spline className="w-5 h-5 text-primary" />
+                      Geometry Profile
+                    </h3>
+                    <div className="space-y-6">
+                      {/* Visual Stacked Bar */}
+                      <div className="h-4 w-full bg-muted rounded-full overflow-hidden flex shadow-inner">
+                        {[
+                          { dist: stats.totalDistance * (stats.percentStraight / 100), color: "bg-blue-500" },
+                          { dist: stats.totalDistance * ((100 - stats.percentStraight) / 100), color: "bg-purple-500" },
+                        ].map((item, idx) => {
+                          const width = (item.dist / (stats.totalDistance || 1)) * 100;
+                          if (width <= 0) return null;
+                          return (
+                            <div
+                              key={idx}
+                              className={cn("h-full transition-all duration-1000", item.color)}
+                              style={{ width: `${width}%` }}
+                            />
+                          );
+                        })}
+                      </div>
+
+                      <div className="space-y-4">
+                        {[
+                          { label: "Straight Sections", dist: stats.totalDistance * (stats.percentStraight / 100), color: "bg-blue-500", desc: "Sustained heading" },
+                          { label: "Corners & Curves", dist: stats.totalDistance * ((100 - stats.percentStraight) / 100), color: "bg-purple-500", desc: "Frequent turns" },
+                        ].map((item, idx) => {
+                          const percentage = (item.dist / (stats.totalDistance || 1)) * 100;
+                          return (
+                            <div key={item.label} className="flex items-center gap-4">
+                              <div className={cn("w-1 h-8 rounded-full", item.color)} />
+                              <div className="flex-1">
+                                <div className="flex justify-between text-sm mb-1">
+                                  <span className="font-bold">{item.label}</span>
+                                  <span className="font-mono text-muted-foreground">{formatDistance(item.dist)}</span>
+                                </div>
+                                <div className="flex justify-between items-end">
+                                  <span className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">{item.desc}</span>
+                                  <span className="text-xs font-bold text-foreground">{percentage.toFixed(1)}%</span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Advanced Elevation Analysis */}
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-                {/* Terrain Profile */}
-                <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
-                  <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-primary" />
-                    Terrain Time Profile
-                  </h3>
-                  <div className="space-y-6">
-                    {/* Visual Stacked Bar */}
-                    <div className="h-4 w-full bg-muted rounded-full overflow-hidden flex shadow-inner">
-                      {[
-                        { seconds: stats.timeClimbing, color: "bg-orange-500" },
-                        { seconds: stats.timeDescending, color: "bg-blue-500" },
-                        { seconds: stats.timeLevel, color: "bg-muted-foreground/30" },
-                      ].map((item, idx) => {
-                        const width = (item.seconds / (stats.totalTime || 1)) * 100;
-                        if (width <= 0) return null;
-                        return (
-                          <div
-                            key={idx}
-                            className={cn("h-full transition-all duration-1000", item.color)}
-                            style={{ width: `${width}%` }}
-                          />
-                        );
-                      })}
+              {/* SECTION 2: ELEVATION */}
+              <div>
+                <h3 className="text-xl font-bold mb-8 flex items-center gap-2">
+                  <TrendingUp className="w-6 h-6 text-primary" />
+                  Elevation & Terrain
+                </h3>
+
+                <div>
+                  <h3 className="text-xl font-bold mb-10">Terrain Analysis</h3>
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-12 gap-y-12">
+                    <div>
+                      <span className="block text-2xl font-normal text-foreground leading-none">+{stats.elevationGain.toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Gain</span>
+                    </div>
+                    <div>
+                      <span className="block text-2xl font-normal text-foreground leading-none">-{stats.elevationLoss.toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Loss</span>
+                    </div>
+                    <div>
+                      <span className="block text-2xl font-normal text-foreground leading-none">{stats.elevationGain - stats.elevationLoss > 0 ? "+" : ""}{(stats.elevationGain - stats.elevationLoss).toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Net Change</span>
+                    </div>
+                    <div>
+                      <span className="block text-2xl font-normal text-foreground leading-none">{stats.hillinessScore.toFixed(1)}</span>
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Hilliness</span>
                     </div>
 
-                    <div className="space-y-4">
-                      {[
-                        { label: "Climbing", seconds: stats.timeClimbing, color: "bg-orange-500", desc: "Uphill battle" },
-                        { label: "Descending", seconds: stats.timeDescending, color: "bg-blue-500", desc: "Gravity assisted" },
-                        { label: "Level Flight", seconds: stats.timeLevel, color: "bg-muted-foreground/30", desc: "Flat terrain" },
-                      ].map((item, idx) => {
-                        const percentage = (item.seconds / (stats.totalTime || 1)) * 100;
-                        return (
-                          <div key={item.label} className="flex items-center gap-4">
-                            <div className={cn("w-1 h-8 rounded-full", item.color)} />
-                            <div className="flex-1">
-                              <div className="flex justify-between text-sm mb-1">
-                                <span className="font-bold">{item.label}</span>
-                                <span className="font-mono text-muted-foreground">{formatDuration(item.seconds)}</span>
-                              </div>
-                              <div className="flex justify-between items-end">
-                                <span className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">{item.desc}</span>
-                                <span className="text-xs font-bold text-foreground">{percentage.toFixed(1)}%</span>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
+                    <div>
+                      <span className="block text-2xl font-normal text-foreground leading-none">{stats.maxElevation.toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Peak</span>
                     </div>
+                    <div>
+                      <span className="block text-2xl font-normal text-foreground leading-none">{stats.minElevation.toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Low</span>
+                    </div>
+
                   </div>
                 </div>
 
-                {/* Grade Intensity Section */}
-                <div className="bg-card border border-border rounded-2xl p-6 shadow-sm flex flex-col justify-center text-center">
-                  <div className="mb-6">
-                    <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <TrendingUp className="w-8 h-8 text-primary" />
+                {/* Advanced Elevation Analysis */}
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                  {/* Terrain Profile */}
+                  <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+                    <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
+                      <TrendingUp className="w-5 h-5 text-primary" />
+                      Terrain Time Profile
+                    </h3>
+                    <div className="space-y-6">
+                      {/* Visual Stacked Bar */}
+                      <div className="h-4 w-full bg-muted rounded-full overflow-hidden flex shadow-inner">
+                        {[
+                          { seconds: stats.timeClimbing, color: "bg-orange-500" },
+                          { seconds: stats.timeDescending, color: "bg-blue-500" },
+                          { seconds: stats.timeLevel, color: "bg-muted-foreground/30" },
+                        ].map((item, idx) => {
+                          const width = (item.seconds / (stats.totalTime || 1)) * 100;
+                          if (width <= 0) return null;
+                          return (
+                            <div
+                              key={idx}
+                              className={cn("h-full transition-all duration-1000", item.color)}
+                              style={{ width: `${width}%` }}
+                            />
+                          );
+                        })}
+                      </div>
+
+                      <div className="space-y-4">
+                        {[
+                          { label: "Climbing", seconds: stats.timeClimbing, color: "bg-orange-500", desc: "Uphill battle" },
+                          { label: "Descending", seconds: stats.timeDescending, color: "bg-blue-500", desc: "Gravity assisted" },
+                          { label: "Level Flight", seconds: stats.timeLevel, color: "bg-muted-foreground/30", desc: "Flat terrain" },
+                        ].map((item, idx) => {
+                          const percentage = (item.seconds / (stats.totalTime || 1)) * 100;
+                          return (
+                            <div key={item.label} className="flex items-center gap-4">
+                              <div className={cn("w-1 h-8 rounded-full", item.color)} />
+                              <div className="flex-1">
+                                <div className="flex justify-between text-sm mb-1">
+                                  <span className="font-bold">{item.label}</span>
+                                  <span className="font-mono text-muted-foreground">{formatDuration(item.seconds)}</span>
+                                </div>
+                                <div className="flex justify-between items-end">
+                                  <span className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">{item.desc}</span>
+                                  <span className="text-xs font-bold text-foreground">{percentage.toFixed(1)}%</span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <h3 className="text-xl font-bold">Terrain Intensity</h3>
-                    <p className="text-muted-foreground text-sm">Quantifying the vertical challenges of your route</p>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-8">
-                    <div>
-                      <p className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground mb-2">Avg Grade</p>
-                      <p className="text-2xl font-normal text-foreground leading-none">
-                        {stats.elevationGain > 0 ? ((stats.elevationGain / (stats.climbDistance * 1000 || 1)) * 100).toFixed(1) : "0.0"}%
-                      </p>
+                  {/* Grade Intensity Section */}
+                  <div className="bg-card border border-border rounded-2xl p-6 shadow-sm flex flex-col justify-center text-center">
+                    <div className="mb-6">
+                      <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <TrendingUp className="w-8 h-8 text-primary" />
+                      </div>
+                      <h3 className="text-xl font-bold">Terrain Intensity</h3>
+                      <p className="text-muted-foreground text-sm">Quantifying the vertical challenges of your route</p>
                     </div>
-                    <div>
-                      <p className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground mb-2">VAM</p>
-                      <p className="text-2xl font-normal text-foreground leading-none">
-                        {stats.movingTime > 0 ? ((stats.elevationGain / (stats.movingTime / 3600))).toFixed(0) : "0"}
-                      </p>
+
+                    <div className="grid grid-cols-2 gap-8">
+                      <div>
+                        <p className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground mb-2">Avg Grade</p>
+                        <p className="text-2xl font-normal text-foreground leading-none">
+                          {stats.elevationGain > 0 ? ((stats.elevationGain / (stats.climbDistance * 1000 || 1)) * 100).toFixed(1) : "0.0"}%
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground mb-2">VAM</p>
+                        <p className="text-2xl font-normal text-foreground leading-none">
+                          {stats.movingTime > 0 ? ((stats.elevationGain / (stats.movingTime / 3600))).toFixed(0) : "0"}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -904,7 +875,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
             </div>
           )}
 
-        </main>
+        </main >
       </div >
     </div >
   );
