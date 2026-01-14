@@ -163,54 +163,47 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
   }, [points, zoomRange, speedCap, isOwner]);
 
 
-  // Calculate speed limited stats
+  // Calculate speed limited stats (for owner's speed limiter tool)
   const limitedStats = useMemo(() => {
     if (!showLimiter || speedLimit <= 0) return null;
     return calculateLimitedStats(filteredPoints, speedLimit);
   }, [filteredPoints, speedLimit, showLimiter]);
 
-  // Calculate capped display values for public viewers
+  // displayStats: Always use actual stats - no recalculation
   const displayStats = useMemo(() => {
-    if (!speedCap || isOwner) {
-      return {
-        maxSpeed: stats.maxSpeed,
-        avgSpeed: stats.avgSpeed,
-        movingAvgSpeed: stats.movingAvgSpeed,
-        totalTime: stats.totalTime,
-        movingTime: stats.movingTime,
-      };
-    }
-    // Apply speed cap calculation
-    // If a point's speed > speedCap, we pretend it was traveled at speedCap
-    // This increases the time taken for that segment
-    const limited = calculateLimitedStats(points, speedCap);
+    return {
+      maxSpeed: stats.maxSpeed,
+      avgSpeed: stats.avgSpeed,
+      movingAvgSpeed: stats.movingAvgSpeed,
+      totalTime: stats.totalTime,
+      movingTime: stats.movingTime,
+    };
+  }, [stats]);
 
-    // If limited stats calculation fails or makes no sense, fallback to simple clamp
-    if (!limited) {
-      return {
-        maxSpeed: Math.min(stats.maxSpeed, speedCap),
-        avgSpeed: Math.min(stats.avgSpeed, speedCap),
-        movingAvgSpeed: Math.min(stats.movingAvgSpeed, speedCap),
-        totalTime: stats.totalTime,
-        movingTime: stats.movingTime,
-      };
-    }
+  // For public viewers: If selection avgSpeed > speedCap, cap it and recompute time
+  // This is a simple overall cap, not per-segment
+  const cappedSelectionStats = useMemo(() => {
+    if (isOwner || !speedCap) return null;
 
-    const originalStoppedTime = stats.totalTime - stats.movingTime;
-    const newTotalTime = limited.simulatedTime;
-    const newMovingTime = Math.max(0, newTotalTime - originalStoppedTime);
+    // Get the effective stats (zoomed selection or full)
+    const effectiveStats = (zoomRange && subsetStats) ? subsetStats : stats;
 
-    // Recalculate moving avg speed based on new moving time
-    const newMovingAvgSpeed = newMovingTime > 0 ? (stats.totalDistance / (newMovingTime / 3600)) : 0;
+    // Only apply cap if average speed exceeds speedCap
+    if (effectiveStats.avgSpeed <= speedCap) return null;
+
+    // Recompute time if we had traveled at speedCap average
+    // Time (seconds) = Distance (km) / Speed (km/h) * 3600
+    const simulatedTime = (effectiveStats.totalDistance / speedCap) * 3600;
+    const timeAdded = simulatedTime - effectiveStats.totalTime;
 
     return {
-      maxSpeed: Math.min(stats.maxSpeed, speedCap),
-      avgSpeed: limited.newAvgSpeed,
-      movingAvgSpeed: newMovingAvgSpeed,
-      totalTime: newTotalTime,
-      movingTime: newMovingTime,
+      originalTime: effectiveStats.totalTime,
+      originalAvgSpeed: effectiveStats.avgSpeed,
+      cappedAvgSpeed: speedCap,
+      simulatedTime,
+      timeAdded,
     };
-  }, [stats, speedCap, isOwner, points]);
+  }, [isOwner, speedCap, zoomRange, subsetStats, stats]);
 
   // Effective speed limit for charts (owner's limiter or public speed cap)
   // Effective speed limit for charts
@@ -492,39 +485,105 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
 
                       {/* Time - Inline with Arrow Delta */}
                       <div className="flex items-baseline gap-2">
-                        <span className={cn("text-xl font-normal tabular-nums", showLimiter && limitedStats?.timeAdded > 0 ? "text-muted-foreground/50 line-through" : "text-foreground")}>
-                          {zoomRange && subsetStats ? formatDuration(subsetStats.totalTime) : formatDuration(displayStats.totalTime)}
-                        </span>
-                        {showLimiter && limitedStats && limitedStats.timeAdded > 0 && (
-                          <div className="flex items-baseline gap-2 animate-in fade-in slide-in-from-left-2">
-                            <span className="text-xl font-normal text-amber-500 tabular-nums">
-                              {formatDuration(limitedStats.simulatedTime)}
+                        {/* Determine if we need to show modified stats */}
+                        {(() => {
+                          // Owner's speed limiter
+                          if (showLimiter && limitedStats && limitedStats.timeAdded > 0) {
+                            return (
+                              <>
+                                <span className="text-xl font-normal tabular-nums text-muted-foreground/50 line-through">
+                                  {zoomRange && subsetStats ? formatDuration(subsetStats.totalTime) : formatDuration(stats.totalTime)}
+                                </span>
+                                <div className="flex items-baseline gap-2 animate-in fade-in slide-in-from-left-2">
+                                  <span className="text-xl font-normal text-amber-500 tabular-nums">
+                                    {formatDuration(limitedStats.simulatedTime)}
+                                  </span>
+                                  <span className="flex items-center text-xs font-bold text-amber-500/90 gap-1">
+                                    <TrendingUp className="w-3 h-3" />
+                                    +{formatDuration(limitedStats.timeAdded)}
+                                    <span className="text-[10px] opacity-80 uppercase tracking-wide ml-0.5">({(limitedStats.timeAdded / limitedStats.originalTime * 100).toFixed(0)}% More Time)</span>
+                                  </span>
+                                </div>
+                              </>
+                            );
+                          }
+                          // Public viewer's speed cap (only if avgSpeed > speedCap)
+                          if (cappedSelectionStats) {
+                            return (
+                              <>
+                                <span className="text-xl font-normal tabular-nums text-muted-foreground/50 line-through">
+                                  {formatDuration(cappedSelectionStats.originalTime)}
+                                </span>
+                                <div className="flex items-baseline gap-2 animate-in fade-in slide-in-from-left-2">
+                                  <span className="text-xl font-normal text-blue-500 tabular-nums">
+                                    {formatDuration(cappedSelectionStats.simulatedTime)}
+                                  </span>
+                                  <span className="flex items-center text-xs font-bold text-blue-500/90 gap-1">
+                                    <TrendingUp className="w-3 h-3" />
+                                    +{formatDuration(cappedSelectionStats.timeAdded)}
+                                    <span className="text-[10px] opacity-80 uppercase tracking-wide ml-0.5">(Capped)</span>
+                                  </span>
+                                </div>
+                              </>
+                            );
+                          }
+                          // Default: show actual time
+                          return (
+                            <span className="text-xl font-normal tabular-nums text-foreground">
+                              {zoomRange && subsetStats ? formatDuration(subsetStats.totalTime) : formatDuration(stats.totalTime)}
                             </span>
-                            <span className="flex items-center text-xs font-bold text-amber-500/90 gap-1">
-                              <TrendingUp className="w-3 h-3" />
-                              +{formatDuration(limitedStats.timeAdded)}
-                              <span className="text-[10px] opacity-80 uppercase tracking-wide ml-0.5">({(limitedStats.timeAdded / limitedStats.originalTime * 100).toFixed(0)}% More Time)</span>
-                            </span>
-                          </div>
-                        )}
+                          );
+                        })()}
                       </div>
 
                       {/* Speed - Inline with Arrow Delta */}
                       <div className="flex items-baseline gap-2">
-                        <span className={cn("text-xl font-normal tabular-nums", showLimiter && limitedStats?.timeAdded > 0 ? "text-muted-foreground/50 line-through" : "text-foreground")}>
-                          {zoomRange && subsetStats ? formatSpeed(subsetStats.avgSpeed) : formatSpeed(displayStats.avgSpeed)}
-                        </span>
-                        {showLimiter && limitedStats && limitedStats.timeAdded > 0 && (
-                          <div className="flex items-baseline gap-2 animate-in fade-in slide-in-from-left-2">
-                            <span className="text-xl font-normal text-amber-500 tabular-nums">
-                              {formatSpeed(limitedStats.newAvgSpeed)}
+                        {(() => {
+                          // Owner's speed limiter
+                          if (showLimiter && limitedStats && limitedStats.timeAdded > 0) {
+                            return (
+                              <>
+                                <span className="text-xl font-normal tabular-nums text-muted-foreground/50 line-through">
+                                  {zoomRange && subsetStats ? formatSpeed(subsetStats.avgSpeed) : formatSpeed(stats.avgSpeed)}
+                                </span>
+                                <div className="flex items-baseline gap-2 animate-in fade-in slide-in-from-left-2">
+                                  <span className="text-xl font-normal text-amber-500 tabular-nums">
+                                    {formatSpeed(limitedStats.newAvgSpeed)}
+                                  </span>
+                                  <span className="flex items-center text-xs font-bold text-amber-500/90">
+                                    <TrendingUp className="w-3 h-3 rotate-180 mr-0.5" />
+                                    -{formatSpeed((zoomRange && subsetStats ? subsetStats.avgSpeed : stats.avgSpeed) - limitedStats.newAvgSpeed)}
+                                  </span>
+                                </div>
+                              </>
+                            );
+                          }
+                          // Public viewer's speed cap (only if avgSpeed > speedCap)
+                          if (cappedSelectionStats) {
+                            return (
+                              <>
+                                <span className="text-xl font-normal tabular-nums text-muted-foreground/50 line-through">
+                                  {formatSpeed(cappedSelectionStats.originalAvgSpeed)}
+                                </span>
+                                <div className="flex items-baseline gap-2 animate-in fade-in slide-in-from-left-2">
+                                  <span className="text-xl font-normal text-blue-500 tabular-nums">
+                                    {formatSpeed(cappedSelectionStats.cappedAvgSpeed)}
+                                  </span>
+                                  <span className="flex items-center text-xs font-bold text-blue-500/90">
+                                    <TrendingUp className="w-3 h-3 rotate-180 mr-0.5" />
+                                    -{formatSpeed(cappedSelectionStats.originalAvgSpeed - cappedSelectionStats.cappedAvgSpeed)}
+                                  </span>
+                                </div>
+                              </>
+                            );
+                          }
+                          // Default: show actual speed
+                          return (
+                            <span className="text-xl font-normal tabular-nums text-foreground">
+                              {zoomRange && subsetStats ? formatSpeed(subsetStats.avgSpeed) : formatSpeed(stats.avgSpeed)}
                             </span>
-                            <span className="flex items-center text-xs font-bold text-amber-500/90">
-                              <TrendingUp className="w-3 h-3 rotate-180 mr-0.5" />
-                              -{formatSpeed((zoomRange && subsetStats ? subsetStats.avgSpeed : displayStats.avgSpeed) - limitedStats.newAvgSpeed)}
-                            </span>
-                          </div>
-                        )}
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
