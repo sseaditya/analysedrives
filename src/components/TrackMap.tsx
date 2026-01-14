@@ -28,6 +28,7 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
   }>({});
   const hoverMarkerRef = useRef<L.Marker | null>(null);
   const lastBoundsRef = useRef<{ points: GPXPoint[], zoomRange?: [number, number] | null } | null>(null);
+  const tileLayerRef = useRef<L.TileLayer | null>(null);
 
   const [mode, setMode] = useState<'plain' | 'speed' | 'acceleration'>('plain');
   const [showStops, setShowStops] = useState(false);
@@ -42,7 +43,7 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
 
 
 
-  // Initialize Map
+  // Initialize Map (once)
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
 
@@ -56,18 +57,40 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
 
     mapInstanceRef.current = map;
 
+    // Initial tile layer (will be updated in separate effect)
     const tileUrl = theme === 'dark'
       ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
       : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
 
-    L.tileLayer(tileUrl, {
+    tileLayerRef.current = L.tileLayer(tileUrl, {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
     }).addTo(map);
 
     return () => {
       map.remove();
       mapInstanceRef.current = null;
+      tileLayerRef.current = null;
     };
+  }, []);
+
+  // Update tile layer when theme changes
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    const tileUrl = theme === 'dark'
+      ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+      : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+
+    // Remove old tile layer
+    if (tileLayerRef.current) {
+      map.removeLayer(tileLayerRef.current);
+    }
+
+    // Add new tile layer
+    tileLayerRef.current = L.tileLayer(tileUrl, {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    }).addTo(map);
   }, [theme]);
 
   // Update Tracks and Markers

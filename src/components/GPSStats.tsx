@@ -503,7 +503,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                             <span className="flex items-center text-xs font-bold text-amber-500/90 gap-1">
                               <TrendingUp className="w-3 h-3" />
                               +{formatDuration(limitedStats.timeAdded)}
-                              <span className="text-[10px] opacity-80 uppercase tracking-wide ml-0.5">({((limitedStats.simulatedTime - displayStats.totalTime) / displayStats.totalTime * 100).toFixed(0)}% Slower)</span>
+                              <span className="text-[10px] opacity-80 uppercase tracking-wide ml-0.5">({(limitedStats.timeAdded / limitedStats.originalTime * 100).toFixed(0)}% More Time)</span>
                             </span>
                           </div>
                         )}
