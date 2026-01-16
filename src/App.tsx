@@ -16,6 +16,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Analytics from "./pages/Analytics";
+import Feed from "./pages/Feed";
 
 const App = () => (
   <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
@@ -33,6 +34,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <Dashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/feed"
+                element={
+                  <ProtectedRoute>
+                    <Feed />
                   </ProtectedRoute>
                 }
               />

@@ -154,6 +154,7 @@ const Dashboard = () => {
             const { data, error } = await supabase
                 .from('activities')
                 .select('*')
+                .eq('user_id', user.id);
             if (error) throw error;
 
             // Sort by activity date (startTime) if available, otherwise fallback to created_at
@@ -474,10 +475,21 @@ const Dashboard = () => {
                         {/* Controls Header */}
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                             <div className="flex items-center gap-4">
-                                <h2 className="text-2xl font-bold flex items-center gap-2">
-                                    <Activity className="w-6 h-6" />
-                                    My Activities
-                                </h2>
+                                {/* Tab Navigation */}
+                                <div className="flex items-center bg-muted/50 p-1 rounded-lg">
+                                    <button
+                                        className="px-4 py-1.5 rounded-md text-sm font-medium bg-background text-foreground shadow-sm transition-colors"
+                                    >
+                                        My Activities
+                                    </button>
+                                    <button
+                                        onClick={() => navigate('/feed')}
+                                        className="px-4 py-1.5 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                                    >
+                                        Community Feed
+                                    </button>
+                                </div>
+
                                 <Button
                                     variant="outline"
                                     size="sm"
