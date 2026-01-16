@@ -118,12 +118,13 @@ const ProfileEditor = ({ children, onProfileUpdate }: ProfileEditorProps) => {
             // Upload new avatar if selected
             if (avatarFile) {
                 const fileExt = avatarFile.name.split(".").pop();
-                const fileName = `${user.id}/avatar.${fileExt}`;
+                // Use timestamp to force a new file (INSERT) instead of UPDATE, avoiding potential RLS update issues
+                const fileName = `${user.id}/${Date.now()}.${fileExt}`;
 
                 // Upload to storage
                 const { error: uploadError } = await supabase.storage
                     .from("avatars")
-                    .upload(fileName, avatarFile, { upsert: true });
+                    .upload(fileName, avatarFile, { upsert: false }); // False to ensure we don't accidentally update if collision (rare)
 
                 if (uploadError) throw uploadError;
 

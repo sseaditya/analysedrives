@@ -17,6 +17,9 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Analytics from "./pages/Analytics";
 import Feed from "./pages/Feed";
+import HowTo from "./pages/HowTo";
+import Terms from "./pages/Terms";
+import Privacy from "./pages/Privacy";
 
 const App = () => (
   <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
@@ -55,6 +58,9 @@ const App = () => (
                 }
               />
               <Route path="/strava-callback" element={<StravaCallback />} />
+              <Route path="/how-to" element={<HowTo />} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/privacy" element={<Privacy />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

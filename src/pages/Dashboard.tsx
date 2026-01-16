@@ -630,9 +630,25 @@ const Dashboard = () => {
                                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
                                 </div>
                             ) : filteredActivities.length === 0 ? (
-                                <div className="text-center py-12 bg-muted/30 rounded-2xl border border-dashed border-border">
-                                    <p className="text-muted-foreground">No activities found matching your criteria.</p>
-                                    <Button variant="link" onClick={() => { setSearchQuery(''); setShowFilters(false); }}>Clear filters</Button>
+                                <div className="text-center py-12 bg-muted/30 rounded-2xl border border-dashed border-border px-6">
+                                    {activities.length === 0 ? (
+                                        <>
+                                            <h3 className="text-lg font-bold mb-2">Welcome to AnalyseDrive!</h3>
+                                            <p className="text-muted-foreground mb-4">You haven't uploaded any drives yet.</p>
+                                            <p className="text-sm text-muted-foreground mb-6">
+                                                Need help getting your GPX files?
+                                                <Button variant="link" onClick={() => navigate('/how-to')} className="px-1 text-primary">
+                                                    Check our guide
+                                                </Button>
+                                            </p>
+                                            <Button onClick={() => setShowUpload(true)}>Upload your first drive</Button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <p className="text-muted-foreground">No activities found matching your criteria.</p>
+                                            <Button variant="link" onClick={() => { setSearchQuery(''); setShowFilters(false); }}>Clear filters</Button>
+                                        </>
+                                    )}
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
