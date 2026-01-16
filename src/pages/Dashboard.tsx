@@ -715,6 +715,10 @@ const Dashboard = () => {
                     </div>
                 </div>
             </main>
+            {/* Floating Theme Toggle */}
+            <div className="fixed bottom-6 right-6 z-[1050]">
+                <ThemeToggle />
+            </div>
         </div>
     );
 };

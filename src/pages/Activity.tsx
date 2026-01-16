@@ -1,5 +1,6 @@
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, MapPin, Pencil, ChevronDown, ChevronUp, Globe, Lock, LogIn } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import GPSStats from "@/components/GPSStats";
 import { GPXStats, GPXPoint, parseGPX, calculateStats } from "@/utils/gpxParser";
@@ -322,6 +323,11 @@ const ActivityPage = () => {
           </div>
         </div>
       )}
+
+      {/* Floating Theme Toggle */}
+      <div className="fixed bottom-6 right-6 z-[1050]">
+        <ThemeToggle />
+      </div>
     </div>
   );
 };

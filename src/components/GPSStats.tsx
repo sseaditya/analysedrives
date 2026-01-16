@@ -435,7 +435,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                 <TrackMap
                   points={mapPoints}
                   hoveredPoint={hoveredPoint}
-                  zoomRange={zoomRange}
+                  zoomRange={zoomRange ? [zoomRange[0] - mapPointsStartIndex, zoomRange[1] - mapPointsStartIndex] : null}
                   stopPoints={stats.stopPoints}
                   tightTurnPoints={stats.tightTurnPoints}
                   privacyMask={privacyMask}
