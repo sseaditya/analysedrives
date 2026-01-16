@@ -283,7 +283,7 @@ const ActivityPage = () => {
         </div>
       </header>
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8 md:py-12">
+      <main className="container mx-auto px-4 py-4 space-y-6">
         <div className="max-w-[1600px] mx-auto">
           <GPSStats
             stats={data.stats}
@@ -299,18 +299,7 @@ const ActivityPage = () => {
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="border-t border-border bg-card/50 mt-auto mb-20 md:mb-0">
-        <div className="container mx-auto px-4 py-6 text-center text-sm text-muted-foreground">
-          <Button
-            variant="outline"
-            onClick={() => navigate("/")}
-            className="gap-2"
-          >
-            Analyze Another Track
-          </Button>
-        </div>
-      </footer>
+
 
       {/* Fixed Bottom Banner for Anonymous Users */}
       {!user && (

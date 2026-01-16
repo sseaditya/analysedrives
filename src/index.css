@@ -8,69 +8,60 @@
 
 @layer base {
   :root {
-    /* ANTHROPIC LIGHT THEME (Strict - Manilla / Cream) */
-    /* Background: Manilla (Creamy Off-White) */
-    /* #F3F1E6 -> HSL(48, 25%, 93%) */
-    --background: 48 25% 93%;
+    /* ANTHROPIC LIGHT THEME */
+    /* Background: Ivory Dark #E5E4DF -> HSL(60, 10%, 89%) */
+    --background: 60 10% 89%;
 
-    /* Foreground: Slate Dark (Soft Black) */
-    /* #191919 -> HSL(0, 0%, 10%) */
+    /* Foreground: Slate Dark #191919 -> HSL(0, 0%, 10%) */
     --foreground: 0 0% 10%;
 
-    /* Card: Slightly lighter/cleaner Manilla for depth */
-    /* #F9F7EF -> HSL(48, 25%, 96%) */
-    --card: 48 25% 96%;
+    /* Card: Slightly lighter Ivory or Manilla -> #EBD8BC (Manilla) for accent? No, keeps clean */
+    /* Using Ivory Light #FAFAF7 for cards on Ivory Dark bg */
+    --card: 60 14% 97%;
     --card-foreground: 0 0% 10%;
 
-    /* Popover: Same as card */
-    --popover: 48 25% 96%;
+    /* Popover */
+    --popover: 60 14% 97%;
     --popover-foreground: 0 0% 10%;
 
-    /* Primary: Book Cloth (Earthy Orange/Red - Higher Contrast) */
-    /* #CC785C -> HSL(15, 52%, 58%) */
+    /* Primary: Book Cloth #CC785C -> HSL(15, 52%, 58%) */
     --primary: 15 52% 58%;
-    --primary-foreground: 48 25% 96%;
+    --primary-foreground: 60 14% 97%;
 
-    /* Secondary: Muted Stone/Beige */
-    /* #EBD8BC -> HSL(36, 52%, 83%) - slightly darkened */
-    --secondary: 48 15% 85%;
+    /* Secondary: Kraft #D4A27F -> HSL(25, 52%, 66%) */
+    --secondary: 25 52% 66%;
     --secondary-foreground: 0 0% 10%;
 
-    /* Muted: Darker Cream/Stone */
-    --muted: 48 15% 85%;
+    /* Muted: Cloud Dark #666663 -> HSL(60, 2%, 40%) - too dark for bg? */
+    /* Use Cloud Light #BFBFBA for muted bg */
+    --muted: 60 2% 73%;
     --muted-foreground: 0 0% 40%;
-    /* Softened text */
 
-    /* Accent: Highlights */
-    --accent: 48 15% 85%;
+    /* Accent: Manilla #EBDBBC -> HSL(40, 50%, 83%) */
+    --accent: 40 50% 83%;
     --accent-foreground: 15 52% 58%;
 
-    /* Destructive: Error Red (Pastel ver) */
-    /* #BF4D43 -> HSL(5, 53%, 51%) */
-    --destructive: 5 53% 51%;
-    --destructive-foreground: 48 25% 96%;
+    /* Destructive: Error #BF4D43 -> HSL(355, 53%, 50%) */
+    --destructive: 355 53% 50%;
+    --destructive-foreground: 60 10% 89%;
 
-    /* Border: Darker Cream for definition */
-    --border: 48 15% 80%;
-    --input: 48 15% 80%;
+    /* Border: Cloud Dark #666663 */
+    --border: 60 2% 40%;
+    --input: 60 2% 40%;
     --ring: 15 52% 58%;
-    /* Book Cloth Ring */
 
     --radius: 0.75rem;
   }
 
   .dark {
-    /* ANTHROPIC DARK THEME (Strict) */
-    /* Background: Slate Dark */
-    /* #191919 -> HSL(0, 0%, 10%) */
+    /* ANTHROPIC DARK THEME */
+    /* Background: Slate Dark #191919 -> HSL(0, 0%, 10%) */
     --background: 0 0% 10%;
 
-    /* Foreground: Ivory Light */
-    /* #FAFAF7 -> HSL(60, 14%, 97%) */
+    /* Foreground: Ivory Light #FAFAF7 -> HSL(60, 14%, 97%) */
     --foreground: 60 14% 97%;
 
-    /* Card: Slate Medium */
-    /* #262625 -> HSL(60, 1% 15%) */
+    /* Card: Slate Medium #262625 -> HSL(60, 1%, 15%) */
     --card: 60 1% 15%;
     --card-foreground: 60 14% 97%;
 
@@ -78,31 +69,29 @@
     --popover: 60 1% 15%;
     --popover-foreground: 60 14% 97%;
 
-    /* Primary: Book Cloth (Same, pops well on dark) */
-    /* #CC785C -> HSL(15, 52%, 58%) */
+    /* Primary: Book Cloth #CC785C -> HSL(15, 52%, 58%) */
     --primary: 15 52% 58%;
     --primary-foreground: 0 0% 10%;
 
-    /* Secondary: Slate light or muted Slate */
-    /* Using Slate Medium as base, lighter for secondary */
-    --secondary: 60 1% 20%;
+    /* Secondary: Cloud Dark #666663 -> HSL(60, 2%, 40%) */
+    --secondary: 60 2% 40%;
     --secondary-foreground: 60 14% 97%;
 
-    /* Muted: Dark Gray */
-    --muted: 60 1% 20%;
+    /* Muted: Slate Light #40403E -> HSL(60, 2%, 25%) */
+    --muted: 60 2% 25%;
     --muted-foreground: 60 5% 60%;
 
-    /* Accent: Dark Gray Highlight */
-    --accent: 60 1% 22%;
+    /* Accent: Cloud Dark #666663 -> HSL(60, 2%, 40%) */
+    --accent: 60 2% 40%;
     --accent-foreground: 15 52% 58%;
 
-    /* Destructive */
-    --destructive: 5 53% 51%;
+    /* Destructive: Error #BF4D43 */
+    --destructive: 355 53% 50%;
     --destructive-foreground: 60 14% 97%;
 
-    /* Border */
-    --border: 60 1% 20%;
-    --input: 60 1% 20%;
+    /* Border: Slate Light #40403E */
+    --border: 60 2% 25%;
+    --input: 60 2% 25%;
     --ring: 15 52% 58%;
   }
 }

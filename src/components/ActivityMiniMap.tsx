@@ -90,8 +90,9 @@ const ActivityMiniMap = ({ coordinates, className }: ActivityMiniMapProps) => {
     }
 
     return (
-        <div className={`w-full h-full relative z-0 ${className}`}>
-            <div ref={mapContainerRef} className="w-full h-full" />
+        <div className="relative h-full w-full bg-muted/20 overflow-hidden isolation-isolate z-0">
+            {/* Map Container */}
+            <div id="mini-map" ref={mapContainerRef} className="absolute inset-0 z-0 bg-background" />
             {/* Overlay to prevent interactions ensuring click goes to card */}
             <div className="absolute inset-0 z-10 bg-transparent cursor-pointer" />
         </div>

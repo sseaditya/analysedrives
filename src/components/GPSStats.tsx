@@ -178,8 +178,17 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
     return calculateLimitedStats(filteredPoints, speedLimit);
   }, [filteredPoints, speedLimit, showLimiter]);
 
-  // displayStats: Always use actual stats - no recalculation
+  // displayStats: Clamp values if speed cap is active for public viewers
   const displayStats = useMemo(() => {
+    if (!isOwner && speedCap && speedCap > 0) {
+      return {
+        maxSpeed: stats.maxSpeed > speedCap ? speedCap : stats.maxSpeed,
+        avgSpeed: stats.avgSpeed > speedCap ? speedCap : stats.avgSpeed,
+        movingAvgSpeed: stats.movingAvgSpeed > speedCap ? speedCap : stats.movingAvgSpeed,
+        totalTime: stats.totalTime,
+        movingTime: stats.movingTime,
+      };
+    }
     return {
       maxSpeed: stats.maxSpeed,
       avgSpeed: stats.avgSpeed,
@@ -187,7 +196,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
       totalTime: stats.totalTime,
       movingTime: stats.movingTime,
     };
-  }, [stats]);
+  }, [stats, isOwner, speedCap]);
 
   // For public viewers: If selection avgSpeed > speedCap, cap it and recompute time
   // This is a simple overall cap, not per-segment
