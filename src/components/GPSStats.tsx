@@ -42,13 +42,14 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
   const [activeTab, setActiveTab] = useState("overview");
 
   // Filter points based on privacy radius
-  const { points, stats, privacyMask, mapPoints } = useMemo(() => {
+  const { points, stats, privacyMask, mapPoints, mapPointsStartIndex } = useMemo(() => {
     if ((!hideRadius || hideRadius <= 0) && isOwner) {
       return {
         points: initialPoints,
         stats: initialStats,
         privacyMask: null,
-        mapPoints: initialPoints
+        mapPoints: initialPoints,
+        mapPointsStartIndex: 0
       };
     }
 
@@ -88,12 +89,13 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
 
     // Safety check: if start crosses end, showing nothing or very little
     if (startIndex >= endIndex) {
-      if (!isOwner) return { points: initialPoints, stats: initialStats, privacyMask: null, mapPoints: [] };
+      if (!isOwner) return { points: initialPoints, stats: initialStats, privacyMask: null, mapPoints: [], mapPointsStartIndex: 0 };
       return {
         points: initialPoints,
         stats: initialStats,
         privacyMask: { start: startIndex, end: endIndex },
-        mapPoints: initialPoints
+        mapPoints: initialPoints,
+        mapPointsStartIndex: 0
       };
     }
 
@@ -105,7 +107,8 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
         points: initialPoints,
         stats: initialStats,
         privacyMask: null,
-        mapPoints: slicedPoints
+        mapPoints: slicedPoints,
+        mapPointsStartIndex: startIndex // Track the offset
       };
     } else {
       // Owner: Keep all points, but pass mask indices
@@ -113,7 +116,8 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
         points: initialPoints,
         stats: initialStats,
         privacyMask: { start: startIndex, end: endIndex },
-        mapPoints: initialPoints
+        mapPoints: initialPoints,
+        mapPointsStartIndex: 0
       };
     }
   }, [initialPoints, initialStats, hideRadius, isOwner]);
