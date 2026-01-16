@@ -310,6 +310,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                             src={ownerProfile.avatar_url}
                             alt={ownerProfile.display_name || "User"}
                             className="w-full h-full object-cover"
+                            crossOrigin="anonymous"
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-muted-foreground font-bold">

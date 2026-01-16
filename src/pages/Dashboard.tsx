@@ -131,6 +131,7 @@ const Dashboard = () => {
 
     const fetchProfile = async () => {
         if (!user) return;
+        setIsLoadingProfile(true);
         try {
             const { data, error } = await supabase
                 .from('profiles')
@@ -375,9 +376,6 @@ const Dashboard = () => {
                             <BarChart3 className="w-4 h-4" />
                             <span className="hidden md:inline">Analytics</span>
                         </Button>
-                        <div className="mr-2">
-                            <ThemeToggle />
-                        </div>
                         <ProfileEditor onProfileUpdate={(updatedProfile) => setProfile(updatedProfile)}>
                             <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
                                 {isLoadingProfile ? (
@@ -391,6 +389,7 @@ const Dashboard = () => {
                                             src={profile?.avatar_url || user?.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.display_name || user?.email || "U")}&background=random`}
                                             alt={profile?.display_name || user?.email || "User"}
                                             className="w-8 h-8 rounded-full border border-border object-cover"
+                                            crossOrigin="anonymous"
                                         />
                                         <span className="text-sm font-medium hidden md:block">
                                             {profile?.display_name || user?.user_metadata?.full_name || user?.email}
@@ -728,7 +727,7 @@ const Dashboard = () => {
                 </div>
             </main>
             {/* Floating Theme Toggle */}
-            <div className="fixed bottom-6 right-6 z-[1050]">
+            <div className="fixed bottom-6 left-6 z-[1050]">
                 <ThemeToggle />
             </div>
         </div>
