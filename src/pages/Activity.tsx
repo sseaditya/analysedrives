@@ -112,7 +112,20 @@ const ActivityPage = () => {
             .single();
 
           if (profileData) {
-            setOwnerProfile(profileData);
+            let processedAvatarUrl = profileData.avatar_url;
+
+            // Handle relative paths (legacy or manual data)
+            if (processedAvatarUrl && !processedAvatarUrl.startsWith('http')) {
+              const { data: urlData } = supabase.storage
+                .from('avatars')
+                .getPublicUrl(processedAvatarUrl);
+              processedAvatarUrl = urlData.publicUrl;
+            }
+
+            setOwnerProfile({
+              ...profileData,
+              avatar_url: processedAvatarUrl
+            });
           }
 
           // 2. Download File

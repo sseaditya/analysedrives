@@ -40,6 +40,7 @@ const Dashboard = () => {
     const [loadingActivities, setLoadingActivities] = useState(true);
     const [showUpload, setShowUpload] = useState(false);
     const [profile, setProfile] = useState<Profile | null>(null);
+    const [isLoadingProfile, setIsLoadingProfile] = useState(true);
 
     // Search and Filters
     const [searchQuery, setSearchQuery] = useState("");
@@ -141,6 +142,8 @@ const Dashboard = () => {
             if (data) setProfile(data);
         } catch (err) {
             console.error("Error fetching profile:", err);
+        } finally {
+            setIsLoadingProfile(false);
         }
     };
 
@@ -377,14 +380,23 @@ const Dashboard = () => {
                         </div>
                         <ProfileEditor onProfileUpdate={(updatedProfile) => setProfile(updatedProfile)}>
                             <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
-                                <img
-                                    src={profile?.avatar_url || user?.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.display_name || user?.email || "U")}&background=random`}
-                                    alt={profile?.display_name || user?.email || "User"}
-                                    className="w-8 h-8 rounded-full border border-border object-cover"
-                                />
-                                <span className="text-sm font-medium hidden md:block">
-                                    {profile?.display_name || user?.user_metadata?.full_name || user?.email}
-                                </span>
+                                {isLoadingProfile ? (
+                                    <>
+                                        <div className="w-8 h-8 rounded-full bg-muted animate-pulse" />
+                                        <div className="h-4 w-24 bg-muted animate-pulse rounded hidden md:block" />
+                                    </>
+                                ) : (
+                                    <>
+                                        <img
+                                            src={profile?.avatar_url || user?.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.display_name || user?.email || "U")}&background=random`}
+                                            alt={profile?.display_name || user?.email || "User"}
+                                            className="w-8 h-8 rounded-full border border-border object-cover"
+                                        />
+                                        <span className="text-sm font-medium hidden md:block">
+                                            {profile?.display_name || user?.user_metadata?.full_name || user?.email}
+                                        </span>
+                                    </>
+                                )}
                             </div>
                         </ProfileEditor>
                         <Button variant="ghost" size="sm" onClick={handleSignOut} className="text-muted-foreground hover:text-destructive">
