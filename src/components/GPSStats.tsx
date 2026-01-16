@@ -29,9 +29,14 @@ interface GPSStatsProps {
   isPublic?: boolean;
   description?: string | null;
   hideRadius?: number; // km
+  ownerProfile?: {
+    display_name: string | null;
+    avatar_url: string | null;
+    car: string | null;
+  } | null;
 }
 
-const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedCap, isOwner = true, isPublic = false, description, hideRadius = 0 }: GPSStatsProps) => {
+const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedCap, isOwner = true, isPublic = false, description, hideRadius = 0, ownerProfile }: GPSStatsProps) => {
   const [hoveredPoint, setHoveredPoint] = useState<GPXPoint | null>(null);
   const [zoomRange, setZoomRange] = useState<[number, number] | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
@@ -296,15 +301,32 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                   <div className="flex-shrink-0 md:w-1/3 border-r border-border/50 pr-8">
                     <div className="flex gap-4">
                       <div className="w-16 h-16 rounded-full bg-muted overflow-hidden border border-border">
-                        {/* Avatar placeholder or <img /> */}
-                        <div className="w-full h-full flex items-center justify-center text-muted-foreground font-bold">AR</div>
+                        {ownerProfile?.avatar_url ? (
+                          <img
+                            src={ownerProfile.avatar_url}
+                            alt={ownerProfile.display_name || "User"}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-muted-foreground font-bold">
+                            {ownerProfile?.display_name?.charAt(0)?.toUpperCase() || "U"}
+                          </div>
+                        )}
                       </div>
                       <div className="flex-1">
+                        {ownerProfile?.display_name && (
+                          <p className="text-sm font-medium text-foreground">
+                            {ownerProfile.display_name}
+                            {ownerProfile.car && (
+                              <span className="text-muted-foreground font-normal"> • {ownerProfile.car}</span>
+                            )}
+                          </p>
+                        )}
                         <p className="text-xs text-muted-foreground leading-tight">
                           {new Date(stats.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} on {new Date(stats.startTime).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
                         </p>
                         <h1 className="text-2xl font-bold tracking-tight mt-1">{fileName}</h1>
-                        <span className="flex items-center gap-1.5"><MapPin className="w-3 h-3" /> {stats.pointCount.toLocaleString()} points recorded</span>
+                        <span className="flex items-center gap-1.5 text-xs text-muted-foreground"><MapPin className="w-3 h-3" /> {stats.pointCount.toLocaleString()} points recorded</span>
 
                       </div>
                     </div>

@@ -24,6 +24,12 @@ interface ActivityMetadata {
   hide_radius: number | null;
 }
 
+interface OwnerProfile {
+  display_name: string | null;
+  avatar_url: string | null;
+  car: string | null;
+}
+
 const ActivityPage = () => {
   const { id } = useParams();
   const location = useLocation();
@@ -35,6 +41,7 @@ const ActivityPage = () => {
     (location.state as ActivityState) || null
   );
   const [metadata, setMetadata] = useState<ActivityMetadata | null>(null);
+  const [ownerProfile, setOwnerProfile] = useState<OwnerProfile | null>(null);
   const [loading, setLoading] = useState(!!id);
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [accessDenied, setAccessDenied] = useState(false);
@@ -95,6 +102,17 @@ const ActivityPage = () => {
             speed_cap: record.speed_cap,
             hide_radius: record.hide_radius,
           });
+
+          // 1.5 Fetch owner profile
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('display_name, avatar_url, car')
+            .eq('id', record.user_id)
+            .single();
+
+          if (profileData) {
+            setOwnerProfile(profileData);
+          }
 
           // 2. Download File
           const { data: fileData, error: storageError } = await supabase.storage
@@ -261,7 +279,8 @@ const ActivityPage = () => {
             isOwner={isOwner}
             isPublic={metadata?.public || false}
             description={metadata?.description || null}
-            hideRadius={metadata?.hide_radius ?? 5} // Default to 5km if not set
+            hideRadius={metadata?.hide_radius ?? 5}
+            ownerProfile={ownerProfile}
           />
         </div>
       </main>

@@ -88,7 +88,7 @@ const ActivityEditor = ({ children, activity, onUpdate }: ActivityEditorProps) =
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>{children}</DialogTrigger>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-md z-[1100]">
                 <DialogHeader>
                     <DialogTitle>Edit Activity</DialogTitle>
                     <DialogDescription>

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { useTheme } from "@/components/ThemeProvider";
 
 interface ActivityMiniMapProps {
     coordinates: [number, number][]; // [lat, lon]
@@ -10,6 +11,8 @@ interface ActivityMiniMapProps {
 const ActivityMiniMap = ({ coordinates, className }: ActivityMiniMapProps) => {
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const mapInstanceRef = useRef<L.Map | null>(null);
+    const tileLayerRef = useRef<L.TileLayer | null>(null);
+    const { theme } = useTheme();
 
     useEffect(() => {
         if (!mapContainerRef.current || !coordinates || coordinates.length === 0) return;
@@ -27,16 +30,26 @@ const ActivityMiniMap = ({ coordinates, className }: ActivityMiniMapProps) => {
                 touchZoom: false,
                 zoomAnimation: false,
             });
-
-            // Use Dark Matter tile layer to match main map
-            L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-                maxZoom: 19
-            }).addTo(mapInstanceRef.current);
         }
 
         const map = mapInstanceRef.current;
 
-        // Clear existing layers (if coordinates change)
+        // Update tile layer based on theme
+        const tileUrl = theme === 'dark'
+            ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+            : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+
+        // Remove old tile layer if exists
+        if (tileLayerRef.current) {
+            map.removeLayer(tileLayerRef.current);
+        }
+
+        // Add new tile layer
+        tileLayerRef.current = L.tileLayer(tileUrl, {
+            maxZoom: 19
+        }).addTo(map);
+
+        // Clear existing polylines
         map.eachLayer((layer) => {
             if (layer instanceof L.Polyline) {
                 map.removeLayer(layer);
@@ -63,9 +76,10 @@ const ActivityMiniMap = ({ coordinates, className }: ActivityMiniMapProps) => {
             if (mapInstanceRef.current) {
                 mapInstanceRef.current.remove();
                 mapInstanceRef.current = null;
+                tileLayerRef.current = null;
             }
         };
-    }, [coordinates]);
+    }, [coordinates, theme]);
 
     if (!coordinates || coordinates.length === 0) {
         return (
@@ -85,3 +99,4 @@ const ActivityMiniMap = ({ coordinates, className }: ActivityMiniMapProps) => {
 };
 
 export default ActivityMiniMap;
+
