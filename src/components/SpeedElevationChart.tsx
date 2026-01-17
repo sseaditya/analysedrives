@@ -68,7 +68,7 @@ const SpeedElevationChart = ({
   const [cursorStyle, setCursorStyle] = useState<string>('crosshair');
   const [dragStartDist, setDragStartDist] = useState<number | null>(null);
 
-  // Calculate combined data for chart - ALWAYS sample to 300 points
+  // Calculate combined data for chart - Keep MORE points for better zoom detail
   const fullData: ChartDataPoint[] = useMemo(() => {
     const rawData: { dist: number; speed: number; ele: number | null; time: Date | undefined }[] = [];
     let cumulativeDistance = 0;
@@ -127,8 +127,9 @@ const SpeedElevationChart = ({
     const offset = Math.floor(WINDOW_SIZE / 2);
     const result: ChartDataPoint[] = [];
 
-    // CONSTANT sampling: Always target ~300 points from full dataset
-    const sampleRate = Math.max(1, Math.floor(points.length / 300));
+    // Sample to ~1000 points to keep good granularity for zooming
+    // This gives us enough detail when we zoom in and re-sample to 300
+    const sampleRate = Math.max(1, Math.floor(points.length / 1000));
 
     for (let i = 0; i < rawData.length; i++) {
       const originalIndex = i + 1;
@@ -180,18 +181,32 @@ const SpeedElevationChart = ({
   // Calculate True Max Speed (for Scale) - unaffected by speedLimit
   const trueMaxSpeed = Math.max(...fullData.map(d => d.speed), 0);
 
-  // Speed chart data: filtered by zoom, then re-sampled to constant 300 points
+  // Speed chart data: filter by zoom, then sample to EXACTLY 300 points
   const speedChartData = useMemo(() => {
     const filtered = zoomRange
       ? fullData.filter(d => d.pointIndex >= zoomRange[0] && d.pointIndex <= zoomRange[1])
       : fullData;
 
-    // Re-sample to constant 300 points for consistent density
+    // Always sample to exactly 300 points for consistent density
     const targetPoints = 300;
     if (filtered.length <= targetPoints) return filtered;
 
-    const sampleRate = Math.max(1, Math.floor(filtered.length / targetPoints));
-    return filtered.filter((_, idx) => idx % sampleRate === 0 || idx === filtered.length - 1);
+    const sampleRate = filtered.length / targetPoints;
+    const sampled: ChartDataPoint[] = [];
+
+    for (let i = 0; i < targetPoints; i++) {
+      const idx = Math.floor(i * sampleRate);
+      if (idx < filtered.length) {
+        sampled.push(filtered[idx]);
+      }
+    }
+
+    // Always include the last point
+    if (sampled[sampled.length - 1] !== filtered[filtered.length - 1]) {
+      sampled.push(filtered[filtered.length - 1]);
+    }
+
+    return sampled;
   }, [fullData, zoomRange]);
 
   // Calculate elevation range for better scaling
@@ -402,7 +417,7 @@ const SpeedElevationChart = ({
   const chartMargin = { top: 10, right: 30, left: 0, bottom: 0 };
 
   // Calculate Y-axis domain for speed chart
-  // speedLimit does NOT affect domain, only adds a reference line
+  // ONLY speedCap affects the domain, speedLimit does NOT
   const speedYDomain = [0, speedCap ? speedCap : Math.ceil(trueMaxSpeed / 10) * 10];
 
   return (
@@ -467,17 +482,17 @@ const SpeedElevationChart = ({
               />
             )}
 
-            {/* Speed Limit Line - Always visible, solid line */}
+            {/* Speed Limit Line - Same color as speed chart, moves with slider */}
             {speedLimit && (
               <ReferenceLine
                 y={speedLimit}
-                stroke="hsl(5, 53%, 51%)"
+                stroke="hsl(15, 52%, 58%)"
                 strokeWidth={2.5}
                 strokeOpacity={0.85}
                 label={{
                   value: `${speedLimit} km/h`,
                   position: 'right',
-                  fill: 'hsl(5, 53%, 51%)',
+                  fill: 'hsl(15, 52%, 58%)',
                   fontSize: 11,
                   fontWeight: 600,
                   offset: 10

@@ -456,8 +456,8 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
               {/* Speed & Elevation Chart */}
               <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
                 {/* Compact Header & Stats Row */}
-                <div className="flex flex-col gap-4 mb-2">
-                  <div className="flex items-center justify-between gap-6 mb-4">
+                <div className="flex flex-col gap-3 mb-3">
+                  <div className="flex items-center justify-between gap-4">
                     {/* Left: Title */}
                     <div className="flex-shrink-0">
                       <h3 className="text-lg font-semibold text-foreground">Speed & Elevation Timeline</h3>
@@ -465,21 +465,17 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
 
                     {/* Middle: Slider (Centered & Flex-grow) */}
                     {showLimiter && (
-                      <div className="flex-1 max-w-[400px] px-2 animate-in fade-in zoom-in-95 duration-200">
+                      <div className="flex-1 max-w-[350px] px-2 animate-in fade-in zoom-in-95 duration-200">
                         <Slider
                           min={40}
                           max={speedCap ? Math.min(speedCap - 10, 200) : Math.max(Math.ceil(stats.maxSpeed / 10) * 10, 120)}
                           step={10}
                           value={[speedLimit]}
                           onValueChange={([val]) => setSpeedLimit(val)}
-                          className="w-full relative py-3 cursor-grab active:cursor-grabbing"
-
-                          // Styles for "Proper" Visible Slider
-                          thumbClassName="h-5 w-5 rounded-full border-2 border-primary bg-background shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
-                          // No weird children, just a tooltip on top via internal logic or sibling if needed, 
-                          // but user asked for "standard". Let's use the thumbChildren for the value label carefully
+                          className="w-full relative py-2 cursor-grab active:cursor-grabbing"
+                          thumbClassName="h-4 w-4 rounded-full border-2 border-primary bg-background shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
                           thumbChildren={
-                            <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-popover text-popover-foreground text-xs font-bold px-2 py-1 rounded shadow-md border whitespace-nowrap">
+                            <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-popover text-popover-foreground text-xs font-bold px-2 py-0.5 rounded shadow-md border whitespace-nowrap">
                               {speedLimit} km/h
                             </div>
                           }
@@ -488,9 +484,9 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                     )}
 
                     {/* Right: Controls (Toggle + Reset) */}
-                    <div className="flex items-center gap-4 flex-shrink-0">
+                    <div className="flex items-center gap-3 flex-shrink-0">
                       {/* Speed Limiter Toggle */}
-                      <div className="flex items-center gap-2 bg-muted/50 px-3 py-1.5 rounded-full border border-border/50">
+                      <div className="flex items-center gap-2 bg-muted/50 px-2.5 py-1 rounded-full border border-border/50">
                         <Switch
                           id="speed-limiter"
                           checked={showLimiter}
@@ -513,11 +509,11 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                   </div>
 
                   {/* Single Line Uniform Stats Row */}
-                  <div className="flex items-center justify-between bg-muted/30 rounded-lg px-4 py-3 border border-border/50">
-                    <div className="flex items-center gap-10">
+                  <div className="flex items-center justify-between bg-muted/30 rounded-lg px-3 py-2 border border-border/50">
+                    <div className="flex items-center gap-8">
                       {/* Distance - Simple Inline */}
                       <div className="flex items-baseline gap-1.5">
-                        <span className="text-xl font-normal tabular-nums">{zoomRange && subsetStats ? formatDistance(subsetStats.totalDistance) : formatDistance(stats.totalDistance)}</span>
+                        <span className="text-lg font-normal tabular-nums">{zoomRange && subsetStats ? formatDistance(subsetStats.totalDistance) : formatDistance(stats.totalDistance)}</span>
                       </div>
 
                       {/* Time - Inline with Arrow Delta */}
@@ -528,17 +524,16 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                           if (showLimiter && limitedStats && limitedStats.timeAdded > 0) {
                             return (
                               <>
-                                <span className="text-xl font-normal tabular-nums text-muted-foreground/50 line-through">
+                                <span className="text-lg font-normal tabular-nums text-muted-foreground/50 line-through">
                                   {zoomRange && subsetStats ? formatDuration(subsetStats.totalTime) : formatDuration(stats.totalTime)}
                                 </span>
-                                <div className="flex items-baseline gap-2 animate-in fade-in slide-in-from-left-2">
-                                  <span className="text-xl font-normal text-amber-500 tabular-nums">
+                                <div className="flex items-baseline gap-1.5 animate-in fade-in slide-in-from-left-2">
+                                  <span className="text-lg font-normal text-amber-500 tabular-nums">
                                     {formatDuration(limitedStats.simulatedTime)}
                                   </span>
-                                  <span className="flex items-center text-xs font-bold text-amber-500/90 gap-1">
+                                  <span className="flex items-center text-xs font-bold text-amber-500/90 gap-0.5">
                                     <TrendingUp className="w-3 h-3" />
                                     +{formatDuration(limitedStats.timeAdded)}
-                                    <span className="text-[10px] opacity-80 uppercase tracking-wide ml-0.5">({(limitedStats.timeAdded / limitedStats.originalTime * 100).toFixed(0)}% More Time)</span>
                                   </span>
                                 </div>
                               </>
@@ -548,17 +543,16 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                           if (cappedSelectionStats) {
                             return (
                               <>
-                                <span className="text-xl font-normal tabular-nums text-muted-foreground/50 line-through">
+                                <span className="text-lg font-normal tabular-nums text-muted-foreground/50 line-through">
                                   {formatDuration(cappedSelectionStats.originalTime)}
                                 </span>
-                                <div className="flex items-baseline gap-2 animate-in fade-in slide-in-from-left-2">
-                                  <span className="text-xl font-normal text-blue-500 tabular-nums">
+                                <div className="flex items-baseline gap-1.5 animate-in fade-in slide-in-from-left-2">
+                                  <span className="text-lg font-normal text-blue-500 tabular-nums">
                                     {formatDuration(cappedSelectionStats.simulatedTime)}
                                   </span>
-                                  <span className="flex items-center text-xs font-bold text-blue-500/90 gap-1">
+                                  <span className="flex items-center text-xs font-bold text-blue-500/90 gap-0.5">
                                     <TrendingUp className="w-3 h-3" />
                                     +{formatDuration(cappedSelectionStats.timeAdded)}
-                                    <span className="text-[10px] opacity-80 uppercase tracking-wide ml-0.5">(Capped)</span>
                                   </span>
                                 </div>
                               </>
@@ -566,7 +560,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                           }
                           // Default: show actual time
                           return (
-                            <span className="text-xl font-normal tabular-nums text-foreground">
+                            <span className="text-lg font-normal tabular-nums text-foreground">
                               {zoomRange && subsetStats ? formatDuration(subsetStats.totalTime) : formatDuration(stats.totalTime)}
                             </span>
                           );
@@ -580,11 +574,11 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                           if (showLimiter && limitedStats && limitedStats.timeAdded > 0) {
                             return (
                               <>
-                                <span className="text-xl font-normal tabular-nums text-muted-foreground/50 line-through">
+                                <span className="text-lg font-normal tabular-nums text-muted-foreground/50 line-through">
                                   {zoomRange && subsetStats ? formatSpeed(subsetStats.avgSpeed) : formatSpeed(stats.avgSpeed)}
                                 </span>
-                                <div className="flex items-baseline gap-2 animate-in fade-in slide-in-from-left-2">
-                                  <span className="text-xl font-normal text-amber-500 tabular-nums">
+                                <div className="flex items-baseline gap-1.5 animate-in fade-in slide-in-from-left-2">
+                                  <span className="text-lg font-normal text-amber-500 tabular-nums">
                                     {formatSpeed(limitedStats.newAvgSpeed)}
                                   </span>
                                   <span className="flex items-center text-xs font-bold text-amber-500/90">
@@ -599,11 +593,11 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                           if (cappedSelectionStats) {
                             return (
                               <>
-                                <span className="text-xl font-normal tabular-nums text-muted-foreground/50 line-through">
+                                <span className="text-lg font-normal tabular-nums text-muted-foreground/50 line-through">
                                   {formatSpeed(cappedSelectionStats.originalAvgSpeed)}
                                 </span>
-                                <div className="flex items-baseline gap-2 animate-in fade-in slide-in-from-left-2">
-                                  <span className="text-xl font-normal text-blue-500 tabular-nums">
+                                <div className="flex items-baseline gap-1.5 animate-in fade-in slide-in-from-left-2">
+                                  <span className="text-lg font-normal text-blue-500 tabular-nums">
                                     {formatSpeed(cappedSelectionStats.cappedAvgSpeed)}
                                   </span>
                                   <span className="flex items-center text-xs font-bold text-blue-500/90">
@@ -616,7 +610,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                           }
                           // Default: show actual speed
                           return (
-                            <span className="text-xl font-normal tabular-nums text-foreground">
+                            <span className="text-lg font-normal tabular-nums text-foreground">
                               {zoomRange && subsetStats ? formatSpeed(subsetStats.avgSpeed) : formatSpeed(stats.avgSpeed)}
                             </span>
                           );
@@ -626,7 +620,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
 
                     {/* Hover Data Display - Right Side */}
                     {hoveredPoint && (
-                      <div className="flex items-center gap-3 bg-primary/10 px-3 py-1.5 rounded-md border border-primary/20 animate-in fade-in slide-in-from-right-2 duration-150">
+                      <div className="flex items-center gap-2 bg-primary/10 px-2.5 py-1 rounded-md border border-primary/20 animate-in fade-in slide-in-from-right-2 duration-150">
                         {/* Calculate cumulative distance to this point */}
                         {(() => {
                           let cumDist = 0;
@@ -655,11 +649,11 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                           return (
                             <>
                               <span className="text-sm font-mono font-semibold">{formatDistance(cumDist)}</span>
-                              <div className="w-px h-4 bg-border" />
+                              <div className="w-px h-3.5 bg-border" />
                               <span className="text-sm font-mono font-semibold">{formatSpeed(pointSpeed)}</span>
                               {hoveredPoint.ele !== undefined && (
                                 <>
-                                  <div className="w-px h-4 bg-border" />
+                                  <div className="w-px h-3.5 bg-border" />
                                   <span className="text-sm font-mono font-semibold">{hoveredPoint.ele.toFixed(0)}m</span>
                                 </>
                               )}
