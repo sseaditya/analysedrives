@@ -126,58 +126,46 @@ const SpeedElevationChart = ({
     const offset = Math.floor(WINDOW_SIZE / 2);
     const result: ChartDataPoint[] = [];
 
-    // Determine range size for sampling
-    let rangeSize = points.length;
-    if (zoomRange) {
-      rangeSize = zoomRange[1] - zoomRange[0];
-    }
-
-    // ORIGINAL SAMPLING: target ~300 points based on range size
-    const sampleRate = Math.max(1, Math.floor(rangeSize / 300));
+    // Sampling rate based on TOTAL points (for full dataset)
+    // This ensures elevation chart always shows the complete route
+    const sampleRate = Math.max(1, Math.floor(points.length / 300));
 
     for (let i = 0; i < rawData.length; i++) {
       const originalIndex = i + 1;
 
-      // Check if within zoom range
-      const isVisible = !zoomRange || (originalIndex >= zoomRange[0] && originalIndex <= zoomRange[1]);
+      // Sample all data points (no zoom filtering here - that happens later for speed chart)
+      const shouldSample = (originalIndex % sampleRate === 0) || originalIndex === points.length - 1;
 
-      if (isVisible) {
-        // ORIGINAL sampling logic
-        const shouldSample = (originalIndex % sampleRate === 0) ||
-          originalIndex === points.length - 1 ||
-          (zoomRange && originalIndex === zoomRange[1]);
+      if (shouldSample) {
+        // Calculate smoothed speed
+        let sum = 0;
+        let count = 0;
 
-        if (shouldSample) {
-          // Calculate smoothed speed
-          let sum = 0;
-          let count = 0;
-
-          for (let j = -offset; j <= offset; j++) {
-            const idx = i + j;
-            if (idx >= 0 && idx < rawData.length) {
-              sum += rawData[idx].speed;
-              count++;
-            }
+        for (let j = -offset; j <= offset; j++) {
+          const idx = i + j;
+          if (idx >= 0 && idx < rawData.length) {
+            sum += rawData[idx].speed;
+            count++;
           }
-          const smoothedSpeed = count > 0 ? sum / count : 0;
-
-          let finalSpeed = parseFloat(smoothedSpeed.toFixed(1));
-          if (speedCap && finalSpeed > speedCap) finalSpeed = speedCap;
-          if (visualLimit && finalSpeed > visualLimit) finalSpeed = visualLimit;
-
-          result.push({
-            distance: rawData[i].dist,
-            speed: finalSpeed,
-            elevation: rawData[i].ele,
-            time: rawData[i].time ? rawData[i].time!.toLocaleTimeString() : '',
-            pointIndex: originalIndex,
-          });
         }
+        const smoothedSpeed = count > 0 ? sum / count : 0;
+
+        let finalSpeed = parseFloat(smoothedSpeed.toFixed(1));
+        if (speedCap && finalSpeed > speedCap) finalSpeed = speedCap;
+        if (visualLimit && finalSpeed > visualLimit) finalSpeed = visualLimit;
+
+        result.push({
+          distance: rawData[i].dist,
+          speed: finalSpeed,
+          elevation: rawData[i].ele,
+          time: rawData[i].time ? rawData[i].time!.toLocaleTimeString() : '',
+          pointIndex: originalIndex,
+        });
       }
     }
 
     return result;
-  }, [points, zoomRange, speedCap, visualLimit]);
+  }, [points, speedCap, visualLimit]);
 
   if (fullData.length === 0) {
     return (
