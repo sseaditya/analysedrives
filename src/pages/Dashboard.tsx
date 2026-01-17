@@ -130,9 +130,9 @@ const Dashboard = () => {
     }, [user]);
 
     const fetchProfile = async () => {
-        if (!user) return;
-        setIsLoadingProfile(true);
         try {
+            if (!user) return;
+            setIsLoadingProfile(true);
             const { data, error } = await supabase
                 .from('profiles')
                 .select('id, display_name, car, avatar_url')
@@ -149,8 +149,9 @@ const Dashboard = () => {
     };
 
     const fetchActivities = async () => {
-        if (!user) return;
         try {
+            if (!user) return;
+            setLoadingActivities(true);
             const { data, error } = await supabase
                 .from('activities')
                 .select('*')
