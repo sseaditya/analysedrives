@@ -623,6 +623,60 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                         })()}
                       </div>
                     </div>
+
+                    {/* Hover Data Display - Right Side */}
+                    {hoveredPoint && (
+                      <div className="flex items-center gap-3 bg-primary/10 px-3 py-1.5 rounded-md border border-primary/20 animate-in fade-in slide-in-from-right-2 duration-150">
+                        {/* Calculate cumulative distance to this point */}
+                        {(() => {
+                          let cumDist = 0;
+                          const hoveredIndex = points.findIndex(p => p === hoveredPoint);
+                          for (let i = 1; i <= hoveredIndex && i < points.length; i++) {
+                            cumDist += haversineDistance(
+                              points[i - 1].lat,
+                              points[i - 1].lon,
+                              points[i].lat,
+                              points[i].lon
+                            );
+                          }
+
+                          // Calculate speed for this point
+                          let pointSpeed = 0;
+                          if (hoveredIndex > 0 && points[hoveredIndex - 1].time && hoveredPoint.time) {
+                            const prev = points[hoveredIndex - 1];
+                            const dist = haversineDistance(prev.lat, prev.lon, hoveredPoint.lat, hoveredPoint.lon);
+                            const timeDiff = (hoveredPoint.time.getTime() - prev.time.getTime()) / 1000 / 3600;
+                            if (timeDiff > 0) {
+                              pointSpeed = dist / timeDiff;
+                              if (pointSpeed > 200) pointSpeed = 0;
+                            }
+                          }
+
+                          return (
+                            <>
+                              <div className="flex items-baseline gap-1">
+                                <span className="text-xs text-muted-foreground uppercase tracking-wide">Dist:</span>
+                                <span className="text-sm font-mono font-semibold">{formatDistance(cumDist)}</span>
+                              </div>
+                              <div className="w-px h-4 bg-border" />
+                              <div className="flex items-baseline gap-1">
+                                <span className="text-xs text-muted-foreground uppercase tracking-wide">Speed:</span>
+                                <span className="text-sm font-mono font-semibold">{formatSpeed(pointSpeed)}</span>
+                              </div>
+                              {hoveredPoint.ele !== undefined && (
+                                <>
+                                  <div className="w-px h-4 bg-border" />
+                                  <div className="flex items-baseline gap-1">
+                                    <span className="text-xs text-muted-foreground uppercase tracking-wide">Elev:</span>
+                                    <span className="text-sm font-mono font-semibold">{hoveredPoint.ele.toFixed(0)}m</span>
+                                  </div>
+                                </>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
                   </div>
                 </div>
 

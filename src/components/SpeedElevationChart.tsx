@@ -66,8 +66,9 @@ const SpeedElevationChart = ({
   const [activeChart, setActiveChart] = useState<'speed' | 'elevation' | null>(null);
   const [interactionMode, setInteractionMode] = useState<InteractionMode>('none');
   const [cursorStyle, setCursorStyle] = useState<string>('crosshair');
+  const [dragStartDist, setDragStartDist] = useState<number | null>(null);
 
-  // Calculate combined data for chart - Original sampling logic
+  // Calculate combined data for chart - ALWAYS sample to 300 points
   const fullData: ChartDataPoint[] = useMemo(() => {
     const rawData: { dist: number; speed: number; ele: number | null; time: Date | undefined }[] = [];
     let cumulativeDistance = 0;
@@ -121,19 +122,18 @@ const SpeedElevationChart = ({
       });
     }
 
-    // Apply smoothing and create final dataset with ORIGINAL sampling
+    // Apply smoothing and create final dataset
     const WINDOW_SIZE = 5;
     const offset = Math.floor(WINDOW_SIZE / 2);
     const result: ChartDataPoint[] = [];
 
-    // Sampling rate based on TOTAL points (for full dataset)
-    // This ensures elevation chart always shows the complete route
+    // CONSTANT sampling: Always target ~300 points from full dataset
     const sampleRate = Math.max(1, Math.floor(points.length / 300));
 
     for (let i = 0; i < rawData.length; i++) {
       const originalIndex = i + 1;
 
-      // Sample all data points (no zoom filtering here - that happens later for speed chart)
+      // Sample all data points (no zoom filtering here)
       const shouldSample = (originalIndex % sampleRate === 0) || originalIndex === points.length - 1;
 
       if (shouldSample) {
@@ -177,13 +177,22 @@ const SpeedElevationChart = ({
 
   const hasElevation = fullData.some((d) => d.elevation !== null);
 
-  // Calculate True Max Speed (for Scale)
+  // Calculate True Max Speed (for Scale) - unaffected by speedLimit
   const trueMaxSpeed = Math.max(...fullData.map(d => d.speed), 0);
 
-  // Prepare Speed Chart Data (filtered by zoom)
-  const speedChartData = zoomRange
-    ? fullData.filter(d => d.pointIndex >= zoomRange[0] && d.pointIndex <= zoomRange[1])
-    : fullData;
+  // Speed chart data: filtered by zoom, then re-sampled to constant 300 points
+  const speedChartData = useMemo(() => {
+    const filtered = zoomRange
+      ? fullData.filter(d => d.pointIndex >= zoomRange[0] && d.pointIndex <= zoomRange[1])
+      : fullData;
+
+    // Re-sample to constant 300 points for consistent density
+    const targetPoints = 300;
+    if (filtered.length <= targetPoints) return filtered;
+
+    const sampleRate = Math.max(1, Math.floor(filtered.length / targetPoints));
+    return filtered.filter((_, idx) => idx % sampleRate === 0 || idx === filtered.length - 1);
+  }, [fullData, zoomRange]);
 
   // Calculate elevation range for better scaling
   const elevations = fullData.map((d) => d.elevation).filter((e): e is number => e !== null);
@@ -203,8 +212,8 @@ const SpeedElevationChart = ({
   const zoomStartDist = zoomRange ? fullData.find(d => d.pointIndex >= zoomRange[0])?.distance || fullMinDistance : null;
   const zoomEndDist = zoomRange ? fullData.find(d => d.pointIndex >= zoomRange[1])?.distance || fullMaxDistance : null;
 
-  // Edge detection threshold (in distance units)
-  const EDGE_THRESHOLD = (fullMaxDistance - fullMinDistance) * 0.02; // 2% of total distance
+  // Edge detection threshold (in distance units) - 3% for better UX
+  const EDGE_THRESHOLD = (fullMaxDistance - fullMinDistance) * 0.03;
 
   const getInteractionMode = (distanceValue: number): InteractionMode => {
     if (!zoomStartDist || !zoomEndDist) return 'new-selection';
@@ -224,7 +233,7 @@ const SpeedElevationChart = ({
       case 'resize-right':
         return 'ew-resize';
       case 'move-window':
-        return 'move';
+        return 'grab';
       case 'new-selection':
       default:
         return 'crosshair';
@@ -241,6 +250,7 @@ const SpeedElevationChart = ({
       setRefAreaRight(null);
       setActiveChart(null);
       setInteractionMode('none');
+      setDragStartDist(null);
       return;
     }
 
@@ -281,6 +291,7 @@ const SpeedElevationChart = ({
     setRefAreaRight(null);
     setActiveChart(null);
     setInteractionMode('none');
+    setDragStartDist(null);
   };
 
   const handleMouseMove = (e: any, chartType: 'speed' | 'elevation') => {
@@ -296,20 +307,26 @@ const SpeedElevationChart = ({
       if (e.activeLabel) {
         const currentDist = parseFloat(e.activeLabel);
 
-        if (interactionMode === 'move-window' && zoomStartDist && zoomEndDist) {
+        if (interactionMode === 'move-window' && zoomStartDist && zoomEndDist && dragStartDist !== null) {
           // Move entire window
-          const startDist = parseFloat(refAreaLeft);
+          const delta = currentDist - dragStartDist;
           const windowSize = zoomEndDist - zoomStartDist;
-          const delta = currentDist - startDist;
 
-          const newStart = zoomStartDist + delta;
-          const newEnd = zoomEndDist + delta;
+          let newStart = zoomStartDist + delta;
+          let newEnd = zoomEndDist + delta;
 
           // Constrain to bounds
-          if (newStart >= fullMinDistance && newEnd <= fullMaxDistance) {
-            setRefAreaLeft(newStart.toString());
-            setRefAreaRight(newEnd.toString());
+          if (newStart < fullMinDistance) {
+            newStart = fullMinDistance;
+            newEnd = newStart + windowSize;
           }
+          if (newEnd > fullMaxDistance) {
+            newEnd = fullMaxDistance;
+            newStart = newEnd - windowSize;
+          }
+
+          setRefAreaLeft(newStart.toString());
+          setRefAreaRight(newEnd.toString());
         } else if (interactionMode === 'resize-left' && zoomEndDist) {
           // Resize from left edge
           setRefAreaLeft(currentDist.toString());
@@ -345,17 +362,21 @@ const SpeedElevationChart = ({
         const mode = getInteractionMode(dist);
         setInteractionMode(mode);
 
-        if (mode === 'move-window' && zoomStartDist && zoomEndDist) {
-          setRefAreaLeft(dist.toString());
-          setRefAreaRight(dist.toString());
+        if (mode === 'move-window') {
+          setDragStartDist(dist);
+          setRefAreaLeft(zoomStartDist?.toString() || null);
+          setRefAreaRight(zoomEndDist?.toString() || null);
+          setCursorStyle('grabbing');
         } else {
           setRefAreaLeft(e.activeLabel);
           setRefAreaRight(null);
+          setDragStartDist(null);
         }
       } else {
         setRefAreaLeft(e.activeLabel);
         setRefAreaRight(null);
         setInteractionMode('new-selection');
+        setDragStartDist(null);
       }
 
       setActiveChart(chartType);
@@ -364,6 +385,7 @@ const SpeedElevationChart = ({
 
   const handleMouseUp = () => {
     zoom();
+    setCursorStyle(interactionMode === 'move-window' ? 'grab' : getCursorForMode(interactionMode));
   };
 
   const handleMouseLeave = () => {
@@ -373,10 +395,15 @@ const SpeedElevationChart = ({
     setActiveChart(null);
     setInteractionMode('none');
     setCursorStyle('crosshair');
+    setDragStartDist(null);
   };
 
   // Shared margin configuration
   const chartMargin = { top: 10, right: 30, left: 0, bottom: 0 };
+
+  // Calculate Y-axis domain for speed chart
+  // speedLimit does NOT affect domain, only adds a reference line
+  const speedYDomain = [0, speedCap ? speedCap : Math.ceil(trueMaxSpeed / 10) * 10];
 
   return (
     <div className="h-full w-full rounded-2xl border border-border bg-card p-6 select-none flex flex-col">
@@ -418,7 +445,7 @@ const SpeedElevationChart = ({
               tickFormatter={(value) => Math.round(value).toString()}
               label={{ value: "Speed (km/h)", angle: -90, position: "insideLeft", fontSize: 12, fill: "hsl(15, 52%, 58%)" }}
               width={60}
-              domain={[0, speedCap ? speedCap : Math.ceil(trueMaxSpeed / 10) * 10]}
+              domain={speedYDomain}
             />
             <Tooltip
               contentStyle={{
@@ -449,19 +476,21 @@ const SpeedElevationChart = ({
               />
             )}
 
+            {/* Speed Limit Line - Does NOT change Y-axis domain */}
             {speedLimit && (
               <ReferenceLine
                 y={speedLimit}
                 stroke="hsl(5, 53%, 51%)"
-                strokeWidth={3}
+                strokeWidth={2.5}
                 strokeOpacity={0.8}
+                strokeDasharray="5 5"
                 label={{
-                  value: `Limit: ${speedLimit} km/h`,
-                  position: 'insideRight',
+                  value: `${speedLimit} km/h`,
+                  position: 'right',
                   fill: 'hsl(5, 53%, 51%)',
-                  fontSize: 12,
+                  fontSize: 11,
                   fontWeight: 600,
-                  dy: -10
+                  offset: 10
                 }}
               />
             )}
@@ -539,17 +568,34 @@ const SpeedElevationChart = ({
                 />
               )}
 
-              {/* Show current zoom range as highlighted area */}
+              {/* Visual handles for current zoom range */}
               {zoomRange && zoomStartDist && zoomEndDist && (
-                <ReferenceArea
-                  x1={zoomStartDist}
-                  x2={zoomEndDist}
-                  strokeOpacity={0.5}
-                  stroke="hsl(15, 52%, 58%)"
-                  strokeWidth={2}
-                  fill="hsl(15, 52%, 58%)"
-                  fillOpacity={0.15}
-                />
+                <>
+                  {/* Main selection area */}
+                  <ReferenceArea
+                    x1={zoomStartDist}
+                    x2={zoomEndDist}
+                    strokeOpacity={0.6}
+                    stroke="hsl(15, 52%, 58%)"
+                    strokeWidth={2}
+                    fill="hsl(15, 52%, 58%)"
+                    fillOpacity={0.15}
+                  />
+                  {/* Left edge handle */}
+                  <ReferenceLine
+                    x={zoomStartDist}
+                    stroke="hsl(15, 52%, 58%)"
+                    strokeWidth={4}
+                    strokeOpacity={0.9}
+                  />
+                  {/* Right edge handle */}
+                  <ReferenceLine
+                    x={zoomEndDist}
+                    stroke="hsl(15, 52%, 58%)"
+                    strokeWidth={4}
+                    strokeOpacity={0.9}
+                  />
+                </>
               )}
             </AreaChart>
           </ResponsiveContainer>
