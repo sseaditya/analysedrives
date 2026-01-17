@@ -10,7 +10,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import { GPXPoint } from "@/utils/gpxParser";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 
 interface SpeedElevationChartProps {
   points: GPXPoint[];
@@ -50,6 +50,8 @@ function haversineDistance(
   return R * c;
 }
 
+type InteractionMode = 'none' | 'new-selection' | 'resize-left' | 'resize-right' | 'move-window';
+
 const SpeedElevationChart = ({
   points,
   onHover,
@@ -62,105 +64,120 @@ const SpeedElevationChart = ({
   const [refAreaLeft, setRefAreaLeft] = useState<string | null>(null);
   const [refAreaRight, setRefAreaRight] = useState<string | null>(null);
   const [activeChart, setActiveChart] = useState<'speed' | 'elevation' | null>(null);
+  const [interactionMode, setInteractionMode] = useState<InteractionMode>('none');
+  const [cursorStyle, setCursorStyle] = useState<string>('crosshair');
 
-  // Calculate combined data for chart
-  const fullData: ChartDataPoint[] = [];
-  let cumulativeDistance = 0;
+  // Calculate combined data for chart - Original sampling logic
+  const fullData: ChartDataPoint[] = useMemo(() => {
+    const rawData: { dist: number; speed: number; ele: number | null; time: Date | undefined }[] = [];
+    let cumulativeDistance = 0;
 
-  // First pass: Calculate all raw speeds and distances
-  const rawData: { dist: number; speed: number; ele: number | null; time: Date | undefined }[] = [];
+    // Dynamic Acceleration Limit
+    const getMaxAccel = (speedKmh: number) => {
+      return Math.max(2.0, 9.0 - (speedKmh / 25.0));
+    };
 
-  // Dynamic Acceleration Limit - Matching gpxParser logic
-  const getMaxAccel = (speedKmh: number) => {
-    return Math.max(2.0, 9.0 - (speedKmh / 25.0));
-  };
+    let prevSpeedMps = 0;
 
-  let prevSpeedMps = 0;
+    for (let i = 1; i < points.length; i++) {
+      const prev = points[i - 1];
+      const curr = points[i];
 
-  for (let i = 1; i < points.length; i++) {
-    const prev = points[i - 1];
-    const curr = points[i];
+      const distance = haversineDistance(prev.lat, prev.lon, curr.lat, curr.lon);
+      cumulativeDistance += distance;
 
-    const distance = haversineDistance(prev.lat, prev.lon, curr.lat, curr.lon);
-    cumulativeDistance += distance;
+      let speedKmh = 0;
+      let speedMps = 0;
 
-    let speedKmh = 0;
-    let speedMps = 0;
+      if (prev.time && curr.time) {
+        const timeDiff = (curr.time.getTime() - prev.time.getTime()) / 1000;
+        if (timeDiff > 0) {
+          const rawSpeedKmh = distance / (timeDiff / 3600);
+          const rawSpeedMps = rawSpeedKmh / 3.6;
 
-    if (prev.time && curr.time) {
-      const timeDiff = (curr.time.getTime() - prev.time.getTime()) / 1000;
-      if (timeDiff > 0) {
-        const rawSpeedKmh = distance / (timeDiff / 3600);
-        const rawSpeedMps = rawSpeedKmh / 3.6;
+          const prevSpeedKmh = prevSpeedMps * 3.6;
+          const maxAccel = getMaxAccel(prevSpeedKmh);
+          const accel = (rawSpeedMps - prevSpeedMps) / timeDiff;
 
-        // Check Accel against Dynamic Limit
-        const prevSpeedKmh = prevSpeedMps * 3.6;
-        const maxAccel = getMaxAccel(prevSpeedKmh);
+          if (accel > maxAccel) {
+            speedMps = prevSpeedMps + (maxAccel * timeDiff);
+            speedKmh = speedMps * 3.6;
+          } else {
+            speedKmh = rawSpeedKmh;
+            speedMps = rawSpeedMps;
+          }
 
-        const accel = (rawSpeedMps - prevSpeedMps) / timeDiff;
-
-        if (accel > maxAccel) {
-          // Clamp
-          speedMps = prevSpeedMps + (maxAccel * timeDiff);
-          speedKmh = speedMps * 3.6;
-        } else {
-          speedKmh = rawSpeedKmh;
-          speedMps = rawSpeedMps;
+          if (speedKmh > 350) speedKmh = prevSpeedMps * 3.6;
         }
+      }
 
-        // Outlier rejection (hard 350 cap)
-        if (speedKmh > 350) speedKmh = prevSpeedMps * 3.6;
+      prevSpeedMps = speedMps;
+
+      rawData.push({
+        dist: parseFloat(cumulativeDistance.toFixed(2)),
+        speed: speedKmh,
+        ele: curr.ele !== undefined ? curr.ele : null,
+        time: curr.time
+      });
+    }
+
+    // Apply smoothing and create final dataset with ORIGINAL sampling
+    const WINDOW_SIZE = 5;
+    const offset = Math.floor(WINDOW_SIZE / 2);
+    const result: ChartDataPoint[] = [];
+
+    // Determine range size for sampling
+    let rangeSize = points.length;
+    if (zoomRange) {
+      rangeSize = zoomRange[1] - zoomRange[0];
+    }
+
+    // ORIGINAL SAMPLING: target ~300 points based on range size
+    const sampleRate = Math.max(1, Math.floor(rangeSize / 300));
+
+    for (let i = 0; i < rawData.length; i++) {
+      const originalIndex = i + 1;
+
+      // Check if within zoom range
+      const isVisible = !zoomRange || (originalIndex >= zoomRange[0] && originalIndex <= zoomRange[1]);
+
+      if (isVisible) {
+        // ORIGINAL sampling logic
+        const shouldSample = (originalIndex % sampleRate === 0) ||
+          originalIndex === points.length - 1 ||
+          (zoomRange && originalIndex === zoomRange[1]);
+
+        if (shouldSample) {
+          // Calculate smoothed speed
+          let sum = 0;
+          let count = 0;
+
+          for (let j = -offset; j <= offset; j++) {
+            const idx = i + j;
+            if (idx >= 0 && idx < rawData.length) {
+              sum += rawData[idx].speed;
+              count++;
+            }
+          }
+          const smoothedSpeed = count > 0 ? sum / count : 0;
+
+          let finalSpeed = parseFloat(smoothedSpeed.toFixed(1));
+          if (speedCap && finalSpeed > speedCap) finalSpeed = speedCap;
+          if (visualLimit && finalSpeed > visualLimit) finalSpeed = visualLimit;
+
+          result.push({
+            distance: rawData[i].dist,
+            speed: finalSpeed,
+            elevation: rawData[i].ele,
+            time: rawData[i].time ? rawData[i].time!.toLocaleTimeString() : '',
+            pointIndex: originalIndex,
+          });
+        }
       }
     }
 
-    // Update State
-    prevSpeedMps = speedMps;
-
-    rawData.push({
-      dist: parseFloat(cumulativeDistance.toFixed(2)),
-      speed: speedKmh,
-      ele: curr.ele !== undefined ? curr.ele : null,
-      time: curr.time
-    });
-  }
-
-  // Calculate True Max Speed (for Scale) BEFORE any visual clipping
-  const trueMaxSpeed = Math.max(...rawData.map(d => d.speed), 0);
-
-  // Second pass: Apply smoothing
-  const WINDOW_SIZE = 5;
-  const offset = Math.floor(WINDOW_SIZE / 2);
-
-  for (let i = 0; i < rawData.length; i++) {
-    // 1. Calculate Smoothed Speed
-    let sum = 0;
-    let count = 0;
-
-    for (let j = -offset; j <= offset; j++) {
-      const idx = i + j;
-      if (idx >= 0 && idx < rawData.length) {
-        sum += rawData[idx].speed;
-        count++;
-      }
-    }
-    const smoothedSpeed = count > 0 ? sum / count : 0;
-    const currRaw = rawData[i];
-
-    let finalSpeed = parseFloat(smoothedSpeed.toFixed(1));
-    // speedCap is the HARD limit (e.g. 50km/h set by owner).
-    if (speedCap && finalSpeed > speedCap) finalSpeed = speedCap;
-
-    // visualLimit is the SOFT limit (e.g. simulation).
-    if (visualLimit && finalSpeed > visualLimit) finalSpeed = visualLimit;
-
-    fullData.push({
-      distance: rawData[i].dist,
-      speed: finalSpeed,
-      elevation: rawData[i].ele,
-      time: rawData[i].time ? rawData[i].time!.toLocaleTimeString() : '',
-      pointIndex: i + 1,
-    });
-  }
+    return result;
+  }, [points, zoomRange, speedCap, visualLimit]);
 
   if (fullData.length === 0) {
     return (
@@ -172,28 +189,13 @@ const SpeedElevationChart = ({
 
   const hasElevation = fullData.some((d) => d.elevation !== null);
 
+  // Calculate True Max Speed (for Scale)
+  const trueMaxSpeed = Math.max(...fullData.map(d => d.speed), 0);
+
   // Prepare Speed Chart Data (filtered by zoom)
   const speedChartData = zoomRange
     ? fullData.filter(d => d.pointIndex >= zoomRange[0] && d.pointIndex <= zoomRange[1])
     : fullData;
-
-  // Sample speed data for performance (target ~300 points)
-  const sampleSpeedData = (data: ChartDataPoint[]) => {
-    const targetPoints = 300;
-    const sampleRate = Math.max(1, Math.floor(data.length / targetPoints));
-    return data.filter((_, idx) => idx % sampleRate === 0 || idx === data.length - 1);
-  };
-
-  const sampledSpeedData = sampleSpeedData(speedChartData);
-
-  // Prepare Elevation Chart Data (always full route)
-  const sampleElevationData = (data: ChartDataPoint[]) => {
-    const targetPoints = 200; // Even more aggressive sampling for elevation
-    const sampleRate = Math.max(1, Math.floor(data.length / targetPoints));
-    return data.filter((_, idx) => idx % sampleRate === 0 || idx === data.length - 1);
-  };
-
-  const sampledElevationData = hasElevation ? sampleElevationData(fullData) : [];
 
   // Calculate elevation range for better scaling
   const elevations = fullData.map((d) => d.elevation).filter((e): e is number => e !== null);
@@ -201,9 +203,45 @@ const SpeedElevationChart = ({
   const maxElevation = elevations.length > 0 ? Math.max(...elevations) : 1000;
   const elevationRange = maxElevation - minElevation || 100;
 
-  // Calculate distance domain (always full route)
-  const minDistance = fullData[0]?.distance || 0;
-  const maxDistance = fullData[fullData.length - 1]?.distance || 100;
+  // Calculate distance domains
+  const fullMinDistance = fullData[0]?.distance || 0;
+  const fullMaxDistance = fullData[fullData.length - 1]?.distance || 100;
+
+  // Speed chart domain - DYNAMIC based on zoom
+  const speedMinDistance = speedChartData[0]?.distance || fullMinDistance;
+  const speedMaxDistance = speedChartData[speedChartData.length - 1]?.distance || fullMaxDistance;
+
+  // Get current zoom range boundaries for brush interaction
+  const zoomStartDist = zoomRange ? fullData.find(d => d.pointIndex >= zoomRange[0])?.distance || fullMinDistance : null;
+  const zoomEndDist = zoomRange ? fullData.find(d => d.pointIndex >= zoomRange[1])?.distance || fullMaxDistance : null;
+
+  // Edge detection threshold (in distance units)
+  const EDGE_THRESHOLD = (fullMaxDistance - fullMinDistance) * 0.02; // 2% of total distance
+
+  const getInteractionMode = (distanceValue: number): InteractionMode => {
+    if (!zoomStartDist || !zoomEndDist) return 'new-selection';
+
+    const distToLeft = Math.abs(distanceValue - zoomStartDist);
+    const distToRight = Math.abs(distanceValue - zoomEndDist);
+
+    if (distToLeft < EDGE_THRESHOLD) return 'resize-left';
+    if (distToRight < EDGE_THRESHOLD) return 'resize-right';
+    if (distanceValue > zoomStartDist && distanceValue < zoomEndDist) return 'move-window';
+    return 'new-selection';
+  };
+
+  const getCursorForMode = (mode: InteractionMode): string => {
+    switch (mode) {
+      case 'resize-left':
+      case 'resize-right':
+        return 'ew-resize';
+      case 'move-window':
+        return 'move';
+      case 'new-selection':
+      default:
+        return 'crosshair';
+    }
+  };
 
   const zoom = () => {
     if (refAreaLeft === refAreaRight || refAreaRight === null || refAreaLeft === null) {
@@ -214,6 +252,7 @@ const SpeedElevationChart = ({
       setRefAreaLeft(null);
       setRefAreaRight(null);
       setActiveChart(null);
+      setInteractionMode('none');
       return;
     }
 
@@ -230,7 +269,7 @@ const SpeedElevationChart = ({
       let startIndex = startData.pointIndex;
       let endIndex = endData.pointIndex;
 
-      // Ensure we always have at least 5 points for context
+      // Ensure minimum points
       const MIN_POINTS = 5;
       const diff = endIndex - startIndex;
 
@@ -253,13 +292,48 @@ const SpeedElevationChart = ({
     setRefAreaLeft(null);
     setRefAreaRight(null);
     setActiveChart(null);
+    setInteractionMode('none');
   };
 
   const handleMouseMove = (e: any, chartType: 'speed' | 'elevation') => {
+    // Update cursor based on hover position (elevation chart only)
+    if (chartType === 'elevation' && e?.activeLabel && !refAreaLeft) {
+      const dist = parseFloat(e.activeLabel);
+      const mode = getInteractionMode(dist);
+      setCursorStyle(getCursorForMode(mode));
+    }
+
     if (refAreaLeft && activeChart === chartType) {
       // dragging
       if (e.activeLabel) {
-        setRefAreaRight(e.activeLabel);
+        const currentDist = parseFloat(e.activeLabel);
+
+        if (interactionMode === 'move-window' && zoomStartDist && zoomEndDist) {
+          // Move entire window
+          const startDist = parseFloat(refAreaLeft);
+          const windowSize = zoomEndDist - zoomStartDist;
+          const delta = currentDist - startDist;
+
+          const newStart = zoomStartDist + delta;
+          const newEnd = zoomEndDist + delta;
+
+          // Constrain to bounds
+          if (newStart >= fullMinDistance && newEnd <= fullMaxDistance) {
+            setRefAreaLeft(newStart.toString());
+            setRefAreaRight(newEnd.toString());
+          }
+        } else if (interactionMode === 'resize-left' && zoomEndDist) {
+          // Resize from left edge
+          setRefAreaLeft(currentDist.toString());
+          setRefAreaRight(zoomEndDist.toString());
+        } else if (interactionMode === 'resize-right' && zoomStartDist) {
+          // Resize from right edge
+          setRefAreaLeft(zoomStartDist.toString());
+          setRefAreaRight(currentDist.toString());
+        } else {
+          // New selection
+          setRefAreaRight(e.activeLabel);
+        }
       }
     }
 
@@ -277,8 +351,25 @@ const SpeedElevationChart = ({
 
   const handleMouseDown = (e: any, chartType: 'speed' | 'elevation') => {
     if (e && e.activeLabel) {
-      setRefAreaLeft(e.activeLabel);
-      setRefAreaRight(null);
+      const dist = parseFloat(e.activeLabel);
+
+      if (chartType === 'elevation') {
+        const mode = getInteractionMode(dist);
+        setInteractionMode(mode);
+
+        if (mode === 'move-window' && zoomStartDist && zoomEndDist) {
+          setRefAreaLeft(dist.toString());
+          setRefAreaRight(dist.toString());
+        } else {
+          setRefAreaLeft(e.activeLabel);
+          setRefAreaRight(null);
+        }
+      } else {
+        setRefAreaLeft(e.activeLabel);
+        setRefAreaRight(null);
+        setInteractionMode('new-selection');
+      }
+
       setActiveChart(chartType);
     }
   };
@@ -292,9 +383,11 @@ const SpeedElevationChart = ({
     setRefAreaLeft(null);
     setRefAreaRight(null);
     setActiveChart(null);
+    setInteractionMode('none');
+    setCursorStyle('crosshair');
   };
 
-  // Shared margin configuration to ensure perfect horizontal alignment
+  // Shared margin configuration
   const chartMargin = { top: 10, right: 30, left: 0, bottom: 0 };
 
   return (
@@ -303,7 +396,7 @@ const SpeedElevationChart = ({
       <div className="flex-[7] w-full min-h-0 mb-4">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart
-            data={sampledSpeedData}
+            data={speedChartData}
             margin={chartMargin}
             onMouseMove={(e) => handleMouseMove(e, 'speed')}
             onMouseLeave={handleMouseLeave}
@@ -320,7 +413,7 @@ const SpeedElevationChart = ({
             <XAxis
               dataKey="distance"
               type="number"
-              domain={[minDistance, maxDistance]}
+              domain={[speedMinDistance, speedMaxDistance]}
               stroke="#9ca3af"
               fontSize={12}
               tickLine={false}
@@ -390,10 +483,10 @@ const SpeedElevationChart = ({
 
       {/* Elevation Chart (Brush - 25% height) */}
       {hasElevation && (
-        <div className="flex-[2.5] w-full min-h-0">
+        <div className="flex-[2.5] w-full min-h-0" style={{ cursor: cursorStyle }}>
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart
-              data={sampledElevationData}
+              data={fullData}
               margin={chartMargin}
               onMouseMove={(e) => handleMouseMove(e, 'elevation')}
               onMouseLeave={handleMouseLeave}
@@ -410,7 +503,7 @@ const SpeedElevationChart = ({
               <XAxis
                 dataKey="distance"
                 type="number"
-                domain={[minDistance, maxDistance]}
+                domain={[fullMinDistance, fullMaxDistance]}
                 stroke="#9ca3af"
                 fontSize={12}
                 tickLine={false}
@@ -447,7 +540,7 @@ const SpeedElevationChart = ({
                 isAnimationActive={false}
               />
 
-              {/* Show selection area when dragging on elevation chart */}
+              {/* Show selection area when dragging */}
               {activeChart === 'elevation' && refAreaLeft && refAreaRight && (
                 <ReferenceArea
                   x1={refAreaLeft}
@@ -459,10 +552,10 @@ const SpeedElevationChart = ({
               )}
 
               {/* Show current zoom range as highlighted area */}
-              {zoomRange && (
+              {zoomRange && zoomStartDist && zoomEndDist && (
                 <ReferenceArea
-                  x1={fullData.find(d => d.pointIndex >= zoomRange[0])?.distance || minDistance}
-                  x2={fullData.find(d => d.pointIndex >= zoomRange[1])?.distance || maxDistance}
+                  x1={zoomStartDist}
+                  x2={zoomEndDist}
                   strokeOpacity={0.5}
                   stroke="hsl(15, 52%, 58%)"
                   strokeWidth={2}
