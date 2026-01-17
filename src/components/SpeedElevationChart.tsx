@@ -447,16 +447,7 @@ const SpeedElevationChart = ({
               width={60}
               domain={speedYDomain}
             />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: "hsl(60, 9%, 94%)",
-                border: "1px solid hsl(60, 5%, 85%)",
-                borderRadius: "12px",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-              }}
-              formatter={(value: number) => [`${value} km/h`, "Speed"]}
-              labelFormatter={(label) => `Distance: ${label} km`}
-            />
+            {/* Tooltip disabled - hover data shown in header */}
             <Area
               type="monotone"
               dataKey="speed"
@@ -476,14 +467,13 @@ const SpeedElevationChart = ({
               />
             )}
 
-            {/* Speed Limit Line - Does NOT change Y-axis domain */}
+            {/* Speed Limit Line - Always visible, solid line */}
             {speedLimit && (
               <ReferenceLine
                 y={speedLimit}
                 stroke="hsl(5, 53%, 51%)"
                 strokeWidth={2.5}
-                strokeOpacity={0.8}
-                strokeDasharray="5 5"
+                strokeOpacity={0.85}
                 label={{
                   value: `${speedLimit} km/h`,
                   position: 'right',
@@ -538,16 +528,7 @@ const SpeedElevationChart = ({
                 width={60}
                 domain={[minElevation - elevationRange * 0.1, maxElevation + elevationRange * 0.1]}
               />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "hsl(60, 9%, 94%)",
-                  border: "1px solid hsl(60, 5%, 85%)",
-                  borderRadius: "12px",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                }}
-                formatter={(value: number) => [`${value} m`, "Elevation"]}
-                labelFormatter={(label) => `Distance: ${label} km`}
-              />
+              {/* Tooltip disabled - hover data shown in header */}
               <Area
                 type="monotone"
                 dataKey="elevation"
@@ -581,19 +562,19 @@ const SpeedElevationChart = ({
                     fill="hsl(15, 52%, 58%)"
                     fillOpacity={0.15}
                   />
-                  {/* Left edge handle */}
+                  {/* Left edge handle - thicker for better visibility */}
                   <ReferenceLine
                     x={zoomStartDist}
                     stroke="hsl(15, 52%, 58%)"
-                    strokeWidth={4}
-                    strokeOpacity={0.9}
+                    strokeWidth={6}
+                    strokeOpacity={0.95}
                   />
-                  {/* Right edge handle */}
+                  {/* Right edge handle - thicker for better visibility */}
                   <ReferenceLine
                     x={zoomEndDist}
                     stroke="hsl(15, 52%, 58%)"
-                    strokeWidth={4}
-                    strokeOpacity={0.9}
+                    strokeWidth={6}
+                    strokeOpacity={0.95}
                   />
                 </>
               )}

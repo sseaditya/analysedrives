@@ -654,22 +654,13 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
 
                           return (
                             <>
-                              <div className="flex items-baseline gap-1">
-                                <span className="text-xs text-muted-foreground uppercase tracking-wide">Dist:</span>
-                                <span className="text-sm font-mono font-semibold">{formatDistance(cumDist)}</span>
-                              </div>
+                              <span className="text-sm font-mono font-semibold">{formatDistance(cumDist)}</span>
                               <div className="w-px h-4 bg-border" />
-                              <div className="flex items-baseline gap-1">
-                                <span className="text-xs text-muted-foreground uppercase tracking-wide">Speed:</span>
-                                <span className="text-sm font-mono font-semibold">{formatSpeed(pointSpeed)}</span>
-                              </div>
+                              <span className="text-sm font-mono font-semibold">{formatSpeed(pointSpeed)}</span>
                               {hoveredPoint.ele !== undefined && (
                                 <>
                                   <div className="w-px h-4 bg-border" />
-                                  <div className="flex items-baseline gap-1">
-                                    <span className="text-xs text-muted-foreground uppercase tracking-wide">Elev:</span>
-                                    <span className="text-sm font-mono font-semibold">{hoveredPoint.ele.toFixed(0)}m</span>
-                                  </div>
+                                  <span className="text-sm font-mono font-semibold">{hoveredPoint.ele.toFixed(0)}m</span>
                                 </>
                               )}
                             </>
