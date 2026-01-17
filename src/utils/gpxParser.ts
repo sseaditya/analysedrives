@@ -433,7 +433,26 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
     minElevation = points[0].ele;
   }
 
-  const robustSegments = calculateRobustSpeeds(points);
+  if (points[0].ele !== undefined) {
+    maxElevation = points[0].ele;
+    minElevation = points[0].ele;
+  }
+
+  // Coordinate Smoothing (3-point SMA)
+  // To reduce "stray points" that cause fake turns
+  const smoothedPoints = points.map((p, i) => {
+    if (i === 0 || i === points.length - 1) return p;
+    const prev = points[i - 1];
+    const next = points[i + 1];
+    return {
+      ...p,
+      lat: (prev.lat + p.lat + next.lat) / 3,
+      lon: (prev.lon + p.lon + next.lon) / 3
+    };
+  });
+
+  const robustSegments = calculateRobustSpeeds(points); // Speeds use raw points for safety? Or should use smoothed?
+  // Let's keep speeds on raw points to capture acceleration physics, but use smoothed for BEARING.
   const isClampedArray = robustSegments.map(s => s.isClamped);
 
   const elevationWindow = 5;
@@ -455,8 +474,9 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
   const rawGradients: number[] = [];
   for (let i = 0; i < robustSegments.length; i++) {
     const { speed, time: timeDiff, distance } = robustSegments[i];
-    const prev = points[i];
-    const curr = points[i + 1];
+    // Use SMOOTHED points for Bearing calculation
+    const prev = smoothedPoints[i];
+    const curr = smoothedPoints[i + 1];
 
     totalDistance += distance;
     speeds.push(speed);
@@ -531,18 +551,21 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
           } else {
             // Direction FLIP -> End previous turn, process it, start new one
 
-            // SHARPNESS CHECK:
-            // 1. Angle Threshold: Reverted to 45 degrees (User Request)
-            // 2. Density Threshold: Turn must be sharp (e.g. > 0.6 deg/meter)
-            const turnDensity = Math.abs(currentTurnSum) / (currentTurnDistance * 1000 || 1);
+            // Turn must happen over minimum distance (15m) to be real
+            if (currentTurnDistance > 0.015) {
+              // SHARPNESS CHECK:
+              // 1. Angle Threshold: Reverted to 45 degrees (User Request)
+              // 2. Density Threshold: Turn must be sharp (e.g. > 0.6 deg/meter)
+              const turnDensity = Math.abs(currentTurnSum) / (currentTurnDistance * 1000 || 1);
 
-            if (Math.abs(currentTurnSum) > 45 && turnDensity > 0.6) {
-              tightTurnsCount++;
-              if (Math.abs(currentTurnSum) > 135) {
-                hairpinCount++;
-                hairpinPoints.push([currentTurnPeak.lat, currentTurnPeak.lon]);
-              } else {
-                tightTurnPoints.push([currentTurnPeak.lat, currentTurnPeak.lon]);
+              if (Math.abs(currentTurnSum) > 45 && turnDensity > 0.6) {
+                tightTurnsCount++;
+                if (Math.abs(currentTurnSum) > 135) {
+                  hairpinCount++;
+                  hairpinPoints.push([currentTurnPeak.lat, currentTurnPeak.lon]);
+                } else {
+                  tightTurnPoints.push([currentTurnPeak.lat, currentTurnPeak.lon]);
+                }
               }
             }
 
@@ -551,10 +574,6 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
             currentTurnPeak = { index: i, delta: delta, lat: curr.lat, lon: curr.lon };
           }
         } else {
-          // If delta is small (< 1.0), we are still theoretically in the turn (or straight).
-          // We add distance to the turn accumulator if we consider it part of the "action".
-          // However, strictly speaking, 0 rotation adds distance which dilutes sharpness.
-          // Let's add it effectively.
           if (Math.abs(currentTurnSum) > 0) {
             currentTurnDistance += distance;
           }
@@ -568,14 +587,17 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
           // If we are going straight for > 25m, the previous turn is definitely over.
           // This prevents "Left -> Straight(50m) -> Left" from becoming a Hairpin.
           if (currentStraightDist > 0.025 && Math.abs(currentTurnSum) > 0) {
-            const turnDensity = Math.abs(currentTurnSum) / (currentTurnDistance * 1000 || 1);
-            if (Math.abs(currentTurnSum) > 45 && turnDensity > 0.6) {
-              tightTurnsCount++;
-              if (Math.abs(currentTurnSum) > 135) {
-                hairpinCount++;
-                hairpinPoints.push([currentTurnPeak.lat, currentTurnPeak.lon]);
-              } else {
-                tightTurnPoints.push([currentTurnPeak.lat, currentTurnPeak.lon]);
+            // Min Dist Check
+            if (currentTurnDistance > 0.015) {
+              const turnDensity = Math.abs(currentTurnSum) / (currentTurnDistance * 1000 || 1);
+              if (Math.abs(currentTurnSum) > 45 && turnDensity > 0.6) {
+                tightTurnsCount++;
+                if (Math.abs(currentTurnSum) > 135) {
+                  hairpinCount++;
+                  hairpinPoints.push([currentTurnPeak.lat, currentTurnPeak.lon]);
+                } else {
+                  tightTurnPoints.push([currentTurnPeak.lat, currentTurnPeak.lon]);
+                }
               }
             }
             // Reset Turn State
@@ -602,14 +624,16 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
   }
 
   // Flush any pending turn at the end of the loop
-  const finalTurnDensity = Math.abs(currentTurnSum) / (currentTurnDistance * 1000 || 1);
-  if (Math.abs(currentTurnSum) > 45 && finalTurnDensity > 0.6) {
-    tightTurnsCount++;
-    if (Math.abs(currentTurnSum) > 135) {
-      hairpinCount++;
-      hairpinPoints.push([currentTurnPeak.lat, currentTurnPeak.lon]);
-    } else {
-      tightTurnPoints.push([currentTurnPeak.lat, currentTurnPeak.lon]);
+  if (currentTurnDistance > 0.015) {
+    const finalTurnDensity = Math.abs(currentTurnSum) / (currentTurnDistance * 1000 || 1);
+    if (Math.abs(currentTurnSum) > 45 && finalTurnDensity > 0.6) {
+      tightTurnsCount++;
+      if (Math.abs(currentTurnSum) > 135) {
+        hairpinCount++;
+        hairpinPoints.push([currentTurnPeak.lat, currentTurnPeak.lon]);
+      } else {
+        tightTurnPoints.push([currentTurnPeak.lat, currentTurnPeak.lon]);
+      }
     }
   }
 
