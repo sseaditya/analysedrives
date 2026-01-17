@@ -433,21 +433,38 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
     minElevation = points[0].ele;
   }
 
+  let currentTurnStartBearing: number | null = null;
+
   if (points[0].ele !== undefined) {
     maxElevation = points[0].ele;
     minElevation = points[0].ele;
   }
 
-  // Coordinate Smoothing (3-point SMA)
-  // To reduce "stray points" that cause fake turns
+  if (points[0].ele !== undefined) {
+    maxElevation = points[0].ele;
+    minElevation = points[0].ele;
+  }
+
+  // Coordinate Smoothing (5-point SMA)
+  // To reduce "stray points" that cause fake turns and flatten wiggles
   const smoothedPoints = points.map((p, i) => {
-    if (i === 0 || i === points.length - 1) return p;
-    const prev = points[i - 1];
-    const next = points[i + 1];
+    const window = 5;
+    const offset = Math.floor(window / 2);
+    let latSum = 0, lonSum = 0, count = 0;
+
+    for (let j = -offset; j <= offset; j++) {
+      const idx = i + j;
+      if (idx >= 0 && idx < points.length) {
+        latSum += points[idx].lat;
+        lonSum += points[idx].lon;
+        count++;
+      }
+    }
+
     return {
       ...p,
-      lat: (prev.lat + p.lat + next.lat) / 3,
-      lon: (prev.lon + p.lon + next.lon) / 3
+      lat: count > 0 ? latSum / count : p.lat,
+      lon: count > 0 ? lonSum / count : p.lon
     };
   });
 
@@ -542,6 +559,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
 
         if (Math.abs(delta) > 1.0) { // Ignore micro-jitters < 1 degree
           if (isTurnContinuation) {
+            if (currentTurnSum === 0) currentTurnStartBearing = lastBearing; // Capture start bearing
             currentTurnSum += delta;
             currentTurnDistance += distance;
             // Update Peak for Marker Placement (Center of the action)
@@ -556,9 +574,18 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
               // SHARPNESS CHECK:
               // 1. Angle Threshold: Reverted to 45 degrees (User Request)
               // 2. Density Threshold: Turn must be sharp (e.g. > 0.6 deg/meter)
+              // 3. Zig-Zag Filter: Net Heading Change must be > 30 degrees
               const turnDensity = Math.abs(currentTurnSum) / (currentTurnDistance * 1000 || 1);
 
-              if (Math.abs(currentTurnSum) > 45 && turnDensity > 0.6) {
+              let netHeadingChange = 360;
+              if (currentTurnStartBearing !== null) {
+                let rawChange = bearing - currentTurnStartBearing;
+                if (rawChange > 180) rawChange -= 360;
+                if (rawChange < -180) rawChange += 360;
+                netHeadingChange = Math.abs(rawChange);
+              }
+
+              if (Math.abs(currentTurnSum) > 45 && turnDensity > 0.6 && netHeadingChange > 30) {
                 tightTurnsCount++;
                 if (Math.abs(currentTurnSum) > 135) {
                   hairpinCount++;
@@ -570,6 +597,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
             }
 
             currentTurnSum = delta;
+            currentTurnStartBearing = lastBearing; // Start new turn
             currentTurnDistance = distance;
             currentTurnPeak = { index: i, delta: delta, lat: curr.lat, lon: curr.lon };
           }
@@ -584,13 +612,20 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
           currentStraightDist += distance;
 
           // --- FLUSH TURN ON STRAIGHT ---
-          // If we are going straight for > 25m, the previous turn is definitely over.
-          // This prevents "Left -> Straight(50m) -> Left" from becoming a Hairpin.
           if (currentStraightDist > 0.025 && Math.abs(currentTurnSum) > 0) {
             // Min Dist Check
             if (currentTurnDistance > 0.015) {
               const turnDensity = Math.abs(currentTurnSum) / (currentTurnDistance * 1000 || 1);
-              if (Math.abs(currentTurnSum) > 45 && turnDensity > 0.6) {
+
+              let netHeadingChange = 360;
+              if (currentTurnStartBearing !== null) {
+                let rawChange = bearing - currentTurnStartBearing;
+                if (rawChange > 180) rawChange -= 360;
+                if (rawChange < -180) rawChange += 360;
+                netHeadingChange = Math.abs(rawChange);
+              }
+
+              if (Math.abs(currentTurnSum) > 45 && turnDensity > 0.6 && netHeadingChange > 30) {
                 tightTurnsCount++;
                 if (Math.abs(currentTurnSum) > 135) {
                   hairpinCount++;
@@ -602,6 +637,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
             }
             // Reset Turn State
             currentTurnSum = 0;
+            currentTurnStartBearing = null;
             currentTurnDistance = 0;
             currentTurnPeak = { index: -1, delta: 0, lat: 0, lon: 0 };
           }
@@ -626,7 +662,17 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
   // Flush any pending turn at the end of the loop
   if (currentTurnDistance > 0.015) {
     const finalTurnDensity = Math.abs(currentTurnSum) / (currentTurnDistance * 1000 || 1);
-    if (Math.abs(currentTurnSum) > 45 && finalTurnDensity > 0.6) {
+    // Net heading might be tricky here as we don't have a 'current' bearing to check against readily available or maybe we do (lastBearing)
+    // Assuming lastBearing is valid
+    let netHeadingChange = 360;
+    if (currentTurnStartBearing !== null && lastBearing !== null) {
+      let rawChange = lastBearing - currentTurnStartBearing;
+      if (rawChange > 180) rawChange -= 360;
+      if (rawChange < -180) rawChange += 360;
+      netHeadingChange = Math.abs(rawChange);
+    }
+
+    if (Math.abs(currentTurnSum) > 45 && finalTurnDensity > 0.6 && netHeadingChange > 30) {
       tightTurnsCount++;
       if (Math.abs(currentTurnSum) > 135) {
         hairpinCount++;
