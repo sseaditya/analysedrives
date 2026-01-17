@@ -423,6 +423,10 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
   const speeds: number[] = [];
   const timeDeltas: number[] = [];
 
+  // Turn Detection State
+  let currentTurnSum = 0;
+  let currentTurnPeak = { index: -1, delta: 0, lat: 0, lon: 0 };
+
   if (points[0].ele !== undefined) {
     maxElevation = points[0].ele;
     minElevation = points[0].ele;
@@ -486,22 +490,66 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
     if (distance > 0.002 && (speeds[speeds.length - 1] > STOP_SPEED_THRESHOLD)) {
       const bearing = calculateBearing(prev.lat, prev.lon, curr.lat, curr.lon);
       if (lastBearing !== null) {
-        let delta = Math.abs(bearing - lastBearing);
-        if (delta > 180) delta = 360 - delta;
-        totalHeadingChange += delta;
+        let delta = bearing - lastBearing;
+        if (delta > 180) delta -= 360;
+        if (delta < -180) delta += 360;
 
-        if (delta > 45) {
-          tightTurnsCount++; // Total Count
-          if (delta > 135) {
-            hairpinCount++; // Hairpin Count
-            hairpinPoints.push([curr.lat, curr.lon]); // Distinct
+        // Total Heading Change (Absolute)
+        totalHeadingChange += Math.abs(delta);
+
+        // --- ROBUST TURN DETECTION ---
+        const isTurnContinuation = (
+          (currentTurnSum === 0) || // Fresh start
+          (Math.sign(delta) === Math.sign(currentTurnSum)) || // Same direction
+          (Math.abs(delta) < 10 && Math.abs(currentTurnSum) > 30) // Minor jitter during a major turn is allowed
+        );
+
+        if (Math.abs(delta) > 1.0) { // Ignore micro-jitters < 1 degree
+          if (isTurnContinuation) {
+            currentTurnSum += delta;
+            // Update Peak for Marker Placement (Center of the action)
+            if (Math.abs(delta) > Math.abs(currentTurnPeak.delta)) {
+              currentTurnPeak = { index: i, delta: delta, lat: curr.lat, lon: curr.lon };
+            }
           } else {
-            tightTurnPoints.push([curr.lat, curr.lon]); // Distinct
+            // Direction FLIP -> End previous turn, process it, start new one
+            if (Math.abs(currentTurnSum) > 45) {
+              tightTurnsCount++;
+              if (Math.abs(currentTurnSum) > 135) {
+                hairpinCount++;
+                hairpinPoints.push([currentTurnPeak.lat, currentTurnPeak.lon]);
+              } else {
+                tightTurnPoints.push([currentTurnPeak.lat, currentTurnPeak.lon]);
+              }
+            }
+
+            currentTurnSum = delta;
+            currentTurnPeak = { index: i, delta: delta, lat: curr.lat, lon: curr.lon };
           }
         }
 
-        if (delta < 5) {
+        // Straight Section Logic
+        if (Math.abs(delta) < 5) { // < 5 degrees is effectively straight
           currentStraightDist += distance;
+
+          // --- FLUSH TURN ON STRAIGHT ---
+          // If we are going straight for > 25m, the previous turn is definitely over.
+          // This prevents "Left -> Straight(50m) -> Left" from becoming a Hairpin.
+          if (currentStraightDist > 0.025 && Math.abs(currentTurnSum) > 0) {
+            if (Math.abs(currentTurnSum) > 45) {
+              tightTurnsCount++;
+              if (Math.abs(currentTurnSum) > 135) {
+                hairpinCount++;
+                hairpinPoints.push([currentTurnPeak.lat, currentTurnPeak.lon]);
+              } else {
+                tightTurnPoints.push([currentTurnPeak.lat, currentTurnPeak.lon]);
+              }
+            }
+            // Reset Turn State
+            currentTurnSum = 0;
+            currentTurnPeak = { index: -1, delta: 0, lat: 0, lon: 0 };
+          }
+
         } else {
           if (currentStraightDist > 0.02) {
             straightSections.push(currentStraightDist);
@@ -509,12 +557,24 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
           }
           currentStraightDist = 0;
         }
+
       } else {
         currentStraightDist = distance;
       }
       lastBearing = bearing;
     } else {
       if (currentStraightDist > 0) currentStraightDist += distance;
+    }
+  }
+
+  // Flush any pending turn at the end of the loop
+  if (Math.abs(currentTurnSum) > 45) {
+    tightTurnsCount++;
+    if (Math.abs(currentTurnSum) > 135) {
+      hairpinCount++;
+      hairpinPoints.push([currentTurnPeak.lat, currentTurnPeak.lon]);
+    } else {
+      tightTurnPoints.push([currentTurnPeak.lat, currentTurnPeak.lon]);
     }
   }
 
