@@ -1,18 +1,15 @@
 import {
-  ComposedChart,
+  AreaChart,
   Area,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
   ReferenceArea,
   ReferenceLine,
 } from "recharts";
 import { GPXPoint } from "@/utils/gpxParser";
-
 import { useState } from "react";
 
 interface SpeedElevationChartProps {
@@ -53,16 +50,24 @@ function haversineDistance(
   return R * c;
 }
 
-const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLimit, speedCap, visualLimit }: SpeedElevationChartProps) => {
+const SpeedElevationChart = ({
+  points,
+  onHover,
+  onZoomChange,
+  zoomRange,
+  speedLimit,
+  speedCap,
+  visualLimit
+}: SpeedElevationChartProps) => {
   const [refAreaLeft, setRefAreaLeft] = useState<string | null>(null);
   const [refAreaRight, setRefAreaRight] = useState<string | null>(null);
+  const [activeChart, setActiveChart] = useState<'speed' | 'elevation' | null>(null);
 
   // Calculate combined data for chart
-  const chartData: ChartDataPoint[] = [];
+  const fullData: ChartDataPoint[] = [];
   let cumulativeDistance = 0;
 
   // First pass: Calculate all raw speeds and distances
-  // We need raw data for every point to perform accurate smoothing before sampling
   const rawData: { dist: number; speed: number; ele: number | null; time: Date | undefined }[] = [];
 
   // Dynamic Acceleration Limit - Matching gpxParser logic
@@ -122,7 +127,7 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
   // Calculate True Max Speed (for Scale) BEFORE any visual clipping
   const trueMaxSpeed = Math.max(...rawData.map(d => d.speed), 0);
 
-  // Second pass: Apply smoothing and sampling
+  // Second pass: Apply smoothing
   const WINDOW_SIZE = 5;
   const offset = Math.floor(WINDOW_SIZE / 2);
 
@@ -141,49 +146,23 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
     const smoothedSpeed = count > 0 ? sum / count : 0;
     const currRaw = rawData[i];
 
-    // 2. Sampling Logic
-    // We sample based on the original point index (i+1 because rawData starts from points[1])
-    const originalIndex = i + 1;
+    let finalSpeed = parseFloat(smoothedSpeed.toFixed(1));
+    // speedCap is the HARD limit (e.g. 50km/h set by owner).
+    if (speedCap && finalSpeed > speedCap) finalSpeed = speedCap;
 
-    // Sample data logic
-    // Only add points if they are within the zoom range (if it exists)
-    const isVisible = !zoomRange || (originalIndex >= zoomRange[0] && originalIndex <= zoomRange[1]);
+    // visualLimit is the SOFT limit (e.g. simulation).
+    if (visualLimit && finalSpeed > visualLimit) finalSpeed = visualLimit;
 
-    if (isVisible) {
-      // Logic to reduce points density
-      // Use dynamic sampling to target ~300 points max for performance
-      let rangeSize = points.length;
-      if (zoomRange) {
-        rangeSize = zoomRange[1] - zoomRange[0];
-      }
-
-      const sampleRate = Math.max(1, Math.floor(rangeSize / 300));
-
-      // Use originalIndex for modulo check to maintain consistent sampling
-      const shouldSample = (originalIndex % sampleRate === 0) || originalIndex === points.length - 1 || (zoomRange && originalIndex === zoomRange[1]);
-
-      if (shouldSample) {
-        let finalSpeed = parseFloat(smoothedSpeed.toFixed(1));
-        // speedCap is the HARD limit (e.g. 50km/h set by owner).
-        // Data is physically clamped to this.
-        if (speedCap && finalSpeed > speedCap) finalSpeed = speedCap;
-
-        // visualLimit is the SOFT limit (e.g. simulation).
-        // Data is visually clamped, but we want to animate it.
-        if (visualLimit && finalSpeed > visualLimit) finalSpeed = visualLimit;
-
-        chartData.push({
-          distance: rawData[i].dist,
-          speed: parseFloat(finalSpeed.toFixed(1)), // Apply limit here
-          elevation: rawData[i].ele,
-          time: rawData[i].time ? rawData[i].time!.toLocaleTimeString() : '',
-          pointIndex: i + 1,
-        });
-      }
-    }
+    fullData.push({
+      distance: rawData[i].dist,
+      speed: finalSpeed,
+      elevation: rawData[i].ele,
+      time: rawData[i].time ? rawData[i].time!.toLocaleTimeString() : '',
+      pointIndex: i + 1,
+    });
   }
 
-  if (chartData.length === 0) {
+  if (fullData.length === 0) {
     return (
       <div className="rounded-2xl border border-border bg-card p-6 text-center text-muted-foreground">
         No data available to display chart
@@ -191,17 +170,50 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
     );
   }
 
-  const hasElevation = chartData.some((d) => d.elevation !== null);
-  const hasSpeed = chartData.some((d) => d.speed > 0);
+  const hasElevation = fullData.some((d) => d.elevation !== null);
+
+  // Prepare Speed Chart Data (filtered by zoom)
+  const speedChartData = zoomRange
+    ? fullData.filter(d => d.pointIndex >= zoomRange[0] && d.pointIndex <= zoomRange[1])
+    : fullData;
+
+  // Sample speed data for performance (target ~300 points)
+  const sampleSpeedData = (data: ChartDataPoint[]) => {
+    const targetPoints = 300;
+    const sampleRate = Math.max(1, Math.floor(data.length / targetPoints));
+    return data.filter((_, idx) => idx % sampleRate === 0 || idx === data.length - 1);
+  };
+
+  const sampledSpeedData = sampleSpeedData(speedChartData);
+
+  // Prepare Elevation Chart Data (always full route)
+  const sampleElevationData = (data: ChartDataPoint[]) => {
+    const targetPoints = 200; // Even more aggressive sampling for elevation
+    const sampleRate = Math.max(1, Math.floor(data.length / targetPoints));
+    return data.filter((_, idx) => idx % sampleRate === 0 || idx === data.length - 1);
+  };
+
+  const sampledElevationData = hasElevation ? sampleElevationData(fullData) : [];
+
+  // Calculate elevation range for better scaling
+  const elevations = fullData.map((d) => d.elevation).filter((e): e is number => e !== null);
+  const minElevation = elevations.length > 0 ? Math.min(...elevations) : 0;
+  const maxElevation = elevations.length > 0 ? Math.max(...elevations) : 1000;
+  const elevationRange = maxElevation - minElevation || 100;
+
+  // Calculate distance domain (always full route)
+  const minDistance = fullData[0]?.distance || 0;
+  const maxDistance = fullData[fullData.length - 1]?.distance || 100;
 
   const zoom = () => {
     if (refAreaLeft === refAreaRight || refAreaRight === null || refAreaLeft === null) {
-      // Logic for Click (Reset)
-      if (zoomRange) { // Only reset if we are currently zoomed
+      // Click (Reset zoom)
+      if (zoomRange) {
         onZoomChange(null);
       }
       setRefAreaLeft(null);
       setRefAreaRight(null);
+      setActiveChart(null);
       return;
     }
 
@@ -211,14 +223,14 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
 
     if (leftDist > rightDist) [leftDist, rightDist] = [rightDist, leftDist];
 
-    const startData = chartData.find(p => p.distance >= leftDist);
-    const endData = chartData.find(p => p.distance >= rightDist);
+    const startData = fullData.find(p => p.distance >= leftDist);
+    const endData = fullData.find(p => p.distance >= rightDist);
 
     if (startData && endData) {
       let startIndex = startData.pointIndex;
       let endIndex = endData.pointIndex;
 
-      // Ensure we always have at least 5 points for context and visibility
+      // Ensure we always have at least 5 points for context
       const MIN_POINTS = 5;
       const diff = endIndex - startIndex;
 
@@ -227,7 +239,6 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
         startIndex = Math.max(0, startIndex - padding);
         endIndex = Math.min(points.length - 1, endIndex + padding);
 
-        // If still not enough (edge case at ends), try to expand other way
         if (endIndex - startIndex < MIN_POINTS) {
           if (startIndex === 0) endIndex = Math.min(points.length - 1, startIndex + MIN_POINTS);
           if (endIndex === points.length - 1) startIndex = Math.max(0, endIndex - MIN_POINTS);
@@ -241,11 +252,11 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
 
     setRefAreaLeft(null);
     setRefAreaRight(null);
+    setActiveChart(null);
   };
 
-  // Handle mouse move to find closest point
-  const handleMouseMove = (e: any) => {
-    if (refAreaLeft) {
+  const handleMouseMove = (e: any, chartType: 'speed' | 'elevation') => {
+    if (refAreaLeft && activeChart === chartType) {
       // dragging
       if (e.activeLabel) {
         setRefAreaRight(e.activeLabel);
@@ -253,7 +264,6 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
     }
 
     if (!e || !e.activePayload || !e.activePayload[0] || !onHover) {
-      if (onHover) onHover(null);
       return;
     }
 
@@ -265,11 +275,11 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
     }
   };
 
-  const handleMouseDown = (e: any) => {
+  const handleMouseDown = (e: any, chartType: 'speed' | 'elevation') => {
     if (e && e.activeLabel) {
       setRefAreaLeft(e.activeLabel);
-      // Reset right on new down press to ensure clean state
       setRefAreaRight(null);
+      setActiveChart(chartType);
     }
   };
 
@@ -279,29 +289,25 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
 
   const handleMouseLeave = () => {
     if (onHover) onHover(null);
-    // Also cancel drag if leaving chart?
-    // User might want to drag outside to snap to edge, but Recharts handles that poorly.
-    // Safest is to reset drag state if they leave without dropping.
     setRefAreaLeft(null);
     setRefAreaRight(null);
+    setActiveChart(null);
   };
 
-  // Calculate elevation range for better scaling
-  const elevations = chartData.map((d) => d.elevation).filter((e): e is number => e !== null);
-  const minElevation = elevations.length > 0 ? Math.min(...elevations) : 0;
-  const maxElevation = elevations.length > 0 ? Math.max(...elevations) : 1000;
-  const elevationRange = maxElevation - minElevation || 100;
+  // Shared margin configuration to ensure perfect horizontal alignment
+  const chartMargin = { top: 10, right: 30, left: 0, bottom: 0 };
 
   return (
-    <div className="h-full w-full rounded-2xl border border-border bg-card p-6 select-none">
-      <div className="h-full w-full select-none">
+    <div className="h-full w-full rounded-2xl border border-border bg-card p-6 select-none flex flex-col">
+      {/* Speed Chart (Main - 70% height) */}
+      <div className="flex-[7] w-full min-h-0 mb-4">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart
-            data={chartData}
-            margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-            onMouseMove={handleMouseMove}
+          <AreaChart
+            data={sampledSpeedData}
+            margin={chartMargin}
+            onMouseMove={(e) => handleMouseMove(e, 'speed')}
             onMouseLeave={handleMouseLeave}
-            onMouseDown={handleMouseDown}
+            onMouseDown={(e) => handleMouseDown(e, 'speed')}
             onMouseUp={handleMouseUp}
           >
             <defs>
@@ -314,47 +320,25 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
             <XAxis
               dataKey="distance"
               type="number"
-              domain={["dataMin", "dataMax"]}
-              stroke="#9ca3af" // Restore stroke
-              fontSize={12}    // Restore font size
+              domain={[minDistance, maxDistance]}
+              stroke="#9ca3af"
+              fontSize={12}
               tickLine={false}
               axisLine={false}
               tickCount={8}
               tickFormatter={(value) => `${Math.round(value)} km`}
               allowDataOverflow
             />
-            {/* Left Y-axis for Speed (more prominent) */}
-            {hasSpeed && (
-              <YAxis
-                yAxisId="speed"
-                stroke="hsl(15, 52%, 58%)"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(value) => Math.round(value).toString()}
-                label={{ value: "Speed (km/h)", angle: -90, position: "insideLeft", fontSize: 12, fill: "hsl(15, 52%, 58%)" }}
-                width={60}
-                // Domain: If speedCap exists, use that + buffer. 
-                // If NO speedCap, use the true max speed of the track (calculated before clipping).
-                // This ensures that when we slide down the visualLimit, the chart axis doesn't shrink.
-                domain={[0, speedCap ? speedCap : Math.ceil(trueMaxSpeed / 10) * 10]}
-              />
-            )}
-            {/* Right Y-axis for Elevation */}
-            {hasElevation && (
-              <YAxis
-                yAxisId="elevation"
-                orientation="right"
-                stroke="hsl(140, 30%, 55%)"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(value) => Math.round(value).toString()}
-                label={{ value: "Elevation (m)", angle: 90, position: "insideRight", fontSize: 12, fill: "hsl(140, 30%, 55%)" }}
-                width={60}
-                domain={[minElevation - elevationRange * 0.1, maxElevation + elevationRange * 0.1]}
-              />
-            )}
+            <YAxis
+              stroke="hsl(15, 52%, 58%)"
+              fontSize={12}
+              tickLine={false}
+              axisLine={false}
+              tickFormatter={(value) => Math.round(value).toString()}
+              label={{ value: "Speed (km/h)", angle: -90, position: "insideLeft", fontSize: 12, fill: "hsl(15, 52%, 58%)" }}
+              width={60}
+              domain={[0, speedCap ? speedCap : Math.ceil(trueMaxSpeed / 10) * 10]}
+            />
             <Tooltip
               contentStyle={{
                 backgroundColor: "hsl(60, 9%, 94%)",
@@ -362,44 +346,20 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
                 borderRadius: "12px",
                 boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
               }}
-              formatter={(value: number, name: string) => {
-                if (name === "speed") return [`${value} km/h`, "Speed"];
-                if (name === "elevation") return [`${value} m`, "Elevation"];
-                return [value, name];
-              }}
+              formatter={(value: number) => [`${value} km/h`, "Speed"]}
               labelFormatter={(label) => `Distance: ${label} km`}
             />
-            {/* Speed Area (more prominent - thicker stroke, more visible fill) */}
-            {hasSpeed && (
-              <Area
-                yAxisId="speed"
-                type="monotone"
-                dataKey="speed"
-                stroke="hsl(15, 52%, 58%)"
-                strokeWidth={3}
-                fill="url(#speedGradient)"
-                name="speed"
-                isAnimationActive={false}
-              />
-            )}
-            {/* Elevation Line (less prominent - thinner line, dashed) */}
-            {hasElevation && (
-              <Line
-                yAxisId="elevation"
-                type="monotone"
-                dataKey="elevation"
-                stroke="hsl(140, 30%, 55%)"
-                strokeWidth={2}
-                strokeDasharray="5 5"
-                dot={false}
-                name="elevation"
-                isAnimationActive={false}
-              />
-            )}
+            <Area
+              type="monotone"
+              dataKey="speed"
+              stroke="hsl(15, 52%, 58%)"
+              strokeWidth={3}
+              fill="url(#speedGradient)"
+              isAnimationActive={false}
+            />
 
-            {refAreaLeft && refAreaRight && (
+            {activeChart === 'speed' && refAreaLeft && refAreaRight && (
               <ReferenceArea
-                yAxisId="speed"
                 x1={refAreaLeft}
                 x2={refAreaRight}
                 strokeOpacity={0.3}
@@ -408,12 +368,10 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
               />
             )}
 
-            {/* Speed Limit Reference Line - Bolder & Highlighted */}
             {speedLimit && (
               <ReferenceLine
-                yAxisId="speed"
                 y={speedLimit}
-                stroke="hsl(5, 53%, 51%)" // Pastel Error Red
+                stroke="hsl(5, 53%, 51%)"
                 strokeWidth={3}
                 strokeOpacity={0.8}
                 label={{
@@ -426,12 +384,98 @@ const SpeedElevationChart = ({ points, onHover, onZoomChange, zoomRange, speedLi
                 }}
               />
             )}
-          </ComposedChart>
+          </AreaChart>
         </ResponsiveContainer>
       </div>
+
+      {/* Elevation Chart (Brush - 25% height) */}
+      {hasElevation && (
+        <div className="flex-[2.5] w-full min-h-0">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart
+              data={sampledElevationData}
+              margin={chartMargin}
+              onMouseMove={(e) => handleMouseMove(e, 'elevation')}
+              onMouseLeave={handleMouseLeave}
+              onMouseDown={(e) => handleMouseDown(e, 'elevation')}
+              onMouseUp={handleMouseUp}
+            >
+              <defs>
+                <linearGradient id="elevationGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="hsl(0, 0%, 60%)" stopOpacity={0.4} />
+                  <stop offset="95%" stopColor="hsl(0, 0%, 60%)" stopOpacity={0.1} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(23, 5%, 82%)" opacity={0.3} />
+              <XAxis
+                dataKey="distance"
+                type="number"
+                domain={[minDistance, maxDistance]}
+                stroke="#9ca3af"
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+                tickCount={8}
+                tickFormatter={(value) => `${Math.round(value)} km`}
+                allowDataOverflow
+              />
+              <YAxis
+                stroke="hsl(0, 0%, 60%)"
+                fontSize={10}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(value) => Math.round(value).toString()}
+                width={60}
+                domain={[minElevation - elevationRange * 0.1, maxElevation + elevationRange * 0.1]}
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "hsl(60, 9%, 94%)",
+                  border: "1px solid hsl(60, 5%, 85%)",
+                  borderRadius: "12px",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                }}
+                formatter={(value: number) => [`${value} m`, "Elevation"]}
+                labelFormatter={(label) => `Distance: ${label} km`}
+              />
+              <Area
+                type="monotone"
+                dataKey="elevation"
+                stroke="hsl(0, 0%, 50%)"
+                strokeWidth={1.5}
+                fill="url(#elevationGradient)"
+                isAnimationActive={false}
+              />
+
+              {/* Show selection area when dragging on elevation chart */}
+              {activeChart === 'elevation' && refAreaLeft && refAreaRight && (
+                <ReferenceArea
+                  x1={refAreaLeft}
+                  x2={refAreaRight}
+                  strokeOpacity={0.3}
+                  fill="hsl(15, 52%, 58%)"
+                  fillOpacity={0.3}
+                />
+              )}
+
+              {/* Show current zoom range as highlighted area */}
+              {zoomRange && (
+                <ReferenceArea
+                  x1={fullData.find(d => d.pointIndex >= zoomRange[0])?.distance || minDistance}
+                  x2={fullData.find(d => d.pointIndex >= zoomRange[1])?.distance || maxDistance}
+                  strokeOpacity={0.5}
+                  stroke="hsl(15, 52%, 58%)"
+                  strokeWidth={2}
+                  fill="hsl(15, 52%, 58%)"
+                  fillOpacity={0.15}
+                />
+              )}
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
     </div>
   );
 };
 
 export default SpeedElevationChart;
-
