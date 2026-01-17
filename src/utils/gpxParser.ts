@@ -62,9 +62,18 @@ export interface GPXStats {
   medianStraightLength: number; // km
   percentStraight: number;
   tightTurnPoints?: [number, number][];
+  hairpinPoints?: [number, number][]; // Added hairpin points
   hardAccelPoints?: [number, number, number][]; // [lat, lon, m/s²]
   hardBrakePoints?: [number, number, number][]; // [lat, lon, m/s²]
   speedDistribution?: SpeedBucket[];
+}
+
+
+export interface SpeedBucket {
+  range: string;
+  minSpeed: number;
+  time: number; // minutes
+  distance: number; // km
 }
 
 // Haversine formula to calculate distance between two GPS points
@@ -105,20 +114,16 @@ function getPercentile(values: number[], percentile: number): number {
   return sorted[Math.max(0, Math.min(index, sorted.length - 1))];
 }
 
-export interface SpeedBucket {
-  range: string;
-  minSpeed: number;
-  time: number; // minutes
-  distance: number; // km
-}
-
 export function calculateSpeedDistribution(points: GPXPoint[], bucketSize: number = 10): SpeedBucket[] {
   if (points.length < 2) return [];
 
+  // We rely on calculateRobustSpeeds which is defined later in the file
+  // However, for distribution we can do a simplified calculation or call it if hoisted.
+  // Functions are hoisted.
   const robustSegments = calculateRobustSpeeds(points);
   const speeds = robustSegments.map(s => s.speed);
 
-  // 2. Smooth Speeds (Moving Average)
+  // Smooth Speeds
   const WINDOW_SIZE = 5;
   const smoothedSpeeds: number[] = [];
 
@@ -137,7 +142,7 @@ export function calculateSpeedDistribution(points: GPXPoint[], bucketSize: numbe
     smoothedSpeeds.push(count > 0 ? sum / count : 0);
   }
 
-  // 3. Bucketize
+  // Bucketize
   const buckets: Record<number, { time: number; distance: number }> = {};
   let maxBucketIndex = 0;
 
@@ -149,32 +154,23 @@ export function calculateSpeedDistribution(points: GPXPoint[], bucketSize: numbe
     if (!buckets[bucketIndex]) {
       buckets[bucketIndex] = { time: 0, distance: 0 };
     }
-    // seg.time is seconds. Convert to minutes.
-    buckets[bucketIndex].time += seg.time / 60;
+    buckets[bucketIndex].time += seg.time / 60; // minutes
     buckets[bucketIndex].distance += seg.distance;
 
     if (bucketIndex > maxBucketIndex) maxBucketIndex = bucketIndex;
   });
 
-  // 4. Format Output with Tail Truncation (Remove high speed noise < 20s)
   const result: SpeedBucket[] = [];
   let foundValidTop = false;
 
-  // Iterate backwards from max bucket to 0
   for (let i = maxBucketIndex; i >= 0; i -= bucketSize) {
     const data = buckets[i] || { time: 0, distance: 0 };
-
-    // Time in minutes. 20 seconds = 0.333 minutes.
     const durationSeconds = data.time * 60;
 
-    // Logic: If we haven't found a valid top yet, check if this bucket is significant (>20s).
-    // If it is NOT significant, skip it (it's noise).
-    // Once we find a significant bucket, 'foundValidTop' becomes true, and we accept all lower buckets.
     if (!foundValidTop) {
       if (durationSeconds >= 20) {
         foundValidTop = true;
       } else {
-        // Skip this bucket as it's likely high-speed GPS noise
         continue;
       }
     }
@@ -195,25 +191,14 @@ export function parseGPX(gpxContent: string): GPXPoint[] {
   const xmlDoc = parser.parseFromString(gpxContent, "text/xml");
 
   const points: GPXPoint[] = [];
-
-  // Try to get trackpoints first (most common)
   let trackpoints = xmlDoc.getElementsByTagName("trkpt");
-
-  // If no trackpoints, try waypoints
-  if (trackpoints.length === 0) {
-    trackpoints = xmlDoc.getElementsByTagName("wpt");
-  }
-
-  // If still no points, try route points
-  if (trackpoints.length === 0) {
-    trackpoints = xmlDoc.getElementsByTagName("rtept");
-  }
+  if (trackpoints.length === 0) trackpoints = xmlDoc.getElementsByTagName("wpt");
+  if (trackpoints.length === 0) trackpoints = xmlDoc.getElementsByTagName("rtept");
 
   for (let i = 0; i < trackpoints.length; i++) {
     const point = trackpoints[i];
     const lat = parseFloat(point.getAttribute("lat") || "0");
     const lon = parseFloat(point.getAttribute("lon") || "0");
-
     const eleElement = point.getElementsByTagName("ele")[0];
     const timeElement = point.getElementsByTagName("time")[0];
 
@@ -224,7 +209,6 @@ export function parseGPX(gpxContent: string): GPXPoint[] {
       time: timeElement ? new Date(timeElement.textContent || "") : undefined,
     });
   }
-
   return points;
 }
 
@@ -235,10 +219,6 @@ interface FilterResult {
   hardBrakePoints: [number, number, number][];
   hardAccelerationCount: number;
   hardBrakingCount: number;
-  qualityValidation: {
-    gapTime: number;
-    clampedCount: number;
-  };
 }
 
 function applyAdvancedFiltering(
@@ -253,36 +233,24 @@ function applyAdvancedFiltering(
   const hardAccelPoints: [number, number, number][] = [];
   const hardBrakePoints: [number, number, number][] = [];
 
-  // Validation Metrics
-  let totalGapTime = 0;
-  let clampedCount = 0;
-
-  // Gap & Clamp Filtering Indices
   const invalidIndices = new Set<number>();
   const p95TimeGap = getPercentile(timeDeltas, MAX_VALID_GAP_PERCENTILE);
   let currentTimeIterator = 0;
 
-  // Build time map for buffer checks
   const timeMap = timeDeltas.map(t => {
     const start = currentTimeIterator;
     currentTimeIterator += t;
     return { start, mid: start + t / 2, end: currentTimeIterator };
   });
 
-  // 1. Identify Invalid Regions (Gaps > P90 or Clamped)
+  // 1. Identify Invalid Regions
   for (let i = 0; i < timeDeltas.length; i++) {
     const time = timeDeltas[i];
     const isLargeGap = time > p95TimeGap && time > MIN_GAP_DURATION;
     const isClamped = isClampedArray[i];
 
-    if (isLargeGap) totalGapTime += time;
-    if (isClamped) clampedCount++;
-
     if (isLargeGap || isClamped) {
-      // Mark this index invalid
       invalidIndices.add(i);
-
-      // Mark surrounding indices within buffer invalid
       const gapTime = timeMap[i].mid;
       for (let j = 0; j < timeMap.length; j++) {
         if (invalidIndices.has(j)) continue;
@@ -293,7 +261,7 @@ function applyAdvancedFiltering(
     }
   }
 
-  // 2. Collect Candidates (ignoring invalid indices)
+  // 2. Candidates
   interface CandidateEvent {
     index: number;
     type: 'ACCEL' | 'BRAKE';
@@ -305,14 +273,12 @@ function applyAdvancedFiltering(
   let candidateEvents: CandidateEvent[] = [];
 
   for (let i = 0; i < finalAccelerations.length; i++) {
-    // If invalid, force acceleration to 0 and skip event detection
     if (invalidIndices.has(i)) {
       finalAccelerations[i] = 0;
       continue;
     }
-
     const val = finalAccelerations[i];
-    const t = timeMap[i].end; // usage timestamp
+    const t = timeMap[i].end;
 
     if (val > HARD_ACCEL_THRESHOLD) {
       const p = points[i + 1];
@@ -323,18 +289,15 @@ function applyAdvancedFiltering(
     }
   }
 
-  // 3. Cluster Decelerations (Keep Max in 30s)
+  // 3. Cluster Brakes
   const brakeEvents = candidateEvents.filter(e => e.type === 'BRAKE');
   const processedBrakeEvents: CandidateEvent[] = [];
-
   if (brakeEvents.length > 0) {
     let currentCluster: CandidateEvent[] = [brakeEvents[0]];
     const CLUSTER_WINDOW = 30.0;
-
     for (let i = 1; i < brakeEvents.length; i++) {
       const prev = currentCluster[currentCluster.length - 1];
       const curr = brakeEvents[i];
-
       if (curr.time - prev.time <= CLUSTER_WINDOW) {
         currentCluster.push(curr);
       } else {
@@ -349,9 +312,8 @@ function applyAdvancedFiltering(
     }
   }
 
-  // 4. Cancellation (Accel/Brake Pair within 30s -> Remove Both)
+  // 4. Cancellation
   const accelEvents = candidateEvents.filter(e => e.type === 'ACCEL');
-
   const accelFlags = new Array(accelEvents.length).fill(true);
   const brakeFlags = new Array(processedBrakeEvents.length).fill(true);
 
@@ -362,7 +324,6 @@ function applyAdvancedFiltering(
       if (tDiff <= CANCELLATION_WINDOW) {
         accelFlags[i] = false;
         brakeFlags[j] = false;
-        // Also neutralize these events on the map!
         finalAccelerations[accelEvents[i].index] = 0;
         finalAccelerations[processedBrakeEvents[j].index] = 0;
         break;
@@ -370,13 +331,12 @@ function applyAdvancedFiltering(
     }
   }
 
-  // 5. Final Output Compilation
+  // 5. Output
   for (let i = 0; i < accelEvents.length; i++) {
     if (accelFlags[i]) {
       hardAccelerationCount++;
       hardAccelPoints.push([accelEvents[i].lat, accelEvents[i].lon, accelEvents[i].magnitude]);
     } else {
-      // Ensure cancelled events are zeroed out (redundant check but safe)
       finalAccelerations[accelEvents[i].index] = 0;
     }
   }
@@ -389,10 +349,6 @@ function applyAdvancedFiltering(
     }
   }
 
-  // Zero out non-max clustered brakes?
-  // Logic: processedBrakeEvents contains only the Max events. All other brakes in the clusters were dropped.
-  // We should zero them out or leave them? User asked to "ignore" them.
-  // Ideally, zero them out so they don't show deep red on map.
   const keptBrakeIndices = new Set(processedBrakeEvents.map(e => e.index));
   brakeEvents.forEach(e => {
     if (!keptBrakeIndices.has(e.index)) {
@@ -400,17 +356,7 @@ function applyAdvancedFiltering(
     }
   });
 
-  return {
-    finalAccelerations,
-    hardAccelPoints,
-    hardBrakePoints,
-    hardAccelerationCount,
-    hardBrakingCount,
-    qualityValidation: {
-      gapTime: totalGapTime,
-      clampedCount
-    }
-  };
+  return { finalAccelerations, hardAccelPoints, hardBrakePoints, hardAccelerationCount, hardBrakingCount };
 }
 
 export function calculateStats(points: GPXPoint[]): GPXStats {
@@ -473,33 +419,24 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
   const straightSections: number[] = [];
   let totalStraightDistance = 0;
   const tightTurnPoints: [number, number][] = [];
+  const hairpinPoints: [number, number][] = [];
   const speeds: number[] = [];
-  const timeDeltas: number[] = []; // seconds
+  const timeDeltas: number[] = [];
 
-  // Handle first point elevation
   if (points[0].ele !== undefined) {
     maxElevation = points[0].ele;
     minElevation = points[0].ele;
   }
 
-  // Pre-calculate robust speeds to filter GPS noise
   const robustSegments = calculateRobustSpeeds(points);
   const isClampedArray = robustSegments.map(s => s.isClamped);
 
-  // Smooth elevation data to prevent noise inflation
-  const ELEVATION_WINDOW_SIZE = 5;
+  const elevationWindow = 5;
   const smoothedElevations: (number | undefined)[] = [];
-
   for (let i = 0; i < points.length; i++) {
-    if (points[i].ele === undefined) {
-      smoothedElevations.push(undefined);
-      continue;
-    }
-
-    let sum = 0;
-    let count = 0;
-    const offset = Math.floor(ELEVATION_WINDOW_SIZE / 2);
-
+    if (points[i].ele === undefined) { smoothedElevations.push(undefined); continue; }
+    let sum = 0, count = 0;
+    const offset = Math.floor(elevationWindow / 2);
     for (let j = -offset; j <= offset; j++) {
       const idx = i + j;
       if (idx >= 0 && idx < points.length && points[idx].ele !== undefined) {
@@ -507,18 +444,12 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
         count++;
       }
     }
-
     smoothedElevations.push(count > 0 ? sum / count : points[i].ele);
   }
 
-  // First pass: Calculate basic metrics using robust data
   const rawGradients: number[] = [];
-
   for (let i = 0; i < robustSegments.length; i++) {
     const { speed, time: timeDiff, distance } = robustSegments[i];
-    // Map back to original points logic. robustSegments[i] corresponds to segment between points[i] and points[i+1]
-
-    // We need i+1 to match points index
     const prev = points[i];
     const curr = points[i + 1];
 
@@ -528,60 +459,51 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
 
     const prevEle = smoothedElevations[i];
     const currEle = smoothedElevations[i + 1];
-
     if (prevEle !== undefined && currEle !== undefined) {
       const eleDiff = currEle - prevEle;
+      if (eleDiff > 0) elevationGain += eleDiff;
+      else if (eleDiff < 0) elevationLoss += Math.abs(eleDiff);
 
-      // Smoothed elevation ensures noise filtering without breaking net change relationship
-      if (eleDiff > 0) {
-        elevationGain += eleDiff;
-      } else if (eleDiff < 0) {
-        elevationLoss += Math.abs(eleDiff);
-      }
-
-      // Calculate raw gradient for this segment
       if (distance > 0.001) {
-        const gradientPercent = (eleDiff / (distance * 1000)) * 100;
-        rawGradients.push(gradientPercent);
+        rawGradients.push((eleDiff / (distance * 1000)) * 100);
       } else {
         rawGradients.push(0);
       }
-
-      // Max/Min (use smoothed elevation)
       if (currEle > maxElevation) maxElevation = currEle;
       if (currEle < minElevation) minElevation = currEle;
 
-      // Steepest sections (only for segments > 5m to filter GPS jitters)
       if (distance > 0.005 && Math.abs(eleDiff) > 0.5) {
-        const gradient = (eleDiff / (distance * 1000)) * 100;
-        if (gradient > steepestClimb) steepestClimb = gradient;
-        if (gradient < steepestDescent) steepestDescent = gradient;
+        const grad = (eleDiff / (distance * 1000)) * 100;
+        if (grad > steepestClimb) steepestClimb = grad;
+        if (grad < steepestDescent) steepestDescent = grad;
       }
     } else {
       rawGradients.push(0);
     }
 
-    // Geometry Calculations
-    // Only calculate bearing if moved more than 2m AND speed > 1km/h to avoid noise when stopped
-    // 1 km/h threshold handles very slow turns while ignoring static drift
-    if (distance > 0.002 && (speeds[speeds.length - 1] > 1.0)) {
+    // Geometry Calculation (Rotation)
+    // Updated Logic: Speed > STOP_SPEED_THRESHOLD
+    if (distance > 0.002 && (speeds[speeds.length - 1] > STOP_SPEED_THRESHOLD)) {
       const bearing = calculateBearing(prev.lat, prev.lon, curr.lat, curr.lon);
       if (lastBearing !== null) {
         let delta = Math.abs(bearing - lastBearing);
         if (delta > 180) delta = 360 - delta;
-
         totalHeadingChange += delta;
-        if (delta > 45) {
-          tightTurnsCount++;
-          tightTurnPoints.push([curr.lat, curr.lon]);
-        }
-        if (delta > 135) hairpinCount++;
 
-        // Straight section logic (threshold 5 degrees)
+        if (delta > 45) {
+          tightTurnsCount++; // Total Count
+          if (delta > 135) {
+            hairpinCount++; // Hairpin Count
+            hairpinPoints.push([curr.lat, curr.lon]); // Distinct
+          } else {
+            tightTurnPoints.push([curr.lat, curr.lon]); // Distinct
+          }
+        }
+
         if (delta < 5) {
           currentStraightDist += distance;
         } else {
-          if (currentStraightDist > 0.02) { // Min 20m
+          if (currentStraightDist > 0.02) {
             straightSections.push(currentStraightDist);
             totalStraightDistance += currentStraightDist;
           }
@@ -592,45 +514,29 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
       }
       lastBearing = bearing;
     } else {
-      // If stopped or jittering, don't update bearing but accumulate distance if moving slowly
       if (currentStraightDist > 0) currentStraightDist += distance;
     }
   }
 
-  // Smooth gradients to prevent oscillation in terrain classification
-  const GRADIENT_WINDOW_SIZE = 5;
+  // Terrain Classification
+  const gradientWindow = 5;
   const smoothedGradients: number[] = [];
-
   for (let i = 0; i < rawGradients.length; i++) {
-    let sum = 0;
-    let count = 0;
-    const offset = Math.floor(GRADIENT_WINDOW_SIZE / 2);
-
+    let sum = 0, count = 0;
+    const offset = Math.floor(gradientWindow / 2);
     for (let j = -offset; j <= offset; j++) {
       const idx = i + j;
-      if (idx >= 0 && idx < rawGradients.length) {
-        sum += rawGradients[idx];
-        count++;
-      }
+      if (idx >= 0 && idx < rawGradients.length) { sum += rawGradients[idx]; count++; }
     }
     smoothedGradients.push(count > 0 ? sum / count : 0);
   }
-
-  // Second pass: Classify terrain time using smoothed gradients
   for (let i = 0; i < smoothedGradients.length; i++) {
-    const gradientPercent = smoothedGradients[i];
-    const timeDiff = timeDeltas[i];
-    const distance = robustSegments[i].distance;
-
-    // Thresholds: ±1% gradient to be considered climbing/descending
-    if (gradientPercent > 1.0) {
-      timeClimbing += timeDiff;
-      climbDistance += distance;
-    } else if (gradientPercent < -1.0) {
-      timeDescending += timeDiff;
-    } else {
-      timeLevel += timeDiff;
-    }
+    const grade = smoothedGradients[i];
+    const t = timeDeltas[i];
+    const d = robustSegments[i].distance;
+    if (grade > 1.0) { timeClimbing += t; climbDistance += d; }
+    else if (grade < -1.0) { timeDescending += t; }
+    else { timeLevel += t; }
   }
 
   if (currentStraightDist > 0.02) {
@@ -638,206 +544,112 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
     totalStraightDistance += currentStraightDist;
   }
 
-  // Summary Geometry Stats
-  const twistinessScore = totalDistance > 0 ? totalHeadingChange / totalDistance : 0;
-  const longestStraightSection = straightSections.length > 0 ? Math.max(...straightSections) : 0;
-  const sortedStraights = [...straightSections].sort((a, b) => a - b);
-  const medianStraightLength = sortedStraights.length > 0
-    ? sortedStraights[Math.floor(sortedStraights.length / 2)]
-    : 0;
-  const percentStraight = totalDistance > 0 ? (totalStraightDistance / totalDistance) * 100 : 0;
-
-  // Fallback for no elevation data
-  if (maxElevation === -Infinity) {
-    maxElevation = 0;
-    minElevation = 0;
-  }
-
-  // Apply Smoothing (Moving Average)
-  const WINDOW_SIZE = SPEED_SMOOTHING_WINDOW;
+  // Motion Profile (Accel)
   const smoothedSpeeds: number[] = [];
+  const speedWin = SPEED_SMOOTHING_WINDOW;
   for (let i = 0; i < speeds.length; i++) {
     let sum = 0, count = 0;
-    const offset = Math.floor(WINDOW_SIZE / 2);
+    const offset = Math.floor(speedWin / 2);
     for (let j = -offset; j <= offset; j++) {
       const idx = i + j;
-      if (idx >= 0 && idx < speeds.length) {
-        sum += speeds[idx];
-        count++;
-      }
+      if (idx >= 0 && idx < speeds.length) { sum += speeds[idx]; count++; }
     }
     const avg = count > 0 ? sum / count : 0;
     smoothedSpeeds.push(avg);
     if (avg > maxSpeed && avg < 200) maxSpeed = avg;
   }
 
-  // --- NEW: Smoothed Acceleration Calculation for Robust Motion Stats ---
-
-  // 1. Calculate Raw Accelerations (From Robust Speeds for consistency)
   const rawAccelerations: number[] = [];
   for (let i = 0; i < speeds.length; i++) {
-    const time = timeDeltas[i];
-    if (i > 0 && time > 0) {
-      // (v2 - v1) / t, convert km/h to m/s
-      // Using speeds[i] (Robust) instead of smoothedSpeeds to match map responsiveness
-      const accel = (speeds[i] / 3.6 - speeds[i - 1] / 3.6) / time;
-      rawAccelerations.push(accel);
-    } else {
-      rawAccelerations.push(0);
-    }
+    const t = timeDeltas[i];
+    if (i > 0 && t > 0) rawAccelerations.push((speeds[i] / 3.6 - speeds[i - 1] / 3.6) / t);
+    else rawAccelerations.push(0);
   }
 
-  // 2. Smooth Accelerations (Moving Average)
-  // Unified Window Size
-  const ACCEL_WINDOW = ACCEL_SMOOTHING_WINDOW;
+  const accelWin = ACCEL_SMOOTHING_WINDOW;
   const smoothedAccelerations: number[] = [];
   for (let i = 0; i < rawAccelerations.length; i++) {
     let sum = 0, count = 0;
-    const offset = Math.floor(ACCEL_WINDOW / 2);
-    for (let j = -offset; j <= offset; j++) {
+    const offset = Math.floor(accelWin / 2);
+    for (let j = -offset; j <= j; j++) {
       const idx = i + j;
-      if (idx >= 0 && idx < rawAccelerations.length) {
-        sum += rawAccelerations[idx]; // Use raw only
-        count++;
-      }
+      if (idx >= 0 && idx < rawAccelerations.length) { sum += rawAccelerations[idx]; count++; }
     }
     smoothedAccelerations.push(count > 0 ? sum / count : 0);
   }
 
-  // APPLY SHARED FILTERING LOGIC
-  const {
-    finalAccelerations, // Has 0s for gaps/cancelled
-    hardAccelPoints,
-    hardBrakePoints,
-    hardAccelerationCount,
-    hardBrakingCount,
-    qualityValidation
-  } = applyAdvancedFiltering(smoothedAccelerations, timeDeltas, points, isClampedArray);
+  const { finalAccelerations, hardAccelPoints, hardBrakePoints, hardAccelerationCount, hardBrakingCount } = applyAdvancedFiltering(smoothedAccelerations, timeDeltas, points, isClampedArray);
 
-  // Calculate Motion Stats using FINAL (Filtered) Accelerations
+  // Motion Buckets
+  let stoppedTime = 0;
+  let stopCount = 0;
+  let isStopped = false;
+  let stopDur = 0;
+  let stopStart = -1;
+  const stopPoints: [number, number][] = [];
+  let turbulenceSum = 0;
   let timeAccelerating = 0;
   let timeBraking = 0;
   let timeCruising = 0;
-  let stoppedTime = 0;
-  let stopCount = 0;
-  let turbulenceSum = 0;
-
-  // State for loop
-  let isCurrentlyStoppedSegment = false;
-  let potentialStopDuration = 0;
-  let potentialStopStartIndex = -1;
-  const stopPoints: [number, number][] = [];
-
   for (let i = 0; i < smoothedSpeeds.length; i++) {
-    const speed = smoothedSpeeds[i];
-    const time = timeDeltas[i];
-    const finalAccel = finalAccelerations[i]; // Use filtered acceleration
-    const smoothedAccel = smoothedAccelerations[i]; // Keep original for turbulence? Or use filtered? 
-    // Filtered is cleaner for score.
+    const s = smoothedSpeeds[i];
+    const t = timeDeltas[i];
+    const a = finalAccelerations[i];
 
-    // Turbulence: Change in acceleration (using unfiltered for raw roughness, or filtered for clean score?)
-    // Let's use smoothed (unfiltered) to capture road bumps, OR final?
-    // User wants to ignore artifacts. Use Final.
-    if (i > 0) {
-      const prevAccel = finalAccelerations[i - 1]; // Use final
-      turbulenceSum += Math.abs(finalAccel - prevAccel);
-    }
+    if (i > 0) turbulenceSum += Math.abs(a - finalAccelerations[i - 1]);
 
-    // --- Motion Profile Time Bucketing (Uses FILTERED Acceleration now) ---
-    // If it was cancelled/gap, finalAccel is 0 -> Cruising. Correct.
-    if (speed < STOP_SPEED_THRESHOLD) {
-      stoppedTime += time;
-      potentialStopDuration += time;
-      if (!isCurrentlyStoppedSegment) {
-        isCurrentlyStoppedSegment = true;
-        potentialStopStartIndex = i;
-      }
+    if (s < STOP_SPEED_THRESHOLD) {
+      stoppedTime += t;
+      stopDur += t;
+      if (!isStopped) { isStopped = true; stopStart = i; }
     } else {
-      if (finalAccel > CRUISING_THRESHOLD) timeAccelerating += time;
-      else if (finalAccel < -CRUISING_THRESHOLD) timeBraking += time;
-      else timeCruising += time;
+      if (a > CRUISING_THRESHOLD) timeAccelerating += t;
+      else if (a < -CRUISING_THRESHOLD) timeBraking += t;
+      else timeCruising += t;
 
-      if (isCurrentlyStoppedSegment) {
-        if (potentialStopDuration >= 10) {
+      if (isStopped) {
+        if (stopDur >= 10) {
           stopCount++;
-          if (potentialStopStartIndex >= 0 && potentialStopStartIndex < points.length) {
-            const p = points[potentialStopStartIndex];
-            stopPoints.push([p.lat, p.lon]);
-          }
+          if (stopStart >= 0) stopPoints.push([points[stopStart].lat, points[stopStart].lon]);
         }
-        potentialStopDuration = 0;
-        isCurrentlyStoppedSegment = false;
-        potentialStopStartIndex = -1;
+        stopDur = 0; isStopped = false; stopStart = -1;
       }
     }
   }
-
-  if (isCurrentlyStoppedSegment && potentialStopDuration >= 10) {
+  if (isStopped && stopDur >= 10) {
     stopCount++;
-    if (potentialStopStartIndex >= 0 && potentialStopStartIndex < points.length) {
-      const p = points[potentialStopStartIndex];
-      stopPoints.push([p.lat, p.lon]);
-    }
+    if (stopStart >= 0) stopPoints.push([points[stopStart].lat, points[stopStart].lon]);
   }
 
   let totalTime = 0;
-  if (points[0].time && points[points.length - 1].time) {
-    totalTime = (points[points.length - 1].time.getTime() - points[0].time.getTime()) / 1000;
-  }
-  const movingTime = Math.max(0, totalTime - stoppedTime);
-  const avgSpeed = totalTime > 0 ? totalDistance / (totalTime / 3600) : 0;
-  const movingAvgSpeed = movingTime > 0 ? totalDistance / (movingTime / 3600) : 0;
-  const accelBrakeRatio = timeBraking > 0 ? timeAccelerating / timeBraking : timeAccelerating;
-  const turbulenceScore = smoothedSpeeds.length > 0 ? (turbulenceSum / smoothedSpeeds.length) * 10 : 0;
+  if (points[0].time && points[points.length - 1].time) totalTime = (points[points.length - 1].time!.getTime() - points[0].time!.getTime()) / 1000;
 
-  // Hilliness Score: Elevation gain per kilometer
-  const hillinessScore = totalDistance > 0 ? elevationGain / totalDistance : 0;
-
-  const speedDistribution = calculateSpeedDistribution(points);
+  const twistinessScore = totalDistance > 0 ? totalHeadingChange / totalDistance : 0;
+  const percentStraight = totalDistance > 0 ? (totalStraightDistance / totalDistance) * 100 : 0;
+  const longestStraightSection = straightSections.length > 0 ? Math.max(...straightSections) : 0;
+  const medianStraightLength = straightSections.length > 0 ? straightSections.sort((a, b) => a - b)[Math.floor(straightSections.length / 2)] : 0;
 
   return {
-    totalDistance,
-    totalTime,
-    movingTime,
-    stoppedTime,
-    stopCount,
-    avgSpeed,
-    movingAvgSpeed,
-    maxSpeed,
-    elevationGain,
-    pointCount: points.length,
-    stopPoints,
-    hardAccelerationCount,
-    hardBrakingCount,
-    timeAccelerating,
-    timeBraking,
-    timeCruising,
-    accelBrakeRatio,
-    turbulenceScore,
+    totalDistance, totalTime, movingTime: Math.max(0, totalTime - stoppedTime), stoppedTime, stopCount,
+    avgSpeed: totalTime > 0 ? totalDistance / (totalTime / 3600) : 0,
+    movingAvgSpeed: (totalTime - stoppedTime) > 0 ? totalDistance / ((totalTime - stoppedTime) / 3600) : 0,
+    maxSpeed, elevationGain, pointCount: points.length,
+    stopPoints, hardAccelerationCount, hardBrakingCount,
+    timeAccelerating, timeBraking, timeCruising,
+    accelBrakeRatio: timeBraking > 0 ? timeAccelerating / timeBraking : timeAccelerating,
+    turbulenceScore: smoothedSpeeds.length > 0 ? (turbulenceSum / smoothedSpeeds.length) * 10 : 0,
     startTime: points[0]?.time,
-    elevationLoss,
-    maxElevation,
-    minElevation,
-    steepestClimb,
-    steepestDescent,
-    timeClimbing,
-    timeDescending,
-    timeLevel,
-    hillinessScore,
+    elevationLoss, maxElevation, minElevation, steepestClimb, steepestDescent,
+    timeClimbing, timeDescending, timeLevel,
+    hillinessScore: totalDistance > 0 ? elevationGain / totalDistance : 0,
     climbDistance,
-    totalHeadingChange,
-    tightTurnsCount,
-    hairpinCount,
-    twistinessScore,
-    longestStraightSection,
-    medianStraightLength,
-    percentStraight,
-    tightTurnPoints,
-    hardAccelPoints,
-    hardBrakePoints,
-    speedDistribution,
+    totalHeadingChange, tightTurnsCount, hairpinCount, twistinessScore,
+    longestStraightSection, medianStraightLength, percentStraight,
+    tightTurnPoints, hairpinPoints, hardAccelPoints, hardBrakePoints,
+    speedDistribution: calculateSpeedDistribution(points)
   };
 }
+
 
 export interface TrackSegment {
   speed: number;        // km/h

@@ -448,6 +448,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                   zoomRange={zoomRange ? [zoomRange[0] - mapPointsStartIndex, zoomRange[1] - mapPointsStartIndex] : null}
                   stopPoints={stats.stopPoints}
                   tightTurnPoints={stats.tightTurnPoints}
+                  hairpinPoints={stats.hairpinPoints}
                   privacyMask={privacyMask}
                 />
               </div>
@@ -768,7 +769,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                       <span className="block text-2xl font-normal text-foreground leading-none">{stats.elevationGain - stats.elevationLoss > 0 ? "+" : ""}{(stats.elevationGain - stats.elevationLoss).toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
                       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Net Change</span>
                     </div>
-                    <div> // Added Peak/Low here as rows if needed, or stick to 8 items grid.
+                    <div>
                       <span className="block text-2xl font-normal text-foreground leading-none">{stats.maxElevation.toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
                       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Peak</span>
                     </div>

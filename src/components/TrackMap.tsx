@@ -11,11 +11,12 @@ interface TrackMapProps {
   zoomRange?: [number, number] | null;
   stopPoints?: [number, number][];
   tightTurnPoints?: [number, number][];
+  hairpinPoints?: [number, number][];
   privacyMask?: { start: number; end: number } | null;
 
 }
 
-const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints, privacyMask }: TrackMapProps) => {
+const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints, hairpinPoints, privacyMask }: TrackMapProps) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const layersRef = useRef<{
@@ -25,6 +26,7 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
     endMarker?: L.Marker;
     stopMarkers?: L.LayerGroup;
     turnMarkers?: L.LayerGroup;
+    hairpinMarkers?: L.LayerGroup;
   }>({});
   const hoverMarkerRef = useRef<L.Marker | null>(null);
   const lastBoundsRef = useRef<{ points: GPXPoint[], zoomRange?: [number, number] | null } | null>(null);
@@ -105,6 +107,7 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
     if (layersRef.current.endMarker) map.removeLayer(layersRef.current.endMarker);
     if (layersRef.current.stopMarkers) map.removeLayer(layersRef.current.stopMarkers);
     if (layersRef.current.turnMarkers) map.removeLayer(layersRef.current.turnMarkers);
+    if (layersRef.current.hairpinMarkers) map.removeLayer(layersRef.current.hairpinMarkers);
 
     // Create a LayerGroup for the track to manage cleanup easily
     if (!layersRef.current.fullTrackGroup) {
@@ -350,6 +353,26 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
       layersRef.current.turnMarkers = turnMarkersLayer;
     }
 
+    // 5. Render Hairpin Markers (Darker/Distinct)
+    if (showTurns && hairpinPoints && hairpinPoints.length > 0) {
+      const hairpinMarkersLayer = L.layerGroup();
+      hairpinPoints.forEach((hairpin, index) => {
+        const hairpinIcon = L.divIcon({
+          className: "hairpin-marker",
+          html: `<div style="background-color: #581c87; width: 16px; height: 16px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center;">
+            <div style="width: 6px; height: 6px; background-color: white; border-radius: 50%;"></div>
+          </div>`,
+          iconSize: [16, 16],
+          iconAnchor: [8, 8],
+        });
+        L.marker(hairpin, { icon: hairpinIcon })
+          .bindPopup(`<b>Hairpin #${index + 1}</b>`)
+          .addTo(hairpinMarkersLayer);
+      });
+      hairpinMarkersLayer.addTo(map);
+      layersRef.current.hairpinMarkers = hairpinMarkersLayer;
+    }
+
 
 
     // Fit Bounds - ONLY if coordinates or zoom range changed
@@ -451,7 +474,7 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
             title={showTurns ? "Hide Turns" : "Show Turns"}
           >
             <div className={`w-2 h-2 rounded-full ${showTurns ? 'bg-white' : 'bg-purple-500'}`} />
-            <span className="text-[10px] font-black uppercase tracking-tight hidden lg:inline">Turns ({tightTurnPoints?.length || 0})</span>
+            <span className="text-[10px] font-black uppercase tracking-tight hidden lg:inline">Turns ({(tightTurnPoints?.length || 0) + (hairpinPoints?.length || 0)})</span>
           </button>
         </div>
       </div>
