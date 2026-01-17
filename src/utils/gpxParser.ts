@@ -425,6 +425,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
 
   // Turn Detection State
   let currentTurnSum = 0;
+  let currentTurnDistance = 0;
   let currentTurnPeak = { index: -1, delta: 0, lat: 0, lon: 0 };
 
   if (points[0].ele !== undefined) {
@@ -486,8 +487,23 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
     }
 
     // Geometry Calculation (Rotation)
-    // Updated Logic: Speed > STOP_SPEED_THRESHOLD
-    if (distance > 0.002 && (speeds[speeds.length - 1] > STOP_SPEED_THRESHOLD)) {
+    // Updated Logic: Check Moving Average Speed > STOP_SPEED_THRESHOLD (Hysteresis)
+    let isMoving = false;
+    if (speeds.length > 0) {
+      const window = 5;
+      let sum = 0;
+      let count = 0;
+      for (let k = 0; k < window; k++) {
+        if (speeds.length - 1 - k >= 0) {
+          sum += speeds[speeds.length - 1 - k];
+          count++;
+        }
+      }
+      const avgSpeed = count > 0 ? sum / count : 0;
+      isMoving = avgSpeed > STOP_SPEED_THRESHOLD;
+    }
+
+    if (distance > 0.002 && isMoving) {
       const bearing = calculateBearing(prev.lat, prev.lon, curr.lat, curr.lon);
       if (lastBearing !== null) {
         let delta = bearing - lastBearing;
@@ -507,13 +523,20 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
         if (Math.abs(delta) > 1.0) { // Ignore micro-jitters < 1 degree
           if (isTurnContinuation) {
             currentTurnSum += delta;
+            currentTurnDistance += distance;
             // Update Peak for Marker Placement (Center of the action)
             if (Math.abs(delta) > Math.abs(currentTurnPeak.delta)) {
               currentTurnPeak = { index: i, delta: delta, lat: curr.lat, lon: curr.lon };
             }
           } else {
             // Direction FLIP -> End previous turn, process it, start new one
-            if (Math.abs(currentTurnSum) > 45) {
+
+            // SHARPNESS CHECK:
+            // 1. Angle Threshold: Reverted to 45 degrees (User Request)
+            // 2. Density Threshold: Turn must be sharp (e.g. > 0.6 deg/meter)
+            const turnDensity = Math.abs(currentTurnSum) / (currentTurnDistance * 1000 || 1);
+
+            if (Math.abs(currentTurnSum) > 45 && turnDensity > 0.6) {
               tightTurnsCount++;
               if (Math.abs(currentTurnSum) > 135) {
                 hairpinCount++;
@@ -524,7 +547,16 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
             }
 
             currentTurnSum = delta;
+            currentTurnDistance = distance;
             currentTurnPeak = { index: i, delta: delta, lat: curr.lat, lon: curr.lon };
+          }
+        } else {
+          // If delta is small (< 1.0), we are still theoretically in the turn (or straight).
+          // We add distance to the turn accumulator if we consider it part of the "action".
+          // However, strictly speaking, 0 rotation adds distance which dilutes sharpness.
+          // Let's add it effectively.
+          if (Math.abs(currentTurnSum) > 0) {
+            currentTurnDistance += distance;
           }
         }
 
@@ -536,7 +568,8 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
           // If we are going straight for > 25m, the previous turn is definitely over.
           // This prevents "Left -> Straight(50m) -> Left" from becoming a Hairpin.
           if (currentStraightDist > 0.025 && Math.abs(currentTurnSum) > 0) {
-            if (Math.abs(currentTurnSum) > 45) {
+            const turnDensity = Math.abs(currentTurnSum) / (currentTurnDistance * 1000 || 1);
+            if (Math.abs(currentTurnSum) > 45 && turnDensity > 0.6) {
               tightTurnsCount++;
               if (Math.abs(currentTurnSum) > 135) {
                 hairpinCount++;
@@ -547,6 +580,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
             }
             // Reset Turn State
             currentTurnSum = 0;
+            currentTurnDistance = 0;
             currentTurnPeak = { index: -1, delta: 0, lat: 0, lon: 0 };
           }
 
@@ -568,7 +602,8 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
   }
 
   // Flush any pending turn at the end of the loop
-  if (Math.abs(currentTurnSum) > 45) {
+  const finalTurnDensity = Math.abs(currentTurnSum) / (currentTurnDistance * 1000 || 1);
+  if (Math.abs(currentTurnSum) > 45 && finalTurnDensity > 0.6) {
     tightTurnsCount++;
     if (Math.abs(currentTurnSum) > 135) {
       hairpinCount++;
