@@ -571,7 +571,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
   for (let i = 0; i < rawAccelerations.length; i++) {
     let sum = 0, count = 0;
     const offset = Math.floor(accelWin / 2);
-    for (let j = -offset; j <= j; j++) {
+    for (let j = -offset; j <= offset; j++) {
       const idx = i + j;
       if (idx >= 0 && idx < rawAccelerations.length) { sum += rawAccelerations[idx]; count++; }
     }
