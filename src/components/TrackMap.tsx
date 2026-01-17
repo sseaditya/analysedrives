@@ -51,7 +51,7 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
 
     const map = L.map(mapRef.current, {
       zoom: 13,
-      scrollWheelZoom: false,
+      scrollWheelZoom: true, // Enabled per user request
       touchZoom: true,
       doubleClickZoom: true,
       preferCanvas: true, // Improve performance with many points

@@ -626,7 +626,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                   </div>
                 </div>
 
-                <div className="relative h-[300px] w-full">
+                <div className="relative h-[300px] w-full cursor-crosshair">
 
                   <ResponsiveContainer width="100%" height="100%">
                     <SpeedElevationChart

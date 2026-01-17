@@ -572,7 +572,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
             // Turn must happen over minimum distance (15m) to be real
             if (currentTurnDistance > 0.015) {
               // SHARPNESS CHECK:
-              // 1. Angle Threshold: Reverted to 45 degrees (User Request)
+              // 1. Angle Threshold: Reverted to 60 degrees (User Request)
               // 2. Density Threshold: Turn must be sharp (e.g. > 0.6 deg/meter)
               // 3. Zig-Zag Filter: Net Heading Change must be > 30 degrees
               const turnDensity = Math.abs(currentTurnSum) / (currentTurnDistance * 1000 || 1);
@@ -585,7 +585,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
                 netHeadingChange = Math.abs(rawChange);
               }
 
-              if (Math.abs(currentTurnSum) > 45 && turnDensity > 0.6 && netHeadingChange > 30) {
+              if (Math.abs(currentTurnSum) > 60 && turnDensity > 0.6 && netHeadingChange > 30) {
                 tightTurnsCount++;
                 if (Math.abs(currentTurnSum) > 135) {
                   hairpinCount++;
@@ -625,7 +625,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
                 netHeadingChange = Math.abs(rawChange);
               }
 
-              if (Math.abs(currentTurnSum) > 45 && turnDensity > 0.6 && netHeadingChange > 30) {
+              if (Math.abs(currentTurnSum) > 60 && turnDensity > 0.6 && netHeadingChange > 30) {
                 tightTurnsCount++;
                 if (Math.abs(currentTurnSum) > 135) {
                   hairpinCount++;
@@ -672,7 +672,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
       netHeadingChange = Math.abs(rawChange);
     }
 
-    if (Math.abs(currentTurnSum) > 45 && finalTurnDensity > 0.6 && netHeadingChange > 30) {
+    if (Math.abs(currentTurnSum) > 60 && finalTurnDensity > 0.6 && netHeadingChange > 30) {
       tightTurnsCount++;
       if (Math.abs(currentTurnSum) > 135) {
         hairpinCount++;
