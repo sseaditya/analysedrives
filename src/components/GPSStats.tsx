@@ -719,112 +719,39 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
           )}
 
 
-          {/* ROUTE STRUCTURE TAB (Merged Geometry + Elevation) */}
+          {/* ROUTE STRUCTURE TAB (Consolidated & Refined) */}
           {activeTab === "structure" && (
             <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
-              {/* SECTION 1: GEOMETRY */}
+              {/* SECTION 1: ALL METRICS (Consolidated) */}
               <div>
                 <h3 className="text-xl font-bold mb-8 flex items-center gap-2">
                   <Spline className="w-6 h-6 text-primary" />
-                  Route Geometry
+                  Route Metrics
                 </h3>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
-                  <div>
-                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-6">turning</h4>
-                    <div className="flex gap-12">
-                      <div>
-                        <span className="block text-2xl font-normal text-foreground">{Math.round(stats.totalHeadingChange).toLocaleString()}°</span>
-                        <span className="text-xs text-muted-foreground mt-1 block">Rotation</span>
-                      </div>
-                      <div>
-                        <span className="block text-2xl font-normal text-foreground">{stats.twistinessScore.toFixed(0)}</span>
-                        <span className="text-xs text-muted-foreground mt-1 block">Twistiness</span>
-                      </div>
+                <div className="bg-card border border-border rounded-2xl p-8 shadow-sm">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-y-10 gap-x-8">
+
+                    {/* Geometry Group */}
+                    <div>
+                      <span className="block text-2xl font-normal text-foreground">{Math.round(stats.totalHeadingChange).toLocaleString()}°</span>
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Rotation</span>
                     </div>
-                  </div>
-
-                  <div>
-                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-6">technical</h4>
-                    <div className="flex gap-12">
-                      <div>
-                        <span className="block text-2xl font-normal text-foreground">{stats.tightTurnsCount}</span>
-                        <span className="text-xs text-muted-foreground mt-1 block">Tight Turns</span>
-                      </div>
-                      <div>
-                        <span className="block text-2xl font-normal text-foreground">{stats.hairpinCount}</span>
-                        <span className="text-xs text-muted-foreground mt-1 block">Hairpins</span>
-                      </div>
+                    <div>
+                      <span className="block text-2xl font-normal text-foreground">{stats.twistinessScore.toFixed(0)}</span>
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Twistiness</span>
                     </div>
-                  </div>
-                </div>
-
-                {/* Advanced Geometry Analysis */}
-                <div className="grid grid-cols-1 gap-8">
-                  {/* Straight vs Curvy Profile */}
-                  <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
-                    <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
-                      <Spline className="w-5 h-5 text-primary" />
-                      Geometry Profile
-                    </h3>
-                    <div className="space-y-6">
-                      {/* Visual Stacked Bar */}
-                      <div className="h-4 w-full bg-muted rounded-full overflow-hidden flex shadow-inner">
-                        {[
-                          { dist: stats.totalDistance * (stats.percentStraight / 100), color: "bg-primary" },
-                          { dist: stats.totalDistance * ((100 - stats.percentStraight) / 100), color: "bg-foreground/80" }, // Curves -> Dark/Blackish
-                        ].map((item, idx) => {
-                          const width = (item.dist / (stats.totalDistance || 1)) * 100;
-                          if (width <= 0) return null;
-                          return (
-                            <div
-                              key={idx}
-                              className={cn("h-full transition-all duration-1000", item.color)}
-                              style={{ width: `${width}%` }}
-                            />
-                          );
-                        })}
-                      </div>
-
-                      <div className="space-y-4">
-                        {[
-                          { label: "Straight Sections", dist: stats.totalDistance * (stats.percentStraight / 100), color: "bg-primary", desc: "Sustained heading" },
-                          { label: "Corners & Curves", dist: stats.totalDistance * ((100 - stats.percentStraight) / 100), color: "bg-foreground/80", desc: "Frequent turns" },
-                        ].map((item, idx) => {
-                          const percentage = (item.dist / (stats.totalDistance || 1)) * 100;
-                          return (
-                            <div key={item.label} className="flex items-center gap-4">
-                              <div className={cn("w-1 h-8 rounded-full", item.color)} />
-                              <div className="flex-1">
-                                <div className="flex justify-between text-sm mb-1">
-                                  <span className="font-bold">{item.label}</span>
-                                  <span className="font-mono text-muted-foreground">{formatDistance(item.dist)}</span>
-                                </div>
-                                <div className="flex justify-between items-end">
-                                  <span className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">{item.desc}</span>
-                                  <span className="text-xs font-bold text-foreground">{percentage.toFixed(1)}%</span>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                    <div>
+                      <span className="block text-2xl font-normal text-foreground">{stats.tightTurnsCount}</span>
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Tight Turns</span>
                     </div>
-                  </div>
-                </div>
-              </div>
+                    <div>
+                      <span className="block text-2xl font-normal text-foreground">{stats.hairpinCount}</span>
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Hairpins</span>
+                    </div>
 
-              {/* SECTION 2: ELEVATION */}
-              <div>
-                <h3 className="text-xl font-bold mb-8 flex items-center gap-2">
-                  <TrendingUp className="w-6 h-6 text-primary" />
-                  Elevation & Terrain
-                </h3>
-
-                <div>
-                  <h3 className="text-xl font-bold mb-10">Terrain Analysis</h3>
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-12 gap-y-12">
+                    {/* Terrain Group */}
                     <div>
                       <span className="block text-2xl font-normal text-foreground leading-none">+{stats.elevationGain.toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
                       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Gain</span>
@@ -834,15 +761,14 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Loss</span>
                     </div>
                     <div>
-                      <span className="block text-2xl font-normal text-foreground leading-none">{stats.elevationGain - stats.elevationLoss > 0 ? "+" : ""}{(stats.elevationGain - stats.elevationLoss).toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
-                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Net Change</span>
-                    </div>
-                    <div>
                       <span className="block text-2xl font-normal text-foreground leading-none">{stats.hillinessScore.toFixed(1)}</span>
                       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Hilliness</span>
                     </div>
-
                     <div>
+                      <span className="block text-2xl font-normal text-foreground leading-none">{stats.elevationGain - stats.elevationLoss > 0 ? "+" : ""}{(stats.elevationGain - stats.elevationLoss).toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Net Change</span>
+                    </div>
+                    <div> // Added Peak/Low here as rows if needed, or stick to 8 items grid.
                       <span className="block text-2xl font-normal text-foreground leading-none">{stats.maxElevation.toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
                       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Peak</span>
                     </div>
@@ -850,92 +776,117 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                       <span className="block text-2xl font-normal text-foreground leading-none">{stats.minElevation.toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
                       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Low</span>
                     </div>
+                  </div>
+                </div>
+              </div>
 
+              {/* SECTION 2: PROFILES (Geometry + Terrain) */}
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                {/* Straight vs Curvy Profile */}
+                <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+                  <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
+                    <Spline className="w-5 h-5 text-primary" />
+                    Geometry Profile
+                  </h3>
+                  <div className="space-y-6">
+                    {/* Visual Stacked Bar */}
+                    <div className="h-4 w-full bg-muted rounded-full overflow-hidden flex shadow-inner">
+                      {[
+                        { dist: stats.totalDistance * (stats.percentStraight / 100), color: "bg-primary" },
+                        { dist: stats.totalDistance * ((100 - stats.percentStraight) / 100), color: "bg-foreground/80" }, // Curves -> Dark/Blackish
+                      ].map((item, idx) => {
+                        const width = (item.dist / (stats.totalDistance || 1)) * 100;
+                        if (width <= 0) return null;
+                        return (
+                          <div
+                            key={idx}
+                            className={cn("h-full transition-all duration-1000", item.color)}
+                            style={{ width: `${width}%` }}
+                          />
+                        );
+                      })}
+                    </div>
+
+                    <div className="space-y-4">
+                      {[
+                        { label: "Straight Sections", dist: stats.totalDistance * (stats.percentStraight / 100), color: "bg-primary", desc: "Sustained heading" },
+                        { label: "Corners & Curves", dist: stats.totalDistance * ((100 - stats.percentStraight) / 100), color: "bg-foreground/80", desc: "Frequent turns" },
+                      ].map((item, idx) => {
+                        const percentage = (item.dist / (stats.totalDistance || 1)) * 100;
+                        return (
+                          <div key={item.label} className="flex items-center gap-4">
+                            <div className={cn("w-1 h-8 rounded-full", item.color)} />
+                            <div className="flex-1">
+                              <div className="flex justify-between text-sm mb-1">
+                                <span className="font-bold">{item.label}</span>
+                                <span className="font-mono text-muted-foreground">{formatDistance(item.dist)}</span>
+                              </div>
+                              <div className="flex justify-between items-end">
+                                <span className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">{item.desc}</span>
+                                <span className="text-xs font-bold text-foreground">{percentage.toFixed(1)}%</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
 
-                {/* Advanced Elevation Analysis */}
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-                  {/* Terrain Profile */}
-                  <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
-                    <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
-                      <TrendingUp className="w-5 h-5 text-primary" />
-                      Terrain Time Profile
-                    </h3>
-                    <div className="space-y-6">
-                      {/* Visual Stacked Bar */}
-                      <div className="h-4 w-full bg-muted rounded-full overflow-hidden flex shadow-inner">
-                        {[
-                          { seconds: stats.timeClimbing, color: "bg-primary" },
-                          { seconds: stats.timeDescending, color: "bg-foreground/80" },
-                          { seconds: stats.timeLevel, color: "bg-muted-foreground/30" },
-                        ].map((item, idx) => {
-                          const width = (item.seconds / (stats.totalTime || 1)) * 100;
-                          if (width <= 0) return null;
-                          return (
-                            <div
-                              key={idx}
-                              className={cn("h-full transition-all duration-1000", item.color)}
-                              style={{ width: `${width}%` }}
-                            />
-                          );
-                        })}
-                      </div>
+                {/* Terrain Profile */}
+                <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+                  <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-primary" />
+                    Terrain Time Profile
+                  </h3>
+                  <div className="space-y-6">
+                    {/* Visual Stacked Bar */}
+                    <div className="h-4 w-full bg-muted rounded-full overflow-hidden flex shadow-inner">
+                      {[
+                        { seconds: stats.timeClimbing, color: "bg-primary" },
+                        { seconds: stats.timeDescending, color: "bg-foreground/80" },
+                        { seconds: stats.timeLevel, color: "bg-muted-foreground/30" },
+                      ].map((item, idx) => {
+                        const width = (item.seconds / (stats.totalTime || 1)) * 100;
+                        if (width <= 0) return null;
+                        return (
+                          <div
+                            key={idx}
+                            className={cn("h-full transition-all duration-1000", item.color)}
+                            style={{ width: `${width}%` }}
+                          />
+                        );
+                      })}
+                    </div>
 
-                      <div className="space-y-4">
-                        {[
-                          { label: "Climbing", seconds: stats.timeClimbing, color: "bg-primary", desc: "Uphill battle" },
-                          { label: "Descending", seconds: stats.timeDescending, color: "bg-foreground/80", desc: "Gravity assisted" },
-                          { label: "Level Flight", seconds: stats.timeLevel, color: "bg-muted-foreground/30", desc: "Flat terrain" },
-                        ].map((item, idx) => {
-                          const percentage = (item.seconds / (stats.totalTime || 1)) * 100;
-                          return (
-                            <div key={item.label} className="flex items-center gap-4">
-                              <div className={cn("w-1 h-8 rounded-full", item.color)} />
-                              <div className="flex-1">
-                                <div className="flex justify-between text-sm mb-1">
-                                  <span className="font-bold">{item.label}</span>
-                                  <span className="font-mono text-muted-foreground">{formatDuration(item.seconds)}</span>
-                                </div>
-                                <div className="flex justify-between items-end">
-                                  <span className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">{item.desc}</span>
-                                  <span className="text-xs font-bold text-foreground">{percentage.toFixed(1)}%</span>
-                                </div>
+                    <div className="space-y-4">
+                      {[
+                        { label: "Climbing", seconds: stats.timeClimbing, color: "bg-primary", desc: "Uphill battle" },
+                        { label: "Descending", seconds: stats.timeDescending, color: "bg-foreground/80", desc: "Gravity assisted" },
+                        { label: "Level Flight", seconds: stats.timeLevel, color: "bg-muted-foreground/30", desc: "Flat terrain" },
+                      ].map((item, idx) => {
+                        const percentage = (item.seconds / (stats.totalTime || 1)) * 100;
+                        return (
+                          <div key={item.label} className="flex items-center gap-4">
+                            <div className={cn("w-1 h-8 rounded-full", item.color)} />
+                            <div className="flex-1">
+                              <div className="flex justify-between text-sm mb-1">
+                                <span className="font-bold">{item.label}</span>
+                                <span className="font-mono text-muted-foreground">{formatDuration(item.seconds)}</span>
+                              </div>
+                              <div className="flex justify-between items-end">
+                                <span className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">{item.desc}</span>
+                                <span className="text-xs font-bold text-foreground">{percentage.toFixed(1)}%</span>
                               </div>
                             </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Grade Intensity Section */}
-                  <div className="bg-card border border-border rounded-2xl p-6 shadow-sm flex flex-col justify-center text-center">
-                    <div className="mb-6">
-                      <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <TrendingUp className="w-8 h-8 text-primary" />
-                      </div>
-                      <h3 className="text-xl font-bold">Terrain Intensity</h3>
-                      <p className="text-muted-foreground text-sm">Quantifying the vertical challenges of your route</p>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-8">
-                      <div>
-                        <p className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground mb-2">Avg Grade</p>
-                        <p className="text-2xl font-normal text-foreground leading-none">
-                          {stats.elevationGain > 0 ? ((stats.elevationGain / (stats.climbDistance * 1000 || 1)) * 100).toFixed(1) : "0.0"}%
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground mb-2">VAM</p>
-                        <p className="text-2xl font-normal text-foreground leading-none">
-                          {stats.movingTime > 0 ? ((stats.elevationGain / (stats.movingTime / 3600))).toFixed(0) : "0"}
-                        </p>
-                      </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
               </div>
+
             </div>
           )}
 

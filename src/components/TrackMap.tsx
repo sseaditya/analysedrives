@@ -443,7 +443,7 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
             title={showStops ? "Hide Stops" : "Show Stops"}
           >
             <div className={`w-2 h-2 rounded-full ${showStops ? 'bg-white' : 'bg-red-500'}`} />
-            <span className="text-[10px] font-black uppercase tracking-tight hidden lg:inline">Stops</span>
+            <span className="text-[10px] font-black uppercase tracking-tight hidden lg:inline">Stops ({stopPoints?.length || 0})</span>
           </button>
           <button
             onClick={() => setShowTurns(!showTurns)}
@@ -451,7 +451,7 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
             title={showTurns ? "Hide Turns" : "Show Turns"}
           >
             <div className={`w-2 h-2 rounded-full ${showTurns ? 'bg-white' : 'bg-purple-500'}`} />
-            <span className="text-[10px] font-black uppercase tracking-tight hidden lg:inline">Turns</span>
+            <span className="text-[10px] font-black uppercase tracking-tight hidden lg:inline">Turns ({tightTurnPoints?.length || 0})</span>
           </button>
         </div>
       </div>

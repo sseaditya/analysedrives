@@ -18,7 +18,7 @@ export const CRUISING_THRESHOLD = 0.4;   // m/s^2 (±0.4 is cruising)
 // Gap Filtering
 export const MAX_VALID_GAP_PERCENTILE = 0.90; // Ignore acceleration on top 10% time gaps
 export const MIN_GAP_DURATION = 5.0; // Only filter if gap is > 5 seconds
-export const GAP_BUFFER_SECONDS = 30.0; // Ignore events ±30s around large gaps
+export const GAP_BUFFER_SECONDS = 10.0; // Ignore events ±10s around large gaps (Reduced from 30s)
 export const CANCELLATION_WINDOW = 30.0; // Cancel Accel/Brake pairs within 30s
 
 export interface GPXStats {
@@ -562,7 +562,9 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
     }
 
     // Geometry Calculations
-    if (distance > 0.002) { // Only calculate bearing if moved more than 2m
+    // Only calculate bearing if moved more than 2m AND speed > 1km/h to avoid noise when stopped
+    // 1 km/h threshold handles very slow turns while ignoring static drift
+    if (distance > 0.002 && (speeds[speeds.length - 1] > 1.0)) {
       const bearing = calculateBearing(prev.lat, prev.lon, curr.lat, curr.lon);
       if (lastBearing !== null) {
         let delta = Math.abs(bearing - lastBearing);
