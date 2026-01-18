@@ -10,7 +10,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import { GPXPoint } from "@/utils/gpxParser";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 
 interface SpeedElevationChartProps {
   points: GPXPoint[];
@@ -424,18 +424,32 @@ const SpeedElevationChart = ({
   };
 
   const handleMouseLeave = () => {
+    // Clear hover visual feedback
     if (onHover) onHover(null);
-    setRefAreaLeft(null);
-    setRefAreaRight(null);
-    setActiveChart(null);
-    setInteractionMode('none');
-    setCursorStyle('crosshair');
-    setDragStartDist(null);
-    setCursorStyle('crosshair');
-    setDragStartDist(null);
     setHoverDistance(null);
     setHoveredPart(null);
+
+    // Only reset interaction interaction if NOT currently performing an action
+    if (!activeChart) {
+      setRefAreaLeft(null);
+      setRefAreaRight(null);
+      setInteractionMode('none');
+      setCursorStyle('crosshair');
+      setDragStartDist(null);
+    }
   };
+
+  // Handle global mouse up to catch interactions ending outside the chart
+  useEffect(() => {
+    if (!activeChart) return;
+
+    const handleGlobalMouseUp = () => {
+      handleMouseUp();
+    };
+
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+  }, [activeChart, handleMouseUp]);
 
   // Shared margin configuration
   const chartMargin = { top: 10, right: 30, left: 0, bottom: 0 };

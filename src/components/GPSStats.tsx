@@ -480,7 +480,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                               <Info className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
                             </TooltipTrigger>
                             <TooltipContent className="max-w-xs text-xs">
-                              <p>Interactive timeline showing speed (line) and elevation (area). Drag to zoom, hover for details.</p>
+                              <p>Interactive timeline showing speed (upper chart) and elevation (lower chart). Select speed/elevation chart to zoom, drag and interact. Use speed limiter to understand how longer your drive takes if you stick to a speed limit.</p>
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
@@ -807,17 +807,13 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                   Route Metrics
                 </h3>
 
-                <div className="bg-card border border-border rounded-2xl p-3 shadow-sm">
+                <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-y-6 gap-x-8">
 
                     {/* Geometry Group */}
                     <div>
                       <span className="block text-2xl font-normal text-foreground">{Math.round(stats.totalHeadingChange).toLocaleString()}°</span>
                       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Rotation</span>
-                    </div>
-                    <div>
-                      <span className="block text-2xl font-normal text-foreground">{stats.tightTurnsCount + stats.hairpinCount}</span>
-                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Turns</span>
                     </div>
                     <div>
                       <span className="block text-2xl font-normal text-foreground">{stats.twistinessScore.toFixed(0)}°/km</span>
@@ -855,7 +851,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
               {/* SECTION 2: PROFILES (Geometry + Terrain) */}
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
                 {/* Straight vs Curvy Profile */}
-                <div className="bg-card border border-border rounded-2xl p-3 shadow-sm">
+                <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
                   <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
                     <Spline className="w-5 h-5 text-primary" />
                     Geometry Profile
@@ -906,7 +902,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                 </div>
 
                 {/* Terrain Profile */}
-                <div className="bg-card border border-border rounded-2xl p-3 shadow-sm">
+                <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
                   <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
                     <TrendingUp className="w-5 h-5 text-primary" />
                     Terrain Time Profile

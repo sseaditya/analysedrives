@@ -226,7 +226,7 @@ const ProfileEditor = ({ children, onProfileUpdate }: ProfileEditorProps) => {
                             <Label htmlFor="displayName">Display Name</Label>
                             <Input
                                 id="displayName"
-                                placeholder="Your name"
+                                placeholder="your display name"
                                 value={displayName}
                                 onChange={(e) => setDisplayName(e.target.value)}
                             />
@@ -237,7 +237,7 @@ const ProfileEditor = ({ children, onProfileUpdate }: ProfileEditorProps) => {
                             <Label htmlFor="car">Car</Label>
                             <Input
                                 id="car"
-                                placeholder="e.g. BMW M3, Tesla Model 3"
+                                placeholder="name your ride"
                                 value={car}
                                 onChange={(e) => setCar(e.target.value)}
                             />

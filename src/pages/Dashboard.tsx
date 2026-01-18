@@ -528,24 +528,6 @@ const Dashboard = () => {
                                 <h3 className="text-lg font-semibold mb-6">Add New Activity</h3>
 
                                 <div className="space-y-8">
-                                    {/* Strava Section */}
-                                    <div className="bg-muted/20 border border-border rounded-xl p-5">
-                                        <h4 className="text-sm font-bold mb-3 flex items-center gap-2 text-foreground">
-                                            <Activity className="w-4 h-4 text-[#FC4C02]" />
-                                            Import from Strava
-                                        </h4>
-                                        <StravaImport onImportComplete={() => {
-                                            fetchActivities();
-                                            setTimeout(() => setShowUpload(false), 1000);
-                                        }} />
-                                    </div>
-
-                                    <div className="relative flex items-center py-2">
-                                        <div className="flex-grow border-t border-border"></div>
-                                        <span className="flex-shrink-0 mx-4 text-xs font-semibold uppercase text-muted-foreground">Or</span>
-                                        <div className="flex-grow border-t border-border"></div>
-                                    </div>
-
                                     {/* GPX Section */}
                                     <div>
                                         <h4 className="text-sm font-bold mb-3 flex items-center gap-2 text-foreground">
