@@ -4,10 +4,14 @@ import { MapPin, Route, Clock, Zap, LogIn, LayoutDashboard, Gauge as Speedometer
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { useTheme } from "@/components/ThemeProvider";
 
 const Index = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
 
   const handleGoogleSignIn = async () => {
     try {
@@ -46,6 +50,9 @@ const Index = () => {
               Dashboard
             </button>
           )}
+          <div className="ml-4 inline-block">
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 
@@ -55,11 +62,11 @@ const Index = () => {
         {/* Left Image - Hidden on mobile, visible on lg */}
         <div className="hidden lg:block w-1/4 h-screen relative">
           <img
-            src="/landing_left.png"
+            src={isDark ? "/left_dark.png" : "/left_light.png"}
             alt="Cyclists"
-            className="w-full h-full object-cover opacity-90"
+            className="w-full h-full object-cover opacity-90 transition-opacity duration-500"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent to-[#FAFAF7]/40 mix-blend-multiply"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent to-[#FAFAF7]/40 mix-blend-multiply dark:to-background/40"></div>
         </div>
 
         {/* Center Content */}
@@ -94,11 +101,11 @@ const Index = () => {
         {/* Right Image - Hidden on mobile, visible on lg */}
         <div className="hidden lg:block w-1/4 h-screen relative">
           <img
-            src="/landing_right.png"
+            src={isDark ? "/right_dark.png" : "/right_light.png"}
             alt="Runner"
-            className="w-full h-full object-cover opacity-90"
+            className="w-full h-full object-cover opacity-90 transition-opacity duration-500"
           />
-          <div className="absolute inset-0 bg-gradient-to-l from-transparent to-[#FAFAF7]/40 mix-blend-multiply"></div>
+          <div className="absolute inset-0 bg-gradient-to-l from-transparent to-[#FAFAF7]/40 mix-blend-multiply dark:to-background/40"></div>
         </div>
 
       </main>
