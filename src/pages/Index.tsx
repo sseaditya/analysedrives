@@ -62,7 +62,7 @@ const Index = () => {
         {/* Left Image - Hidden on mobile, visible on lg */}
         <div className="hidden lg:block w-1/4 h-screen relative">
           <img
-            src={isDark ? "/left_dark.png" : "/left_light.png"}
+            src={isDark ? "/left_dark.jpg" : "/left_light.jpg"}
             alt="Cyclists"
             className="w-full h-full object-cover opacity-90 transition-opacity duration-500"
           />
@@ -101,7 +101,7 @@ const Index = () => {
         {/* Right Image - Hidden on mobile, visible on lg */}
         <div className="hidden lg:block w-1/4 h-screen relative">
           <img
-            src={isDark ? "/right_dark.png" : "/right_light.png"}
+            src={isDark ? "/right_dark.jpg" : "/right_light.jpg"}
             alt="Runner"
             className="w-full h-full object-cover opacity-90 transition-opacity duration-500"
           />
