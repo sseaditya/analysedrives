@@ -247,7 +247,12 @@ const Feed = () => {
                                                 <span className="text-[10px] uppercase text-muted-foreground font-semibold">Time</span>
                                                 <div className="flex items-center gap-1 font-bold text-sm">
                                                     <Clock className="w-3 h-3 text-primary" />
-                                                    {formatDuration(activity.stats?.totalTime || 0)}
+                                                    {(() => {
+                                                        const totalSeconds = activity.stats?.totalTime || 0;
+                                                        const h = Math.floor(totalSeconds / 3600);
+                                                        const m = Math.floor((totalSeconds % 3600) / 60);
+                                                        return h > 0 ? `${h}h ${m}m` : `${m}m`;
+                                                    })()}
                                                 </div>
                                             </div>
                                             <div>
