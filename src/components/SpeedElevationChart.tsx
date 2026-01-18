@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import { GPXPoint } from "@/utils/gpxParser";
 import { useState, useMemo, useEffect } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface SpeedElevationChartProps {
   points: GPXPoint[];
@@ -70,6 +71,7 @@ const SpeedElevationChart = ({
   const [dragStartDist, setDragStartDist] = useState<number | null>(null);
   const [hoverDistance, setHoverDistance] = useState<number | null>(null);
   const [hoveredPart, setHoveredPart] = useState<'left' | 'right' | 'center' | null>(null);
+  const isMobile = useIsMobile();
 
   // Calculate combined data for chart - Keep MORE points for better zoom detail
   const fullData: ChartDataPoint[] = useMemo(() => {
@@ -390,6 +392,7 @@ const SpeedElevationChart = ({
   };
 
   const handleMouseDown = (e: any, chartType: 'speed' | 'elevation') => {
+    if (isMobile) return; // Disable selection on mobile
     if (e && e.activeLabel) {
       const dist = parseFloat(e.activeLabel);
 
@@ -507,7 +510,7 @@ const SpeedElevationChart = ({
               type="monotone"
               dataKey="speed"
               stroke="hsl(15, 52%, 58%)"
-              strokeWidth={3}
+              strokeWidth={isMobile ? 1.5 : 3}
               fill="url(#speedGradient)"
               isAnimationActive={false}
             />

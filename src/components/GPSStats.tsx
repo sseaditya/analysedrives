@@ -469,7 +469,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
               <div className="bg-card border border-border rounded-2xl p-3 shadow-sm">
                 {/* Compact Header & Stats Row */}
                 <div className="flex flex-col gap-3 mb-3">
-                  <div className="flex items-center justify-between gap-4">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     {/* Left: Title */}
                     <div className="flex-shrink-0">
                       <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
@@ -487,9 +487,9 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                       </h3>
                     </div>
 
-                    {/* Middle: Slider (Centered & Flex-grow) */}
+                    {/* Middle: Slider (Centered & Flex-grow) - Mobile optimized */}
                     {showLimiter && (
-                      <div className="flex-1 max-w-[350px] px-2 animate-in fade-in zoom-in-95 duration-200">
+                      <div className="w-full md:flex-1 md:max-w-[350px] px-2 animate-in fade-in zoom-in-95 duration-200 order-3 md:order-2 mt-4 md:mt-0">
                         <Slider
                           min={40}
                           max={speedCap ? Math.min(speedCap - 10, 200) : Math.max(Math.ceil(stats.maxSpeed / 10) * 10, 120)}
@@ -497,7 +497,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                           value={[speedLimit]}
                           onValueChange={([val]) => setSpeedLimit(val)}
                           className="w-full relative py-2 cursor-grab active:cursor-grabbing"
-                          thumbClassName="h-4 w-4 rounded-full border-2 border-primary bg-background shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                          thumbClassName="h-6 w-6 md:h-4 md:w-4 rounded-full border-2 border-primary bg-background shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
                           thumbChildren={
                             <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-popover text-popover-foreground text-xs font-bold px-2 py-0.5 rounded shadow-md border whitespace-nowrap">
                               {speedLimit} km/h
@@ -508,7 +508,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                     )}
 
                     {/* Right: Controls (Toggle + Reset) */}
-                    <div className="flex items-center gap-3 flex-shrink-0">
+                    <div className="flex items-center gap-3 flex-shrink-0 order-2 md:order-3">
                       {/* Speed Limiter Toggle */}
                       <div className="flex items-center gap-2 bg-muted/50 px-2.5 py-1 rounded-full border border-border/50">
                         <Switch
