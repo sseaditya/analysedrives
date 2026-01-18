@@ -25,6 +25,7 @@ interface SpeedElevationChartProps {
 interface ChartDataPoint {
   distance: number;
   speed: number;
+  originalSpeed: number; // For scaling Y-axis correctly even when visual limit is applied
   elevation: number | null;
   time: string;
   pointIndex: number;
@@ -67,6 +68,7 @@ const SpeedElevationChart = ({
   const [interactionMode, setInteractionMode] = useState<InteractionMode>('none');
   const [cursorStyle, setCursorStyle] = useState<string>('crosshair');
   const [dragStartDist, setDragStartDist] = useState<number | null>(null);
+  const [hoverDistance, setHoverDistance] = useState<number | null>(null);
 
   // Calculate combined data for chart - Keep MORE points for better zoom detail
   const fullData: ChartDataPoint[] = useMemo(() => {
@@ -152,12 +154,15 @@ const SpeedElevationChart = ({
         const smoothedSpeed = count > 0 ? sum / count : 0;
 
         let finalSpeed = parseFloat(smoothedSpeed.toFixed(1));
+        const originalSpeed = finalSpeed; // Keep pure smoothed speed for Y-axis scaling
+
         if (speedCap && finalSpeed > speedCap) finalSpeed = speedCap;
         if (visualLimit && finalSpeed > visualLimit) finalSpeed = visualLimit;
 
         result.push({
           distance: rawData[i].dist,
           speed: finalSpeed,
+          originalSpeed: originalSpeed,
           elevation: rawData[i].ele,
           time: rawData[i].time ? rawData[i].time!.toLocaleTimeString() : '',
           pointIndex: originalIndex,
@@ -178,8 +183,8 @@ const SpeedElevationChart = ({
 
   const hasElevation = fullData.some((d) => d.elevation !== null);
 
-  // Calculate True Max Speed (for Scale) - unaffected by speedLimit
-  const trueMaxSpeed = Math.max(...fullData.map(d => d.speed), 0);
+  // Calculate True Max Speed from ORIGINAL data (unaffected by clamping)
+  const trueMaxSpeed = Math.max(...fullData.map(d => d.originalSpeed), 0);
 
   // Speed chart data: filter by zoom, then sample to EXACTLY 300 points
   const speedChartData = useMemo(() => {
@@ -310,6 +315,11 @@ const SpeedElevationChart = ({
   };
 
   const handleMouseMove = (e: any, chartType: 'speed' | 'elevation') => {
+    // Update hover distance for sync lines
+    if (e?.activeLabel) {
+      setHoverDistance(parseFloat(e.activeLabel));
+    }
+
     // Update cursor based on hover position (elevation chart only)
     if (chartType === 'elevation' && e?.activeLabel && !refAreaLeft) {
       const dist = parseFloat(e.activeLabel);
@@ -411,6 +421,7 @@ const SpeedElevationChart = ({
     setInteractionMode('none');
     setCursorStyle('crosshair');
     setDragStartDist(null);
+    setHoverDistance(null);
   };
 
   // Shared margin configuration
@@ -418,6 +429,7 @@ const SpeedElevationChart = ({
 
   // Calculate Y-axis domain for speed chart
   // ONLY speedCap affects the domain, speedLimit does NOT
+  // Use original speed max to prevent rescaling when visual limit is applied
   const speedYDomain = [0, speedCap ? speedCap : Math.ceil(trueMaxSpeed / 10) * 10];
 
   return (
@@ -479,6 +491,17 @@ const SpeedElevationChart = ({
                 strokeOpacity={0.3}
                 fill="hsl(15, 52%, 58%)"
                 fillOpacity={0.3}
+              />
+            )}
+
+            {/* Synchronized Hover Line */}
+            {hoverDistance !== null && (
+              <ReferenceLine
+                x={hoverDistance}
+                stroke="hsl(23, 5%, 50%)"
+                strokeDasharray="3 3"
+                strokeOpacity={0.6}
+                isFront={true}
               />
             )}
 
@@ -552,6 +575,17 @@ const SpeedElevationChart = ({
                 fill="url(#elevationGradient)"
                 isAnimationActive={false}
               />
+
+              {/* Synchronized Hover Line */}
+              {hoverDistance !== null && (
+                <ReferenceLine
+                  x={hoverDistance}
+                  stroke="hsl(23, 5%, 50%)"
+                  strokeDasharray="3 3"
+                  strokeOpacity={0.6}
+                  isFront={true}
+                />
+              )}
 
               {/* Show selection area when dragging */}
               {activeChart === 'elevation' && refAreaLeft && refAreaRight && (
