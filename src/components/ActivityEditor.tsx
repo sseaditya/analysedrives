@@ -7,42 +7,49 @@ import {
     DialogTitle,
     DialogDescription,
     DialogFooter,
-    DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
-import { Loader2, Globe, Lock, Gauge, MapPin } from "lucide-react";
+import { Loader2, Globe, Lock, Gauge, MapPin, Trash2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 
 interface ActivityData {
     id: string;
+    title: string;
     description: string | null;
     public: boolean;
     speed_cap: number | null;
     hide_radius: number | null;
+    file_path?: string;
 }
 
 interface ActivityEditorProps {
-    children: React.ReactNode;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
     activity: ActivityData;
     onUpdate?: (updated: ActivityData) => void;
 }
 
-const ActivityEditor = ({ children, activity, onUpdate }: ActivityEditorProps) => {
-    const [open, setOpen] = useState(false);
+const ActivityEditor = ({ open, onOpenChange, activity, onUpdate }: ActivityEditorProps) => {
+    const navigate = useNavigate();
     const [saving, setSaving] = useState(false);
+    const [deleting, setDeleting] = useState(false);
 
+    const [title, setTitle] = useState(activity.title || "");
     const [description, setDescription] = useState(activity.description || "");
     const [isPublic, setIsPublic] = useState(activity.public || false);
     const [speedCap, setSpeedCap] = useState(activity.speed_cap || 120);
     const [hideRadius, setHideRadius] = useState(activity.hide_radius || 5);
 
-    // Reset state when dialog opens
+    // Reset state when dialog opens or activity changes
     useEffect(() => {
         if (open) {
+            setTitle(activity.title || "");
             setDescription(activity.description || "");
             setIsPublic(activity.public || false);
             setSpeedCap(activity.speed_cap || 120);
@@ -51,11 +58,17 @@ const ActivityEditor = ({ children, activity, onUpdate }: ActivityEditorProps) =
     }, [open, activity]);
 
     const handleSave = async () => {
+        if (!title.trim()) {
+            toast.error("Title is required");
+            return;
+        }
+
         setSaving(true);
         try {
             const { error } = await supabase
                 .from("activities")
                 .update({
+                    title: title.trim(),
                     description: description.trim() || null,
                     public: isPublic,
                     speed_cap: isPublic ? speedCap : null,
@@ -66,11 +79,12 @@ const ActivityEditor = ({ children, activity, onUpdate }: ActivityEditorProps) =
             if (error) throw error;
 
             toast.success("Activity updated!");
-            setOpen(false);
+            onOpenChange(false);
 
             if (onUpdate) {
                 onUpdate({
                     ...activity,
+                    title: title.trim(),
                     description: description.trim() || null,
                     public: isPublic,
                     speed_cap: isPublic ? speedCap : null,
@@ -85,27 +99,71 @@ const ActivityEditor = ({ children, activity, onUpdate }: ActivityEditorProps) =
         }
     };
 
+    const handleDelete = async () => {
+        if (!window.confirm("Are you sure you want to delete this activity? This cannot be undone.")) return;
+
+        setDeleting(true);
+        try {
+            // 1. Delete file from Storage (if path exists)
+            if (activity.file_path) {
+                const { error: storageError } = await supabase.storage
+                    .from('gpx-files')
+                    .remove([activity.file_path]);
+
+                if (storageError) console.error("Storage delete error:", storageError);
+            }
+
+            // 2. Delete record from Table
+            const { error: dbError } = await supabase
+                .from('activities')
+                .delete()
+                .eq('id', activity.id);
+
+            if (dbError) throw dbError;
+
+            toast.success("Activity deleted");
+            onOpenChange(false);
+            navigate("/dashboard");
+
+        } catch (err) {
+            console.error("Error deleting activity:", err);
+            toast.error("Failed to delete activity");
+        } finally {
+            setDeleting(false);
+        }
+    };
+
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>{children}</DialogTrigger>
-            <DialogContent className="sm:max-w-md z-[1100]">
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md z-[2001]">
                 <DialogHeader>
                     <DialogTitle>Edit Activity</DialogTitle>
                     <DialogDescription>
-                        Update description and visibility settings.
+                        Update details and visibility settings.
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="space-y-6 py-4">
+                    {/* Title */}
+                    <div className="space-y-2">
+                        <Label htmlFor="title">Title</Label>
+                        <Input
+                            id="title"
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            placeholder="Activity Title"
+                        />
+                    </div>
+
                     {/* Description */}
                     <div className="space-y-2">
                         <Label htmlFor="description">Description</Label>
                         <Textarea
                             id="description"
-                            placeholder="Add a description for this activity..."
+                            placeholder="Add a description..."
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
-                            rows={4}
+                            rows={3}
                             className="resize-none"
                         />
                     </div>
@@ -145,7 +203,7 @@ const ActivityEditor = ({ children, activity, onUpdate }: ActivityEditorProps) =
                                 </Label>
                             </div>
                             <p className="text-xs text-muted-foreground">
-                                Hide the first and last {hideRadius}km of your route to protect your privacy. Only you will see the full path.
+                                Hide the first and last {hideRadius}km of your route.
                             </p>
                             <div className="flex items-center gap-4">
                                 <Slider
@@ -173,7 +231,7 @@ const ActivityEditor = ({ children, activity, onUpdate }: ActivityEditorProps) =
                                 </Label>
                             </div>
                             <p className="text-xs text-muted-foreground">
-                                Limit the maximum speed shown to public viewers. Your actual data remains unchanged.
+                                Limit the maximum speed shown to public viewers.
                             </p>
                             <div className="flex items-center gap-4">
                                 <Slider
@@ -192,14 +250,26 @@ const ActivityEditor = ({ children, activity, onUpdate }: ActivityEditorProps) =
                     )}
                 </div>
 
-                <DialogFooter>
-                    <Button variant="ghost" onClick={() => setOpen(false)} disabled={saving}>
-                        Cancel
+                <DialogFooter className="flex sm:justify-between items-center gap-4">
+                    <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={handleDelete}
+                        disabled={saving || deleting}
+                        className="mr-auto"
+                    >
+                        {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4 mr-2" />}
+                        Delete
                     </Button>
-                    <Button onClick={handleSave} disabled={saving}>
-                        {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                        Save Changes
-                    </Button>
+                    <div className="flex gap-2">
+                        <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving || deleting}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleSave} disabled={saving || deleting}>
+                            {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                            Save
+                        </Button>
+                    </div>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

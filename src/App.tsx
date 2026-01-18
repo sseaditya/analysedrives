@@ -13,7 +13,6 @@ const queryClient = new QueryClient();
 
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
-import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Analytics from "./pages/Analytics";
 import Feed from "./pages/Feed";
@@ -31,7 +30,7 @@ const App = () => (
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<Index />} />
-              <Route path="/login" element={<Login />} />
+
               <Route
                 path="/dashboard"
                 element={

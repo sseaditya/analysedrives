@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { MapPin, Activity, TrendingUp, Compass, RotateCcw, MoveRight, GitCommit, Spline, Gauge, Clock, AlertTriangle, Globe, Lock } from "lucide-react";
+import { MapPin, Activity, TrendingUp, Compass, RotateCcw, MoveRight, GitCommit, Spline, Gauge, Clock, AlertTriangle, Globe, Lock, Pencil } from "lucide-react";
 import { ResponsiveContainer } from "recharts";
 import TrackMap from "./TrackMap";
 import SpeedElevationChart from "./SpeedElevationChart";
@@ -34,9 +34,10 @@ interface GPSStatsProps {
     avatar_url: string | null;
     car: string | null;
   } | null;
+  onEdit?: () => void;
 }
 
-const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedCap, isOwner = true, isPublic = false, description, hideRadius = 0, ownerProfile }: GPSStatsProps) => {
+const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedCap, isOwner = true, isPublic = false, description, hideRadius = 0, ownerProfile, onEdit }: GPSStatsProps) => {
   const [hoveredPoint, setHoveredPoint] = useState<GPXPoint | null>(null);
   const [zoomRange, setZoomRange] = useState<[number, number] | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
@@ -306,9 +307,9 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
 
           {/* OVERVIEW TAB */}
           {activeTab === "overview" && (
-            <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="bg-background text-foreground p-6 border border-border">
-                <div className="flex flex-col md:flex-row gap-8">
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="bg-background text-foreground p-4 border border-border">
+                <div className="flex flex-col md:flex-row gap-6">
 
                   {/* LEFT SIDE: Avatar & Title (Mirroring Strava's Left Column) */}
                   <div className="flex-shrink-0 md:w-1/3 border-r border-border/50 pr-8">
@@ -339,7 +340,18 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                         <p className="text-xs text-muted-foreground leading-tight">
                           {new Date(stats.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} on {new Date(stats.startTime).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
                         </p>
-                        <h1 className="text-2xl font-bold tracking-tight mt-1">{fileName}</h1>
+                        <div className="flex items-center gap-3 mt-1">
+                          <h1 className="text-2xl font-bold tracking-tight">{fileName}</h1>
+                          {isOwner && onEdit && (
+                            <button
+                              onClick={onEdit}
+                              className="p-1 hover:bg-muted rounded-full transition-colors text-muted-foreground hover:text-foreground"
+                              title="Edit Activity"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                         <span className="flex items-center gap-1.5 text-xs text-muted-foreground"><MapPin className="w-3 h-3" /> {stats.pointCount.toLocaleString()} points recorded</span>
 
                       </div>
@@ -376,7 +388,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                   {/* RIGHT SIDE: Data Grid (The Strava Data Layout) */}
                   <div className="flex-1">
                     {/* 1. Hero Stats (Distance, Time, Elevation) */}
-                    <div className="grid grid-cols-3 gap-y-12 gap-x-6 mb-8 items-end">
+                    <div className="grid grid-cols-3 gap-y-6 gap-x-6 mb-4 items-end">
                       <div>
                         <div className="flex items-baseline gap-1">
                           <span className="text-2xl font-normal tabular-nums">{formatDistance(stats.totalDistance).replace(' km', '')}</span>
@@ -761,17 +773,17 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
 
           {/* ROUTE STRUCTURE TAB (Consolidated & Refined) */}
           {activeTab === "structure" && (
-            <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
               {/* SECTION 1: ALL METRICS (Consolidated) */}
               <div>
-                <h3 className="text-xl font-bold mb-8 flex items-center gap-2">
+                <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
                   <Spline className="w-6 h-6 text-primary" />
                   Route Metrics
                 </h3>
 
-                <div className="bg-card border border-border rounded-2xl p-8 shadow-sm">
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-y-10 gap-x-8">
+                <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-y-6 gap-x-8">
 
                     {/* Geometry Group */}
                     <div>

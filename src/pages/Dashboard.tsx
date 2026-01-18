@@ -271,7 +271,7 @@ const Dashboard = () => {
     const handleSignOut = async () => {
         try {
             await signOut();
-            navigate("/login");
+            navigate("/");
         } catch (error) {
             console.error("Error signing out:", error);
         }
@@ -352,7 +352,7 @@ const Dashboard = () => {
             {/* Dashboard Header */}
             <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
                 <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex items-center gap-2 flex-shrink-0 cursor-pointer" onClick={() => navigate('/dashboard')}>
                         <span className="font-bold text-xl text-foreground hidden md:block">AnalyseDrive</span>
                     </div>
 
@@ -603,27 +603,6 @@ const Dashboard = () => {
                                         {/* Mini Map */}
                                         <div className="h-40 w-full relative bg-muted/30">
                                             <ActivityMiniMap coordinates={activity.stats?.previewCoordinates} />
-                                            <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
-                                                {/* Actions Bubble */}
-                                                <div className="bg-background/80 backdrop-blur-sm p-1.5 rounded-full shadow-sm flex items-center gap-1">
-                                                    <Button
-                                                        size="icon"
-                                                        variant="ghost"
-                                                        className="h-6 w-6 hover:text-primary"
-                                                        onClick={(e) => handleStartEdit(e, activity)}
-                                                    >
-                                                        <Pencil className="w-3.5 h-3.5" />
-                                                    </Button>
-                                                    <Button
-                                                        size="icon"
-                                                        variant="ghost"
-                                                        className="h-6 w-6 hover:text-destructive"
-                                                        onClick={(e) => handleDelete(e, activity.id, activity.file_path)}
-                                                    >
-                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                    </Button>
-                                                </div>
-                                            </div>
                                         </div>
 
                                         {/* Details */}

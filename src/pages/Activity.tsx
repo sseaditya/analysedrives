@@ -23,6 +23,7 @@ interface ActivityMetadata {
   public: boolean;
   speed_cap: number | null;
   hide_radius: number | null;
+  file_path?: string;
 }
 
 interface OwnerProfile {
@@ -47,6 +48,7 @@ const ActivityPage = () => {
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [accessDenied, setAccessDenied] = useState(false);
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
 
   // Determine ownership
   const isOwner = user && metadata ? user.id === metadata.user_id : false;
@@ -102,6 +104,7 @@ const ActivityPage = () => {
             public: record.public,
             speed_cap: record.speed_cap,
             hide_radius: record.hide_radius,
+            file_path: record.file_path
           });
 
           // 1.5 Fetch owner profile
@@ -250,20 +253,30 @@ const ActivityPage = () => {
               <span className="text-xs text-muted-foreground">Activity Details</span>
             </div>
             {isOwner && metadata && (
-              <ActivityEditor
-                activity={{
-                  id: metadata.id,
-                  description: metadata.description,
-                  public: metadata.public,
-                  speed_cap: metadata.speed_cap,
-                  hide_radius: metadata.hide_radius,
-                }}
-                onUpdate={(updated) => setMetadata({ ...metadata, ...updated })}
-              >
-                <Button variant="ghost" size="icon" className="h-8 w-8">
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setIsEditorOpen(true)}
+                >
                   <Pencil className="w-4 h-4" />
                 </Button>
-              </ActivityEditor>
+                <ActivityEditor
+                  open={isEditorOpen}
+                  onOpenChange={setIsEditorOpen}
+                  activity={{
+                    id: metadata.id,
+                    title: metadata.title,
+                    description: metadata.description,
+                    public: metadata.public,
+                    speed_cap: metadata.speed_cap,
+                    hide_radius: metadata.hide_radius,
+                    file_path: metadata.file_path
+                  }}
+                  onUpdate={(updated) => setMetadata({ ...metadata, ...updated })}
+                />
+              </>
             )}
 
             {/* Header Login Button for Anonymous Users */}
@@ -295,6 +308,7 @@ const ActivityPage = () => {
             description={metadata?.description || null}
             hideRadius={metadata?.hide_radius ?? 5}
             ownerProfile={ownerProfile}
+            onEdit={() => setIsEditorOpen(true)}
           />
         </div>
       </main>

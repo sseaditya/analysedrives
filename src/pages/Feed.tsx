@@ -2,11 +2,19 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { MapPin, LogOut, Clock, Activity, Search, LayoutDashboard, Globe, Car, User } from "lucide-react";
+import { MapPin, LogOut, Clock, Activity, Search, LayoutDashboard, Globe, Car, User, BarChart3 } from "lucide-react";
 import { formatDistance, formatDuration } from "@/utils/gpxParser";
 import { supabase } from "@/lib/supabase";
 import ActivityMiniMap from "@/components/ActivityMiniMap";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import ProfileEditor from "@/components/ProfileEditor";
+
+interface Profile {
+    id: string;
+    display_name: string | null;
+    car: string | null;
+    avatar_url: string | null;
+}
 
 interface ActivityRecord {
     id: string;
@@ -28,19 +36,34 @@ const Feed = () => {
     const [activities, setActivities] = useState<ActivityRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
+    const [profile, setProfile] = useState<Profile | null>(null);
+    const [isLoadingProfile, setIsLoadingProfile] = useState(false);
 
     useEffect(() => {
         fetchPublicActivities();
-    }, []);
+        fetchProfile();
+    }, [user]);
+
+    const fetchProfile = async () => {
+        try {
+            if (!user) return;
+            setIsLoadingProfile(true);
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('id, display_name, car, avatar_url')
+                .eq('id', user.id)
+                .single();
+
+            if (data) setProfile(data);
+        } catch (err) {
+            console.error("Error fetching profile:", err);
+        } finally {
+            setIsLoadingProfile(false);
+        }
+    };
 
     const fetchPublicActivities = async () => {
         try {
-            // Fetch public activities with profile info
-            // Note: Using profiles!user_id if foreign key is named user_id, 
-            // or just profiles if standard relation.
-            // We assume 'activities.user_id' references 'profiles.id'.
-
-            // Try explicit join on user_id
             const { data, error } = await supabase
                 .from('activities')
                 .select('*, profiles:user_id(display_name, car, avatar_url)')
@@ -60,7 +83,7 @@ const Feed = () => {
     const handleSignOut = async () => {
         try {
             await signOut();
-            navigate("/login");
+            navigate("/");
         } catch (error) {
             console.error("Error signing out:", error);
         }
@@ -78,7 +101,7 @@ const Feed = () => {
             {/* Header */}
             <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
                 <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex items-center gap-2 flex-shrink-0 cursor-pointer" onClick={() => navigate('/dashboard')}>
                         <span className="font-serif font-bold text-xl text-foreground hidden md:block tracking-tight">AnalyseDrive</span>
                     </div>
 
@@ -98,12 +121,34 @@ const Feed = () => {
                         <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => navigate('/dashboard')}
-                            className="text-muted-foreground hover:text-primary gap-2"
+                            onClick={() => navigate('/analytics')}
+                            className="text-muted-foreground hover:text-primary gap-2 mr-2"
                         >
-                            <LayoutDashboard className="w-4 h-4" />
-                            <span className="hidden md:inline">My Dashboard</span>
+                            <BarChart3 className="w-4 h-4" />
+                            <span className="hidden md:inline">Analytics</span>
                         </Button>
+                        <ProfileEditor onProfileUpdate={(updatedProfile) => setProfile(updatedProfile)}>
+                            <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
+                                {isLoadingProfile ? (
+                                    <>
+                                        <div className="w-8 h-8 rounded-full bg-muted animate-pulse" />
+                                        <div className="h-4 w-24 bg-muted animate-pulse rounded hidden md:block" />
+                                    </>
+                                ) : (
+                                    <>
+                                        <img
+                                            src={profile?.avatar_url || user?.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.display_name || user?.email || "U")}&background=random`}
+                                            alt={profile?.display_name || user?.email || "User"}
+                                            className="w-8 h-8 rounded-full border border-border object-cover"
+                                            crossOrigin="anonymous"
+                                        />
+                                        <span className="text-sm font-medium hidden md:block">
+                                            {profile?.display_name || user?.user_metadata?.full_name || user?.email}
+                                        </span>
+                                    </>
+                                )}
+                            </div>
+                        </ProfileEditor>
                         <Button variant="ghost" size="sm" onClick={handleSignOut} className="text-muted-foreground hover:text-destructive">
                             <LogOut className="w-4 h-4 mr-2" />
                             Sign Out
