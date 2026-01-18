@@ -131,12 +131,6 @@ const Feed = () => {
                                     >
                                         Community Feed
                                     </button>
-                                    <button
-                                        onClick={() => navigate('/analytics')}
-                                        className="px-4 py-1.5 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-                                    >
-                                        My Analytics
-                                    </button>
                                 </div>
                             </div>
                         </div>

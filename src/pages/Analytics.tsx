@@ -2,14 +2,17 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, BarChart3, Map as MapIcon, RefreshCcw, Loader2 } from "lucide-react";
+import { ArrowLeft, BarChart3, Map as MapIcon, RefreshCcw, Loader2, TrendingUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import SpeedDistributionChart from "@/components/SpeedDistributionChart";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import React from "react";
-import { SpeedBucket, parseGPX, calculateStats, generatePreviewPolyline } from "@/utils/gpxParser";
+import { SpeedBucket, parseGPX, calculateStats, generatePreviewPolyline, formatDistance } from "@/utils/gpxParser";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+
+type TimePeriod = 'week' | 'month' | 'year' | 'all';
 
 const Analytics = () => {
     const { user } = useAuth();
@@ -17,6 +20,7 @@ const Analytics = () => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [loading, setLoading] = useState(true);
     const [activities, setActivities] = useState<any[]>([]);
+    const [timePeriod, setTimePeriod] = useState<TimePeriod>('all');
 
     const [isRepairing, setIsRepairing] = useState(false);
     const [repairProgress, setRepairProgress] = useState(0);
@@ -116,6 +120,36 @@ const Analytics = () => {
             setIsRepairing(false);
         }
     };
+
+    // Cumulative Stats with Time Period Filtering
+    const cumulativeStats = useMemo(() => {
+        const now = new Date();
+        const periodActivities = activities.filter(a => {
+            if (timePeriod === 'all') return true;
+            const date = new Date(a.stats?.startTime || a.created_at);
+            const diffTime = Math.abs(now.getTime() - date.getTime());
+            const diffDays = diffTime / (1000 * 60 * 60 * 24);
+
+            if (timePeriod === 'week') return diffDays <= 7;
+            if (timePeriod === 'month') return diffDays <= 30;
+            if (timePeriod === 'year') return diffDays <= 365;
+            return true;
+        });
+
+        const count = periodActivities.length;
+        const totalDist = periodActivities.reduce((acc, curr) => acc + (curr.stats?.totalDistance || 0), 0);
+        const totalTime = periodActivities.reduce((acc, curr) => acc + (curr.stats?.totalTime || 0), 0);
+        const avgSpeed = totalTime > 0 ? totalDist / (totalTime / 3600) : 0;
+        const maxSpeed = Math.max(...periodActivities.map(a => a.stats?.maxSpeed || 0), 0);
+
+        return {
+            count,
+            totalDist,
+            totalTime,
+            avgSpeed,
+            maxSpeed
+        };
+    }, [activities, timePeriod]);
 
     // 1. Global Speed Profile Aggregation
     const aggregatedSpeedDistribution = useMemo(() => {
@@ -281,6 +315,54 @@ const Analytics = () => {
             </header>
 
             <main className="container mx-auto px-4 py-8 flex-1 space-y-8">
+
+                {/* Your Progress Section */}
+                <div className="bg-card border border-border rounded-2xl p-6">
+                    <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
+                        <TrendingUp className="w-5 h-5 text-primary" />
+                        Your Progress
+                    </h3>
+
+                    {/* Time Period Tabs */}
+                    <div className="grid grid-cols-4 bg-muted/50 p-1 rounded-lg mb-6 max-w-md">
+                        {(['week', 'month', 'year', 'all'] as TimePeriod[]).map((p) => (
+                            <button
+                                key={p}
+                                onClick={() => setTimePeriod(p)}
+                                className={cn(
+                                    "text-sm py-2 rounded-md font-medium capitalize transition-all",
+                                    timePeriod === p ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                {p}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Stats Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                        <div className="p-4 rounded-xl bg-muted/40 border border-border">
+                            <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Total Distance</span>
+                            <div className="text-2xl font-bold mt-1 text-primary">{formatDistance(cumulativeStats.totalDist)}</div>
+                        </div>
+                        <div className="p-4 rounded-xl bg-foreground/5 border border-foreground/10">
+                            <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Total Time</span>
+                            <div className="text-2xl font-bold mt-1 text-foreground">{Math.round(cumulativeStats.totalTime / 3600)}h</div>
+                        </div>
+                        <div className="p-4 rounded-xl bg-foreground/5 border border-foreground/10">
+                            <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Activities</span>
+                            <div className="text-2xl font-bold mt-1 text-foreground">{cumulativeStats.count}</div>
+                        </div>
+                        <div className="p-4 rounded-xl bg-foreground/5 border border-foreground/10">
+                            <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Avg Speed</span>
+                            <div className="text-2xl font-bold mt-1 text-foreground">{cumulativeStats.avgSpeed.toFixed(1)} <span className="text-sm">km/h</span></div>
+                        </div>
+                        <div className="p-4 rounded-xl bg-foreground/5 border border-foreground/10">
+                            <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Max Speed</span>
+                            <div className="text-2xl font-bold mt-1 text-foreground">{cumulativeStats.maxSpeed.toFixed(0)} <span className="text-sm">km/h</span></div>
+                        </div>
+                    </div>
+                </div>
 
                 {/* Global Speed Profile Section */}
                 <div className="bg-card border border-border rounded-2xl p-6">
