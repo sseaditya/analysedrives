@@ -487,7 +487,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                           className="w-full relative py-2 cursor-grab active:cursor-grabbing"
                           thumbClassName="h-4 w-4 rounded-full border-2 border-primary bg-background shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
                           thumbChildren={
-                            <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-popover text-popover-foreground text-xs font-bold px-2 py-0.5 rounded shadow-md border whitespace-nowrap">
+                            <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-popover text-popover-foreground text-xs font-bold px-2 py-0.5 rounded shadow-md border whitespace-nowrap">
                               {speedLimit} km/h
                             </div>
                           }
@@ -503,7 +503,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                           id="speed-limiter"
                           checked={showLimiter}
                           onCheckedChange={setShowLimiter}
-                          className="data-[state=checked]:bg-amber-500"
+                          className="data-[state=checked]:bg-[#CC785C]"
                         />
                         <Label htmlFor="speed-limiter" className="text-xs font-semibold cursor-pointer">Speed Limiter</Label>
                       </div>
@@ -539,13 +539,15 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                                 <span className="text-lg font-normal tabular-nums text-muted-foreground/50 line-through">
                                   {zoomRange && subsetStats ? formatDuration(subsetStats.totalTime) : formatDuration(stats.totalTime)}
                                 </span>
-                                <div className="flex items-baseline gap-1.5 animate-in fade-in slide-in-from-left-2">
-                                  <span className="text-lg font-normal text-amber-500 tabular-nums">
+                                <div className="flex items-baseline gap-2 animate-in fade-in slide-in-from-left-2">
+                                  <span className="text-lg font-normal text-[#CC785C] tabular-nums">
                                     {formatDuration(limitedStats.simulatedTime)}
                                   </span>
-                                  <span className="flex items-center text-xs font-bold text-amber-500/90 gap-0.5">
-                                    <TrendingUp className="w-3 h-3" />
-                                    +{formatDuration(limitedStats.timeAdded)}
+                                  <span className="text-lg font-normal text-[#CC785C] tabular-nums">
+                                    (+{formatDuration(limitedStats.timeAdded)})
+                                  </span>
+                                  <span className="text-sm font-semibold text-[#CC785C]">
+                                    {((limitedStats.timeAdded / (zoomRange && subsetStats ? subsetStats.totalTime : stats.totalTime)) * 100).toFixed(0)}% slower
                                   </span>
                                 </div>
                               </>
@@ -589,13 +591,12 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                                 <span className="text-lg font-normal tabular-nums text-muted-foreground/50 line-through">
                                   {zoomRange && subsetStats ? formatSpeed(subsetStats.avgSpeed) : formatSpeed(stats.avgSpeed)}
                                 </span>
-                                <div className="flex items-baseline gap-1.5 animate-in fade-in slide-in-from-left-2">
-                                  <span className="text-lg font-normal text-amber-500 tabular-nums">
+                                <div className="flex items-baseline gap-2 animate-in fade-in slide-in-from-left-2">
+                                  <span className="text-lg font-normal text-[#CC785C] tabular-nums">
                                     {formatSpeed(limitedStats.newAvgSpeed)}
                                   </span>
-                                  <span className="flex items-center text-xs font-bold text-amber-500/90">
-                                    <TrendingUp className="w-3 h-3 rotate-180 mr-0.5" />
-                                    -{formatSpeed((zoomRange && subsetStats ? subsetStats.avgSpeed : stats.avgSpeed) - limitedStats.newAvgSpeed)}
+                                  <span className="text-lg font-normal text-[#CC785C] tabular-nums">
+                                    (-{formatSpeed((zoomRange && subsetStats ? subsetStats.avgSpeed : stats.avgSpeed) - limitedStats.newAvgSpeed)})
                                   </span>
                                 </div>
                               </>
@@ -791,26 +792,17 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Rotation</span>
                     </div>
                     <div>
-                      <span className="block text-2xl font-normal text-foreground">{stats.twistinessScore.toFixed(0)}</span>
+                      <span className="block text-2xl font-normal text-foreground">{stats.twistinessScore.toFixed(0)}°/km</span>
                       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Twistiness</span>
                     </div>
-                    <div>
-                      <span className="block text-2xl font-normal text-foreground">{stats.tightTurnsCount}</span>
-                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Tight Turns</span>
-                    </div>
-                    <div>
-                      <span className="block text-2xl font-normal text-foreground">{stats.hairpinCount}</span>
-                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Hairpins</span>
-                    </div>
-
                     {/* Terrain Group */}
                     <div>
                       <span className="block text-2xl font-normal text-foreground leading-none">+{stats.elevationGain.toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
-                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Gain</span>
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Uphill</span>
                     </div>
                     <div>
                       <span className="block text-2xl font-normal text-foreground leading-none">-{stats.elevationLoss.toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
-                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Loss</span>
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Downhill</span>
                     </div>
                     <div>
                       <span className="block text-2xl font-normal text-foreground leading-none">{stats.hillinessScore.toFixed(1)}</span>
@@ -818,15 +810,15 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                     </div>
                     <div>
                       <span className="block text-2xl font-normal text-foreground leading-none">{stats.elevationGain - stats.elevationLoss > 0 ? "+" : ""}{(stats.elevationGain - stats.elevationLoss).toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
-                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Net Change</span>
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Elevation Gain</span>
                     </div>
                     <div>
                       <span className="block text-2xl font-normal text-foreground leading-none">{stats.maxElevation.toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
-                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Peak</span>
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Highest Point</span>
                     </div>
                     <div>
                       <span className="block text-2xl font-normal text-foreground leading-none">{stats.minElevation.toFixed(0)}<span className="text-xl text-muted-foreground ml-1">m</span></span>
-                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Low</span>
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Lowest Point</span>
                     </div>
                   </div>
                 </div>
@@ -835,7 +827,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
               {/* SECTION 2: PROFILES (Geometry + Terrain) */}
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
                 {/* Straight vs Curvy Profile */}
-                <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+                <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
                   <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
                     <Spline className="w-5 h-5 text-primary" />
                     Geometry Profile
@@ -886,7 +878,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                 </div>
 
                 {/* Terrain Profile */}
-                <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+                <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
                   <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
                     <TrendingUp className="w-5 h-5 text-primary" />
                     Terrain Time Profile

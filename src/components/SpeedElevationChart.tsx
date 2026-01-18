@@ -498,9 +498,8 @@ const SpeedElevationChart = ({
             {hoverDistance !== null && (
               <ReferenceLine
                 x={hoverDistance}
-                stroke="hsl(23, 5%, 50%)"
-                strokeDasharray="3 3"
-                strokeOpacity={0.6}
+                stroke="hsl(var(--foreground))"
+                strokeOpacity={1}
                 isFront={true}
               />
             )}
@@ -580,9 +579,8 @@ const SpeedElevationChart = ({
               {hoverDistance !== null && (
                 <ReferenceLine
                   x={hoverDistance}
-                  stroke="hsl(23, 5%, 50%)"
-                  strokeDasharray="3 3"
-                  strokeOpacity={0.6}
+                  stroke="hsl(var(--foreground))"
+                  strokeOpacity={1}
                   isFront={true}
                 />
               )}
