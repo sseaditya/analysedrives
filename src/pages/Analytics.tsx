@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, BarChart3, Map as MapIcon, RefreshCcw, Loader2, TrendingUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import SpeedDistributionChart from "@/components/SpeedDistributionChart";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -392,6 +393,11 @@ const Analytics = () => {
                     </div>
                 </div>
             </main>
+
+            {/* Floating Theme Toggle */}
+            <div className="fixed bottom-6 left-6 z-[1050]">
+                <ThemeToggle />
+            </div>
         </div>
     );
 };

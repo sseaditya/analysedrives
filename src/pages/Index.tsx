@@ -10,6 +10,7 @@ import { useTheme } from "@/components/ThemeProvider";
 const Index = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+
   const { theme } = useTheme();
   const isDark = theme === 'dark';
 
@@ -50,9 +51,7 @@ const Index = () => {
               Dashboard
             </button>
           )}
-          <div className="ml-4 inline-block">
-            <ThemeToggle />
-          </div>
+
         </div>
       </header>
 
@@ -66,7 +65,7 @@ const Index = () => {
             alt="Cyclists"
             className="w-full h-full object-cover opacity-90 transition-opacity duration-500"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent to-[#FAFAF7]/40 mix-blend-multiply dark:to-background/40"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent to-[#FAFAF7]/40 mix-blend-multiply dark:hidden"></div>
         </div>
 
         {/* Center Content */}
@@ -105,7 +104,7 @@ const Index = () => {
             alt="Runner"
             className="w-full h-full object-cover opacity-90 transition-opacity duration-500"
           />
-          <div className="absolute inset-0 bg-gradient-to-l from-transparent to-[#FAFAF7]/40 mix-blend-multiply dark:to-background/40"></div>
+          <div className="absolute inset-0 bg-gradient-to-l from-transparent to-[#FAFAF7]/40 mix-blend-multiply dark:hidden"></div>
         </div>
 
       </main>
@@ -134,6 +133,11 @@ const Index = () => {
           </div>
         </div>
       </section>
+
+      {/* Floating Theme Toggle */}
+      <div className="fixed bottom-6 left-6 z-[1050]">
+        <ThemeToggle />
+      </div>
 
     </div>
   );
