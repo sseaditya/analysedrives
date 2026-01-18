@@ -319,8 +319,8 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
 
                   {/* LEFT SIDE: Avatar & Title (Mirroring Strava's Left Column) */}
                   <div className="flex-shrink-0 md:w-1/3 border-r border-border/50 pr-8">
-                    <div className="flex gap-4">
-                      <div className="w-16 h-16 rounded-full bg-muted overflow-hidden border border-border">
+                    <div className="flex gap-4 items-start">
+                      <div className="w-24 h-24 rounded-full bg-muted overflow-hidden border border-border flex-shrink-0">
                         {ownerProfile?.avatar_url ? (
                           <img
                             src={ownerProfile.avatar_url}
@@ -334,23 +334,26 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                           </div>
                         )}
                       </div>
-                      <div className="flex items-center gap-3 mt-1">
-                        <h1 className="text-2xl font-bold tracking-tight">{fileName}</h1>
-                      </div>
-                      <div className="flex-1">
-                        {ownerProfile?.display_name && (
-                          <p className="text-sm font-medium text-foreground">
-                            {ownerProfile.display_name}
-                            {ownerProfile.car && (
-                              <span className="text-muted-foreground font-normal"> • {ownerProfile.car}</span>
-                            )}
-                          </p>
-                        )}
-                        <p className="text-xs text-muted-foreground leading-tight">
-                          {new Date(stats.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} on {new Date(stats.startTime).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
-                        </p>
-                        <span className="flex items-center gap-1.5 text-xs text-muted-foreground"><MapPin className="w-3 h-3" /> {stats.pointCount.toLocaleString()} points recorded</span>
 
+                      <div className="flex flex-col gap-1 pt-1">
+                        <div className="flex items-center gap-3">
+                          <h1 className="text-2xl font-bold tracking-tight leading-tight">{fileName}</h1>
+                        </div>
+
+                        <div className="flex flex-col gap-0.5">
+                          {ownerProfile?.display_name && (
+                            <p className="text-sm font-medium text-foreground">
+                              {ownerProfile.display_name}
+                              {ownerProfile.car && (
+                                <span className="text-muted-foreground font-normal"> • {ownerProfile.car}</span>
+                              )}
+                            </p>
+                          )}
+                          <p className="text-xs text-muted-foreground leading-tight">
+                            {new Date(stats.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} on {new Date(stats.startTime).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                          </p>
+                          <span className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5"><MapPin className="w-3 h-3" /> {stats.pointCount.toLocaleString()} points recorded</span>
+                        </div>
                       </div>
                     </div>
 

@@ -69,6 +69,7 @@ const SpeedElevationChart = ({
   const [cursorStyle, setCursorStyle] = useState<string>('crosshair');
   const [dragStartDist, setDragStartDist] = useState<number | null>(null);
   const [hoverDistance, setHoverDistance] = useState<number | null>(null);
+  const [hoveredPart, setHoveredPart] = useState<'left' | 'right' | 'center' | null>(null);
 
   // Calculate combined data for chart - Keep MORE points for better zoom detail
   const fullData: ChartDataPoint[] = useMemo(() => {
@@ -325,6 +326,15 @@ const SpeedElevationChart = ({
       const dist = parseFloat(e.activeLabel);
       const mode = getInteractionMode(dist);
       setCursorStyle(getCursorForMode(mode));
+
+      // Update hover part state
+      if (mode === 'resize-left') setHoveredPart('left');
+      else if (mode === 'resize-right') setHoveredPart('right');
+      else if (mode === 'move-window') setHoveredPart('center');
+      else setHoveredPart(null);
+    } else if (chartType === 'speed') {
+      // Reset interaction hovering if on speed chart
+      setHoveredPart(null);
     }
 
     if (refAreaLeft && activeChart === chartType) {
@@ -421,7 +431,10 @@ const SpeedElevationChart = ({
     setInteractionMode('none');
     setCursorStyle('crosshair');
     setDragStartDist(null);
+    setCursorStyle('crosshair');
+    setDragStartDist(null);
     setHoverDistance(null);
+    setHoveredPart(null);
   };
 
   // Shared margin configuration
@@ -433,7 +446,7 @@ const SpeedElevationChart = ({
   const speedYDomain = [0, speedCap ? speedCap : Math.ceil(trueMaxSpeed / 10) * 10];
 
   return (
-    <div className="h-full w-full rounded-2xl border border-border bg-card p-6 select-none flex flex-col">
+    <div className="h-full w-full rounded-2xl border border-border bg-card p-3 select-none flex flex-col cursor-crosshair">
       {/* Speed Chart (Main - 70% height) */}
       <div className="flex-[7] w-full min-h-0 mb-4">
         <ResponsiveContainer width="100%" height="100%">
@@ -607,20 +620,20 @@ const SpeedElevationChart = ({
                     stroke="hsl(15, 52%, 58%)"
                     strokeWidth={2}
                     fill="hsl(15, 52%, 58%)"
-                    fillOpacity={0.15}
+                    fillOpacity={hoveredPart === 'center' ? 0.35 : 0.15}
                   />
                   {/* Left edge handle - thicker for better visibility */}
                   <ReferenceLine
                     x={zoomStartDist}
-                    stroke="hsl(15, 52%, 58%)"
-                    strokeWidth={6}
+                    stroke={hoveredPart === 'left' ? "hsl(var(--foreground))" : "hsl(15, 52%, 58%)"}
+                    strokeWidth={hoveredPart === 'left' ? 8 : 6}
                     strokeOpacity={0.95}
                   />
                   {/* Right edge handle - thicker for better visibility */}
                   <ReferenceLine
                     x={zoomEndDist}
-                    stroke="hsl(15, 52%, 58%)"
-                    strokeWidth={6}
+                    stroke={hoveredPart === 'right' ? "hsl(var(--foreground))" : "hsl(15, 52%, 58%)"}
+                    strokeWidth={hoveredPart === 'right' ? 8 : 6}
                     strokeOpacity={0.95}
                   />
                 </>
