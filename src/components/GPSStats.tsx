@@ -479,7 +479,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                             <TooltipTrigger asChild>
                               <Info className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs text-xs z-50">
+                            <TooltipContent className="max-w-xs text-xs z-[1100]">
                               <p>Interactive timeline showing speed (upper chart) and elevation (lower chart). Select speed/elevation chart to zoom, drag and interact. Use speed limiter to understand how longer your drive takes if you stick to a speed limit.</p>
                             </TooltipContent>
                           </Tooltip>
