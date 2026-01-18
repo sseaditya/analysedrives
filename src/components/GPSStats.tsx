@@ -279,7 +279,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col lg:flex-row gap-8">
         {/* Sidebar Navigation */}
-        <aside className="w-full lg:w-64 flex-shrink-0">
+        <aside className="w-full lg:w-40 flex-shrink-0">
           <div className="sticky top-24 space-y-2">
             {tabs.map((tab) => {
               const Icon = tab.icon;
@@ -452,7 +452,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
               </div>
 
               {/* Map Section */}
-              <div className="bg-card border border-border rounded-2xl p-2 shadow-sm">
+              <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
                 <h3 className="text-lg font-semibold mb-4 text-foreground">Route Map</h3>
                 <TrackMap
                   points={mapPoints}
@@ -466,7 +466,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
               </div>
 
               {/* Speed & Elevation Chart */}
-              <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+              <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
                 {/* Compact Header & Stats Row */}
                 <div className="flex flex-col gap-3 mb-3">
                   <div className="flex items-center justify-between gap-4">
@@ -694,7 +694,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
               </div>
 
               {/* Speed Distribution (Moved to Overview) */}
-              <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+              <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-lg font-semibold flex items-center gap-2">
                     <TrendingUp className="w-5 h-5 text-primary" />
@@ -713,7 +713,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
 
               {/* Motion Time Profile (Moved to Overview) */}
               {/* Uses effective stats (subset if zoomed, full if not) */}
-              <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+              <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <Activity className="w-5 h-5 text-primary" />
                   Motion Time Profile
