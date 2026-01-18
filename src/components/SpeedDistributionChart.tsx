@@ -140,7 +140,8 @@ const SpeedDistributionChart = ({ points, speedLimit, buckets }: SpeedDistributi
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} opacity={0.3} />
                 <XAxis
                     dataKey="range"
-                    stroke="hsl(var(--muted-foreground))"
+                    stroke="hsl(var(--foreground))"
+                    strokeOpacity={0.6}
                     fontSize={10}
                     tickLine={false}
                     axisLine={false}
@@ -177,7 +178,7 @@ const SpeedDistributionChart = ({ points, speedLimit, buckets }: SpeedDistributi
                     cursor={{ fill: 'hsl(var(--muted)/0.2)' }}
                     formatter={(value: number, name: string) => {
                         if (name === "Time (min)") return [`${value.toFixed(1)} min`, name];
-                        if (name === "Distance (km)") return [`${value.toFixed(2)} km`, name];
+                        if (name === "Distance (km)") return [`${value.toFixed(1)} km`, name];
                         return [value, name];
                     }}
                 />

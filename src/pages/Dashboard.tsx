@@ -575,7 +575,7 @@ const Dashboard = () => {
                                 )}
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                                 {filteredActivities.map((activity) => (
                                     <div
                                         key={activity.id}
@@ -635,14 +635,19 @@ const Dashboard = () => {
                                                 </div>
                                                 <div className="flex flex-col">
                                                     <span className="text-[10px] uppercase text-muted-foreground font-medium">Time</span>
-                                                    <span className="text-sm font-bold flex items-center gap-1">
+                                                    <span className="text-sm font-bold flex items-center gap-1 whitespace-nowrap">
                                                         <Clock className="w-3 h-3 text-primary" />
-                                                        {formatDuration(activity.stats?.totalTime || 0)}
+                                                        {(() => {
+                                                            const totalSeconds = activity.stats?.totalTime || 0;
+                                                            const h = Math.floor(totalSeconds / 3600);
+                                                            const m = Math.floor((totalSeconds % 3600) / 60);
+                                                            return h > 0 ? `${h}h ${m}m` : `${m}m`;
+                                                        })()}
                                                     </span>
                                                 </div>
                                                 <div className="flex flex-col">
                                                     <span className="text-[10px] uppercase text-muted-foreground font-medium">Avg</span>
-                                                    <span className="text-sm font-bold flex items-center gap-1">
+                                                    <span className="text-sm font-bold flex items-center gap-1 whitespace-nowrap">
                                                         <Activity className="w-3 h-3 text-primary" />
                                                         {activity.stats?.avgSpeed ? `${activity.stats.avgSpeed.toFixed(1)}` : '-'}
                                                     </span>
