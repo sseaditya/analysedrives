@@ -911,16 +911,13 @@ export function formatDuration(seconds: number): string {
   return `${secs}s`;
 }
 
-export function formatDistance(km: number): string {
-  if (km < 1) {
-    return `${(km * 1000).toFixed(0)} m`;
-  }
-  return `${km.toFixed(2)} km`;
-}
+export const formatDistance = (km: number): string => {
+  return `${km.toFixed(1)} km`;
+};
 
-export function formatSpeed(kmh: number): string {
+export const formatSpeed = (kmh: number): string => {
   return `${kmh.toFixed(1)} km/h`;
-}
+};
 
 // Helper to downsample track for mini-maps (preserve shape with fewer points)
 export function generatePreviewPolyline(points: GPXPoint[], targetCount: number = 100): [number, number][] {

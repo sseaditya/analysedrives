@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { MapPin, Activity, TrendingUp, Compass, RotateCcw, MoveRight, GitCommit, Spline, Gauge, Clock, AlertTriangle, Globe, Lock, Pencil } from "lucide-react";
+import { MapPin, Activity, TrendingUp, Compass, RotateCcw, MoveRight, GitCommit, Spline, Gauge, Clock, AlertTriangle, Globe, Lock, Pencil, Info } from "lucide-react";
 import { ResponsiveContainer } from "recharts";
 import TrackMap from "./TrackMap";
 import SpeedElevationChart from "./SpeedElevationChart";
@@ -9,6 +9,12 @@ import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   GPXStats,
   GPXPoint,
@@ -308,7 +314,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
           {/* OVERVIEW TAB */}
           {activeTab === "overview" && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="bg-background text-foreground p-4 border border-border">
+              <div className="bg-background text-foreground p-3 border border-border">
                 <div className="flex flex-col md:flex-row gap-6">
 
                   {/* LEFT SIDE: Avatar & Title (Mirroring Strava's Left Column) */}
@@ -328,6 +334,9 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                           </div>
                         )}
                       </div>
+                      <div className="flex items-center gap-3 mt-1">
+                        <h1 className="text-2xl font-bold tracking-tight">{fileName}</h1>
+                      </div>
                       <div className="flex-1">
                         {ownerProfile?.display_name && (
                           <p className="text-sm font-medium text-foreground">
@@ -340,18 +349,6 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                         <p className="text-xs text-muted-foreground leading-tight">
                           {new Date(stats.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} on {new Date(stats.startTime).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
                         </p>
-                        <div className="flex items-center gap-3 mt-1">
-                          <h1 className="text-2xl font-bold tracking-tight">{fileName}</h1>
-                          {isOwner && onEdit && (
-                            <button
-                              onClick={onEdit}
-                              className="p-1 hover:bg-muted rounded-full transition-colors text-muted-foreground hover:text-foreground"
-                              title="Edit Activity"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
                         <span className="flex items-center gap-1.5 text-xs text-muted-foreground"><MapPin className="w-3 h-3" /> {stats.pointCount.toLocaleString()} points recorded</span>
 
                       </div>
@@ -452,8 +449,8 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
               </div>
 
               {/* Map Section */}
-              <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
-                <h3 className="text-lg font-semibold mb-4 text-foreground">Route Map</h3>
+              <div className="bg-card border border-border rounded-2xl p-3 shadow-sm">
+                <h3 className="text-lg font-semibold mb-2 text-foreground">Route Map</h3>
                 <TrackMap
                   points={mapPoints}
                   hoveredPoint={hoveredPoint}
@@ -466,13 +463,25 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
               </div>
 
               {/* Speed & Elevation Chart */}
-              <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
+              <div className="bg-card border border-border rounded-2xl p-3 shadow-sm">
                 {/* Compact Header & Stats Row */}
                 <div className="flex flex-col gap-3 mb-3">
                   <div className="flex items-center justify-between gap-4">
                     {/* Left: Title */}
                     <div className="flex-shrink-0">
-                      <h3 className="text-lg font-semibold text-foreground">Speed & Elevation Timeline</h3>
+                      <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                        Speed & Elevation Timeline
+                        <TooltipProvider delayDuration={300}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs text-xs">
+                              <p>Interactive timeline showing speed (line) and elevation (area). Drag to zoom, hover for details.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </h3>
                     </div>
 
                     {/* Middle: Slider (Centered & Flex-grow) */}
@@ -633,7 +642,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
 
                     {/* Hover Data Display - Right Side */}
                     {hoveredPoint && (
-                      <div className="flex items-center gap-2 bg-primary/10 px-2.5 py-1 rounded-md border border-primary/20 animate-in fade-in slide-in-from-right-2 duration-150">
+                      <div className="flex items-center gap-2 bg-primary/10 px-2.5 rounded-md border border-primary/20 animate-in fade-in slide-in-from-right-2 duration-150">
                         {/* Calculate cumulative distance to this point */}
                         {(() => {
                           let cumDist = 0;
@@ -656,6 +665,8 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                             if (timeDiff > 0) {
                               pointSpeed = dist / timeDiff;
                               if (pointSpeed > 200) pointSpeed = 0;
+                              // Clamp for public viewers if speed cap exists
+                              if (!isOwner && speedCap && pointSpeed > speedCap) pointSpeed = speedCap;
                             }
                           }
 
@@ -695,13 +706,23 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
               </div>
 
               {/* Speed Distribution (Moved to Overview) */}
-              <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
+              <div className="bg-card border border-border rounded-2xl p-3 shadow-sm">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-lg font-semibold flex items-center gap-2">
                     <TrendingUp className="w-5 h-5 text-primary" />
                     Speed Distribution
                     {zoomRange && <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Filtered to selection</span>}
                     {effectiveChartSpeedLimit && <span className="text-xs font-normal text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full">Capped at {effectiveChartSpeedLimit} km/h</span>}
+                    <TooltipProvider delayDuration={300}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs text-xs">
+                          <p>Histogram showing how much time/distance was spent at each speed range.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </h3>
                 </div>
                 <div className="h-[250px]">
@@ -714,7 +735,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
 
               {/* Motion Time Profile (Moved to Overview) */}
               {/* Uses effective stats (subset if zoomed, full if not) */}
-              <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
+              <div className="bg-card border border-border rounded-2xl p-3 shadow-sm">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <Activity className="w-5 h-5 text-primary" />
                   Motion Time Profile
@@ -758,7 +779,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                           ].map(item => (
                             <div key={item.label} className="flex items-center gap-2">
                               <div className={cn("w-2 h-2 rounded-full", item.color)} />
-                              <span className="font-medium text-muted-foreground">{item.label}:</span>
+                              <span className="font-medium text-muted-foreground">{item.label} ({((item.seconds / total) * 100).toFixed(0)}%):</span>
                               <span className="font-mono tabular-nums text-foreground">{formatDuration(item.seconds)}</span>
                             </div>
                           ))}
@@ -783,13 +804,17 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                   Route Metrics
                 </h3>
 
-                <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
+                <div className="bg-card border border-border rounded-2xl p-3 shadow-sm">
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-y-6 gap-x-8">
 
                     {/* Geometry Group */}
                     <div>
                       <span className="block text-2xl font-normal text-foreground">{Math.round(stats.totalHeadingChange).toLocaleString()}°</span>
                       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Rotation</span>
+                    </div>
+                    <div>
+                      <span className="block text-2xl font-normal text-foreground">{stats.tightTurnsCount + stats.hairpinCount}</span>
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-2 block">Turns</span>
                     </div>
                     <div>
                       <span className="block text-2xl font-normal text-foreground">{stats.twistinessScore.toFixed(0)}°/km</span>
@@ -827,7 +852,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
               {/* SECTION 2: PROFILES (Geometry + Terrain) */}
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
                 {/* Straight vs Curvy Profile */}
-                <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
+                <div className="bg-card border border-border rounded-2xl p-3 shadow-sm">
                   <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
                     <Spline className="w-5 h-5 text-primary" />
                     Geometry Profile
@@ -878,7 +903,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                 </div>
 
                 {/* Terrain Profile */}
-                <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
+                <div className="bg-card border border-border rounded-2xl p-3 shadow-sm">
                   <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
                     <TrendingUp className="w-5 h-5 text-primary" />
                     Terrain Time Profile
