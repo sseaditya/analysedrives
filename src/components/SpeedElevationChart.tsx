@@ -10,7 +10,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import { GPXPoint } from "@/utils/gpxParser";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface SpeedElevationChartProps {
@@ -90,6 +90,11 @@ function calculateNiceTicks(min: number, max: number, type: 'distance' | 'time',
     else niceFraction = 10;
 
     niceStep = niceFraction * Math.pow(10, exponent);
+
+    // Prefer integer steps for distance unless range is very small (< 1.5km)
+    if (niceStep < 1 && range >= 1.5) {
+      niceStep = 1;
+    }
   } else {
     // Nice steps for time (seconds)
     // Custom set of nice intervals
@@ -335,9 +340,14 @@ const SpeedElevationChart = ({
   const xAxisDataKey = xAxisMode === 'time' ? 'elapsedTime' : 'distance';
   const speedXDomain = xAxisMode === 'time' ? [speedMinTime, speedMaxTime] : [speedMinDistance, speedMaxDistance];
   const fullXDomain = xAxisMode === 'time' ? [fullMinTime, fullMaxTime] : [fullMinDistance, fullMaxDistance];
-  const xAxisFormatter = xAxisMode === 'time'
-    ? (value: number) => formatTimeAxis(value)
-    : (value: number) => `${Math.round(value)} km`;
+  const xAxisFormatter = useCallback((value: number) => {
+    if (xAxisMode === 'time') {
+      return formatTimeAxis(value);
+    }
+    // Distance: show decimals if step is fractional, otherwise integer
+    const isInteger = value % 1 === 0;
+    return isInteger ? `${Math.round(value)} km` : `${parseFloat(value.toFixed(1))} km`;
+  }, [xAxisMode]);
 
   // Get current zoom range boundaries for brush interaction
   const zoomStartDist = zoomRange ? fullData.find(d => d.pointIndex >= zoomRange[0])?.distance || fullMinDistance : null;
