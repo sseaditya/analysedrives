@@ -21,6 +21,7 @@ interface SpeedElevationChartProps {
   speedLimit?: number | null;
   speedCap?: number | null;
   visualLimit?: number;
+  xAxisMode?: 'distance' | 'time';
 }
 
 interface ChartDataPoint {
@@ -29,7 +30,20 @@ interface ChartDataPoint {
   originalSpeed: number; // For scaling Y-axis correctly even when visual limit is applied
   elevation: number | null;
   time: string;
+  elapsedTime: number; // Elapsed time in seconds from start
   pointIndex: number;
+}
+
+// Format elapsed time for axis display (e.g., "5:30" for 5 min 30 sec)
+function formatTimeAxis(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}h`;
+  }
+  return `${minutes}:${secs.toString().padStart(2, '0')}`;
 }
 
 // Haversine formula
@@ -61,7 +75,8 @@ const SpeedElevationChart = ({
   zoomRange,
   speedLimit,
   speedCap,
-  visualLimit
+  visualLimit,
+  xAxisMode = 'distance'
 }: SpeedElevationChartProps) => {
   const [refAreaLeft, setRefAreaLeft] = useState<string | null>(null);
   const [refAreaRight, setRefAreaRight] = useState<string | null>(null);
@@ -75,8 +90,9 @@ const SpeedElevationChart = ({
 
   // Calculate combined data for chart - Keep MORE points for better zoom detail
   const fullData: ChartDataPoint[] = useMemo(() => {
-    const rawData: { dist: number; speed: number; ele: number | null; time: Date | undefined }[] = [];
+    const rawData: { dist: number; speed: number; ele: number | null; time: Date | undefined; elapsed: number }[] = [];
     let cumulativeDistance = 0;
+    const startTime = points[0]?.time?.getTime() || 0;
 
     // Dynamic Acceleration Limit
     const getMaxAccel = (speedKmh: number) => {
@@ -123,7 +139,8 @@ const SpeedElevationChart = ({
         dist: parseFloat(cumulativeDistance.toFixed(2)),
         speed: speedKmh,
         ele: curr.ele !== undefined ? curr.ele : null,
-        time: curr.time
+        time: curr.time,
+        elapsed: curr.time ? (curr.time.getTime() - startTime) / 1000 : 0
       });
     }
 
@@ -168,6 +185,7 @@ const SpeedElevationChart = ({
           originalSpeed: originalSpeed,
           elevation: rawData[i].ele,
           time: rawData[i].time ? rawData[i].time!.toLocaleTimeString() : '',
+          elapsedTime: rawData[i].elapsed,
           pointIndex: originalIndex,
         });
       }
@@ -227,9 +245,23 @@ const SpeedElevationChart = ({
   const fullMinDistance = fullData[0]?.distance || 0;
   const fullMaxDistance = fullData[fullData.length - 1]?.distance || 100;
 
+  // Calculate time domains (for time mode)
+  const fullMinTime = fullData[0]?.elapsedTime || 0;
+  const fullMaxTime = fullData[fullData.length - 1]?.elapsedTime || 0;
+
   // Speed chart domain - DYNAMIC based on zoom
   const speedMinDistance = speedChartData[0]?.distance || fullMinDistance;
   const speedMaxDistance = speedChartData[speedChartData.length - 1]?.distance || fullMaxDistance;
+  const speedMinTime = speedChartData[0]?.elapsedTime || fullMinTime;
+  const speedMaxTime = speedChartData[speedChartData.length - 1]?.elapsedTime || fullMaxTime;
+
+  // Determine X-axis configuration based on mode
+  const xAxisDataKey = xAxisMode === 'time' ? 'elapsedTime' : 'distance';
+  const speedXDomain = xAxisMode === 'time' ? [speedMinTime, speedMaxTime] : [speedMinDistance, speedMaxDistance];
+  const fullXDomain = xAxisMode === 'time' ? [fullMinTime, fullMaxTime] : [fullMinDistance, fullMaxDistance];
+  const xAxisFormatter = xAxisMode === 'time'
+    ? (value: number) => formatTimeAxis(value)
+    : (value: number) => `${Math.round(value)} km`;
 
   // Get current zoom range boundaries for brush interaction
   const zoomStartDist = zoomRange ? fullData.find(d => d.pointIndex >= zoomRange[0])?.distance || fullMinDistance : null;
@@ -379,6 +411,9 @@ const SpeedElevationChart = ({
       }
     }
 
+    // Skip hover callback on mobile to remove floating data display
+    if (isMobile) return;
+
     if (!e || !e.activePayload || !e.activePayload[0] || !onHover) {
       return;
     }
@@ -483,16 +518,16 @@ const SpeedElevationChart = ({
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(23, 5%, 82%)" opacity={0.5} />
             <XAxis
-              dataKey="distance"
+              dataKey={xAxisDataKey}
               type="number"
-              domain={[speedMinDistance, speedMaxDistance]}
+              domain={speedXDomain}
               stroke="hsl(var(--foreground))"
               strokeOpacity={0.6}
               fontSize={12}
               tickLine={false}
               axisLine={false}
               tickCount={8}
-              tickFormatter={(value) => `${Math.round(value)} km`}
+              tickFormatter={xAxisFormatter}
               allowDataOverflow
             />
             <YAxis
@@ -576,16 +611,16 @@ const SpeedElevationChart = ({
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(23, 5%, 82%)" opacity={0.3} />
               <XAxis
-                dataKey="distance"
+                dataKey={xAxisDataKey}
                 type="number"
-                domain={[fullMinDistance, fullMaxDistance]}
+                domain={fullXDomain}
                 stroke="hsl(var(--foreground))"
                 strokeOpacity={0.6}
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
                 tickCount={8}
-                tickFormatter={(value) => `${Math.round(value)} km`}
+                tickFormatter={xAxisFormatter}
                 allowDataOverflow
               />
               <YAxis

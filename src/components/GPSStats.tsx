@@ -1,9 +1,11 @@
 import { useState, useMemo } from "react";
 import { MapPin, Activity, TrendingUp, Compass, RotateCcw, MoveRight, GitCommit, Spline, Gauge, Clock, AlertTriangle, Globe, Lock, Pencil, Info } from "lucide-react";
 import { ResponsiveContainer } from "recharts";
+import { useIsMobile } from "@/hooks/use-mobile";
 import TrackMap from "./TrackMap";
 import SpeedElevationChart from "./SpeedElevationChart";
 import SpeedDistributionChart from "./SpeedDistributionChart";
+import DistanceTimeChart from "./DistanceTimeChart";
 import ChartRangeSlider from "./ChartRangeSlider";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
@@ -20,6 +22,7 @@ import {
   GPXPoint,
   formatDistance,
   formatDuration,
+  formatDurationShort,
   formatSpeed,
   haversineDistance,
   calculateLimitedStats,
@@ -140,6 +143,8 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
 
   const [speedLimit, setSpeedLimit] = useState<number>(initialSpeedLimit);
   const [showLimiter, setShowLimiter] = useState(false);
+  const [xAxisMode, setXAxisMode] = useState<'distance' | 'time'>('distance');
+  const isMobile = useIsMobile();
 
   const tabs = [
     { id: "overview", label: "Overview", icon: MapPin },
@@ -398,7 +403,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                       </div>
                       <div>
                         <div className="flex items-baseline gap-1">
-                          <span className="text-2xl font-normal tabular-nums">{formatDuration(displayStats.totalTime)}</span>
+                          <span className="text-2xl font-normal tabular-nums">{isMobile ? formatDurationShort(displayStats.totalTime) : formatDuration(displayStats.totalTime)}</span>
                         </div>
                         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Elapsed Time</span>
                       </div>
@@ -417,7 +422,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Elevation Gained</span>
                       </div>
                       <div>
-                        <div className="text-2xl font-normal tabular-nums">{formatDuration(displayStats.movingTime)}</div>
+                        <div className="text-2xl font-normal tabular-nums">{isMobile ? formatDurationShort(displayStats.movingTime) : formatDuration(displayStats.movingTime)}</div>
                         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Moving Time</span>
                       </div>
                       <div>
@@ -509,6 +514,28 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
 
                     {/* Right: Controls (Toggle + Reset) */}
                     <div className="flex items-center gap-3 flex-shrink-0 order-2 md:order-3">
+                      {/* Distance/Time Toggle */}
+                      <div className="flex items-center gap-2 bg-muted/50 px-2.5 py-1 rounded-full border border-border/50">
+                        <button
+                          onClick={() => setXAxisMode('distance')}
+                          className={cn(
+                            "text-xs font-semibold px-2 py-0.5 rounded-md transition-colors",
+                            xAxisMode === 'distance' ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          Distance
+                        </button>
+                        <button
+                          onClick={() => setXAxisMode('time')}
+                          className={cn(
+                            "text-xs font-semibold px-2 py-0.5 rounded-md transition-colors",
+                            xAxisMode === 'time' ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          Time
+                        </button>
+                      </div>
+
                       {/* Speed Limiter Toggle */}
                       <div className="flex items-center gap-2 bg-muted/50 px-2.5 py-1 rounded-full border border-border/50">
                         <Switch
@@ -547,22 +574,24 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                           // Owner's speed limiter
                           if (showLimiter && limitedStats && limitedStats.timeAdded > 0) {
                             return (
-                              <>
+                              <div className="flex flex-col gap-0.5 animate-in fade-in slide-in-from-left-2">
+                                {/* Line 1: Original values */}
                                 <span className="text-lg font-normal tabular-nums text-muted-foreground/50 line-through">
                                   {zoomRange && subsetStats ? formatDuration(subsetStats.totalTime) : formatDuration(stats.totalTime)}
                                 </span>
-                                <div className="flex items-baseline gap-2 animate-in fade-in slide-in-from-left-2">
+                                {/* Line 2: Projected values */}
+                                <div className="flex items-baseline gap-2">
                                   <span className="text-lg font-normal text-[#CC785C] tabular-nums">
                                     {formatDuration(limitedStats.simulatedTime)}
                                   </span>
-                                  <span className="text-lg font-normal text-[#CC785C] tabular-nums">
+                                  <span className="text-sm text-[#CC785C] tabular-nums">
                                     (+{formatDuration(limitedStats.timeAdded)})
                                   </span>
-                                  <span className="text-sm font-semibold text-[#CC785C]">
+                                  <span className="text-xs font-semibold text-[#CC785C]">
                                     {((limitedStats.timeAdded / (zoomRange && subsetStats ? subsetStats.totalTime : stats.totalTime)) * 100).toFixed(0)}% slower
                                   </span>
                                 </div>
-                              </>
+                              </div>
                             );
                           }
                           // Public viewer's speed cap (only if avgSpeed > speedCap)
@@ -599,19 +628,21 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                           // Owner's speed limiter
                           if (showLimiter && limitedStats && limitedStats.timeAdded > 0) {
                             return (
-                              <>
+                              <div className="flex flex-col gap-0.5 animate-in fade-in slide-in-from-left-2">
+                                {/* Line 1: Original values */}
                                 <span className="text-lg font-normal tabular-nums text-muted-foreground/50 line-through">
                                   {zoomRange && subsetStats ? formatSpeed(subsetStats.avgSpeed) : formatSpeed(stats.avgSpeed)}
                                 </span>
-                                <div className="flex items-baseline gap-2 animate-in fade-in slide-in-from-left-2">
+                                {/* Line 2: Projected values */}
+                                <div className="flex items-baseline gap-2">
                                   <span className="text-lg font-normal text-[#CC785C] tabular-nums">
                                     {formatSpeed(limitedStats.newAvgSpeed)}
                                   </span>
-                                  <span className="text-lg font-normal text-[#CC785C] tabular-nums">
+                                  <span className="text-sm text-[#CC785C] tabular-nums">
                                     (-{formatSpeed((zoomRange && subsetStats ? subsetStats.avgSpeed : stats.avgSpeed) - limitedStats.newAvgSpeed)})
                                   </span>
                                 </div>
-                              </>
+                              </div>
                             );
                           }
                           // Public viewer's speed cap (only if avgSpeed > speedCap)
@@ -643,8 +674,8 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                       </div>
                     </div>
 
-                    {/* Hover Data Display - Right Side */}
-                    {hoveredPoint && (
+                    {/* Hover Data Display - Right Side (Desktop only) */}
+                    {!isMobile && hoveredPoint && (
                       <div className="flex items-center gap-2 bg-primary/10 px-2.5 rounded-md border border-primary/20 animate-in fade-in slide-in-from-right-2 duration-150">
                         {/* Calculate cumulative distance to this point */}
                         {(() => {
@@ -703,6 +734,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                       speedLimit={effectiveChartSpeedLimit}
                       speedCap={!isOwner ? speedCap : null}
                       visualLimit={showLimiter ? speedLimit : undefined}
+                      xAxisMode={xAxisMode}
                     />
                   </ResponsiveContainer>
                 </div>
@@ -732,6 +764,35 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                   <SpeedDistributionChart
                     points={filteredPoints}
                     speedLimit={!isOwner ? (effectiveChartSpeedLimit ?? speedCap) : effectiveChartSpeedLimit}
+                  />
+                </div>
+              </div>
+
+              {/* Distance vs Time Chart */}
+              <div className="bg-card border border-border rounded-2xl p-3 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-primary" />
+                    Distance vs Time
+                    {zoomRange && <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Filtered to selection</span>}
+                    <TooltipProvider delayDuration={300}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs text-xs">
+                          <p>Shows distance traveled over time, helping visualize the progress of your drive.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </h3>
+                </div>
+                <div className="h-[200px]">
+                  <DistanceTimeChart
+                    points={filteredPoints}
+                    zoomRange={zoomRange}
+                    speedLimit={effectiveChartSpeedLimit}
+                    speedCap={!isOwner ? speedCap : null}
                   />
                 </div>
               </div>

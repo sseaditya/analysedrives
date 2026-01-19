@@ -911,6 +911,17 @@ export function formatDuration(seconds: number): string {
   return `${secs}s`;
 }
 
+// Mobile-friendly version that omits seconds
+export function formatDurationShort(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  return `${minutes}m`;
+}
+
 export const formatDistance = (km: number): string => {
   return `${km.toFixed(1)} km`;
 };
