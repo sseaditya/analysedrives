@@ -35,15 +35,16 @@ interface ChartDataPoint {
 }
 
 // Format elapsed time for axis display (e.g., "5:30" for 5 min 30 sec)
+// Format elapsed time for axis display (e.g., "30m", "1h", "1h 30m")
 function formatTimeAxis(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = Math.floor(seconds % 60);
 
   if (hours > 0) {
-    return `${hours}:${minutes.toString().padStart(2, '0')}h`;
+    if (minutes === 0) return `${hours}h`;
+    return `${hours}h ${minutes}m`;
   }
-  return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  return `${minutes}m`;
 }
 
 // Haversine formula
@@ -534,7 +535,8 @@ const SpeedElevationChart = ({
               fontSize={12}
               tickLine={false}
               axisLine={false}
-              tickCount={8}
+              tickCount={xAxisMode === 'time' ? 8 : undefined}
+              ticks={xAxisMode === 'distance' ? undefined : undefined} // Let Recharts handle ticks
               tickFormatter={xAxisFormatter}
               allowDataOverflow
             />
@@ -547,6 +549,8 @@ const SpeedElevationChart = ({
               label={{ value: "Speed (km/h)", angle: -90, position: "insideLeft", fontSize: 12, fill: "hsl(15, 52%, 58%)" }}
               width={60}
               domain={speedYDomain}
+              tickCount={6}
+              ticks={speedCap ? undefined : undefined} // Let Recharts handle ticks for now but limit count
             />
             {/* Tooltip disabled - hover data shown in header */}
             <Area
@@ -672,12 +676,12 @@ const SpeedElevationChart = ({
               )}
 
               {/* Visual handles for current zoom range */}
-              {zoomRange && zoomStartDist && zoomEndDist && (
+              {zoomRange && zoomStartVal !== null && zoomEndVal !== null && (
                 <>
                   {/* Main selection area */}
                   <ReferenceArea
-                    x1={zoomStartDist}
-                    x2={zoomEndDist}
+                    x1={zoomStartVal}
+                    x2={zoomEndVal}
                     strokeOpacity={0.6}
                     stroke="hsl(15, 52%, 58%)"
                     strokeWidth={2}
@@ -686,14 +690,14 @@ const SpeedElevationChart = ({
                   />
                   {/* Left edge handle - thicker for better visibility */}
                   <ReferenceLine
-                    x={zoomStartDist}
+                    x={zoomStartVal}
                     stroke={hoveredPart === 'left' ? "hsl(var(--foreground))" : "hsl(15, 52%, 58%)"}
                     strokeWidth={hoveredPart === 'left' ? 8 : 6}
                     strokeOpacity={0.95}
                   />
                   {/* Right edge handle - thicker for better visibility */}
                   <ReferenceLine
-                    x={zoomEndDist}
+                    x={zoomEndVal}
                     stroke={hoveredPart === 'right' ? "hsl(var(--foreground))" : "hsl(15, 52%, 58%)"}
                     strokeWidth={hoveredPart === 'right' ? 8 : 6}
                     strokeOpacity={0.95}

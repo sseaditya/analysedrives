@@ -27,16 +27,16 @@ interface ChartDataPoint {
     pointIndex: number;
 }
 
-// Format elapsed time for axis display (e.g., "5:30" for 5 min 30 sec)
+// Format elapsed time for axis display (e.g., "30m", "1h", "1h 30m")
 function formatTimeAxis(seconds: number): string {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
 
     if (hours > 0) {
-        return `${hours}:${minutes.toString().padStart(2, '0')}h`;
+        if (minutes === 0) return `${hours}h`;
+        return `${hours}h ${minutes}m`;
     }
-    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+    return `${minutes}m`;
 }
 
 const DistanceTimeChart = ({
@@ -221,7 +221,13 @@ const DistanceTimeChart = ({
                         if (name === "distance") return [`${value.toFixed(2)} km`, "Distance"];
                         return [value, name];
                     }}
-                    labelFormatter={(label) => `Time: ${formatTimeAxis(label as number)}`}
+                    labelFormatter={(label) => {
+                        const seconds = label as number;
+                        const h = Math.floor(seconds / 3600);
+                        const m = Math.floor((seconds % 3600) / 60);
+                        const s = Math.floor(seconds % 60);
+                        return `Time: ${h}h ${m}m ${s}s`;
+                    }}
                 />
                 <Area
                     type="monotone"

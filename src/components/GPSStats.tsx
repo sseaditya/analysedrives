@@ -737,8 +737,18 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                             }
                           }
 
+                          const elapsedTime = (hoveredPoint.time && points[0].time)
+                            ? (hoveredPoint.time.getTime() - points[0].time.getTime()) / 1000
+                            : 0;
+                          const h = Math.floor(elapsedTime / 3600);
+                          const m = Math.floor((elapsedTime % 3600) / 60);
+                          const s = Math.floor(elapsedTime % 60);
+                          const timeStr = `${h}h ${m}m ${s}s`;
+
                           return (
                             <>
+                              <span className="text-sm font-mono font-semibold">{timeStr}</span>
+                              <div className="w-px h-3.5 bg-border" />
                               <span className="text-sm font-mono font-semibold">{formatDistance(cumDist)}</span>
                               <div className="w-px h-3.5 bg-border" />
                               <span className="text-sm font-mono font-semibold">{formatSpeed(pointSpeed)}</span>
