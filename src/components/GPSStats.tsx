@@ -573,24 +573,42 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                         {(() => {
                           // Owner's speed limiter
                           if (showLimiter && limitedStats && limitedStats.timeAdded > 0) {
+                            if (isMobile) {
+                              // Mobile: Two-line stacked
+                              return (
+                                <div className="flex flex-col gap-0.5 animate-in fade-in slide-in-from-left-2">
+                                  <span className="text-xs font-normal tabular-nums text-muted-foreground/50 line-through">
+                                    {zoomRange && subsetStats ? formatDurationShort(subsetStats.totalTime) : formatDurationShort(stats.totalTime)}
+                                  </span>
+                                  <div className="flex items-baseline gap-1.5">
+                                    <span className="text-sm font-normal text-[#CC785C] tabular-nums">
+                                      {formatDurationShort(limitedStats.simulatedTime)}
+                                    </span>
+                                    <span className="text-xs text-[#CC785C] tabular-nums">
+                                      (+{formatDurationShort(limitedStats.timeAdded)})
+                                    </span>
+                                    <span className="text-[10px] font-semibold text-[#CC785C]">
+                                      {((limitedStats.timeAdded / (zoomRange && subsetStats ? subsetStats.totalTime : stats.totalTime)) * 100).toFixed(0)}%
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            }
+                            // Desktop: Inline (Original behavior restored)
                             return (
-                              <div className="flex flex-col gap-0.5 animate-in fade-in slide-in-from-left-2">
-                                {/* Line 1: Original values */}
+                              <div className="flex items-baseline gap-2 animate-in fade-in slide-in-from-left-2">
                                 <span className="text-lg font-normal tabular-nums text-muted-foreground/50 line-through">
                                   {zoomRange && subsetStats ? formatDuration(subsetStats.totalTime) : formatDuration(stats.totalTime)}
                                 </span>
-                                {/* Line 2: Projected values */}
-                                <div className="flex items-baseline gap-2">
-                                  <span className="text-lg font-normal text-[#CC785C] tabular-nums">
-                                    {formatDuration(limitedStats.simulatedTime)}
-                                  </span>
-                                  <span className="text-sm text-[#CC785C] tabular-nums">
-                                    (+{formatDuration(limitedStats.timeAdded)})
-                                  </span>
-                                  <span className="text-xs font-semibold text-[#CC785C]">
-                                    {((limitedStats.timeAdded / (zoomRange && subsetStats ? subsetStats.totalTime : stats.totalTime)) * 100).toFixed(0)}% slower
-                                  </span>
-                                </div>
+                                <span className="text-lg font-normal text-[#CC785C] tabular-nums">
+                                  {formatDuration(limitedStats.simulatedTime)}
+                                </span>
+                                <span className="text-sm text-[#CC785C] tabular-nums">
+                                  (+{formatDuration(limitedStats.timeAdded)})
+                                </span>
+                                <span className="text-xs font-semibold text-[#CC785C]">
+                                  {((limitedStats.timeAdded / (zoomRange && subsetStats ? subsetStats.totalTime : stats.totalTime)) * 100).toFixed(0)}% slower
+                                </span>
                               </div>
                             );
                           }
@@ -627,21 +645,36 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                         {(() => {
                           // Owner's speed limiter
                           if (showLimiter && limitedStats && limitedStats.timeAdded > 0) {
+                            if (isMobile) {
+                              // Mobile: Two-line stacked
+                              return (
+                                <div className="flex flex-col gap-0.5 animate-in fade-in slide-in-from-left-2">
+                                  <span className="text-xs font-normal tabular-nums text-muted-foreground/50 line-through">
+                                    {zoomRange && subsetStats ? formatSpeed(subsetStats.avgSpeed) : formatSpeed(stats.avgSpeed)}
+                                  </span>
+                                  <div className="flex items-baseline gap-1.5">
+                                    <span className="text-sm font-normal text-[#CC785C] tabular-nums">
+                                      {formatSpeed(limitedStats.newAvgSpeed)}
+                                    </span>
+                                    <span className="text-xs text-[#CC785C] tabular-nums">
+                                      (-{formatSpeed((zoomRange && subsetStats ? subsetStats.avgSpeed : stats.avgSpeed) - limitedStats.newAvgSpeed)})
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            }
+                            // Desktop: Inline (Original behavior)
                             return (
-                              <div className="flex flex-col gap-0.5 animate-in fade-in slide-in-from-left-2">
-                                {/* Line 1: Original values */}
+                              <div className="flex items-baseline gap-2 animate-in fade-in slide-in-from-left-2">
                                 <span className="text-lg font-normal tabular-nums text-muted-foreground/50 line-through">
                                   {zoomRange && subsetStats ? formatSpeed(subsetStats.avgSpeed) : formatSpeed(stats.avgSpeed)}
                                 </span>
-                                {/* Line 2: Projected values */}
-                                <div className="flex items-baseline gap-2">
-                                  <span className="text-lg font-normal text-[#CC785C] tabular-nums">
-                                    {formatSpeed(limitedStats.newAvgSpeed)}
-                                  </span>
-                                  <span className="text-sm text-[#CC785C] tabular-nums">
-                                    (-{formatSpeed((zoomRange && subsetStats ? subsetStats.avgSpeed : stats.avgSpeed) - limitedStats.newAvgSpeed)})
-                                  </span>
-                                </div>
+                                <span className="text-lg font-normal text-[#CC785C] tabular-nums">
+                                  {formatSpeed(limitedStats.newAvgSpeed)}
+                                </span>
+                                <span className="text-sm text-[#CC785C] tabular-nums">
+                                  (-{formatSpeed((zoomRange && subsetStats ? subsetStats.avgSpeed : stats.avgSpeed) - limitedStats.newAvgSpeed)})
+                                </span>
                               </div>
                             );
                           }
@@ -791,6 +824,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                   <DistanceTimeChart
                     points={filteredPoints}
                     zoomRange={zoomRange}
+                    onZoomChange={setZoomRange}
                     speedLimit={effectiveChartSpeedLimit}
                     speedCap={!isOwner ? speedCap : null}
                   />

@@ -267,20 +267,28 @@ const SpeedElevationChart = ({
   const zoomStartDist = zoomRange ? fullData.find(d => d.pointIndex >= zoomRange[0])?.distance || fullMinDistance : null;
   const zoomEndDist = zoomRange ? fullData.find(d => d.pointIndex >= zoomRange[1])?.distance || fullMaxDistance : null;
 
-  // Edge detection threshold (in distance units) - 3% for better UX
-  const EDGE_THRESHOLD = (fullMaxDistance - fullMinDistance) * 0.03;
+  const zoomStartTime = zoomRange ? fullData.find(d => d.pointIndex >= zoomRange[0])?.elapsedTime || fullMinTime : null;
+  const zoomEndTime = zoomRange ? fullData.find(d => d.pointIndex >= zoomRange[1])?.elapsedTime || fullMaxTime : null;
 
-  const getInteractionMode = (distanceValue: number): InteractionMode => {
-    if (!zoomStartDist || !zoomEndDist) return 'new-selection';
+  // Generic values for interaction logic
+  const zoomStartVal = xAxisMode === 'time' ? zoomStartTime : zoomStartDist;
+  const zoomEndVal = xAxisMode === 'time' ? zoomEndTime : zoomEndDist;
+  const fullMinVal = xAxisMode === 'time' ? fullMinTime : fullMinDistance;
+  const fullMaxVal = xAxisMode === 'time' ? fullMaxTime : fullMaxDistance;
 
-    const distToLeft = Math.abs(distanceValue - zoomStartDist);
-    const distToRight = Math.abs(distanceValue - zoomEndDist);
+  // Edge detection threshold - 3% for better UX
+  const EDGE_THRESHOLD = (fullMaxVal - fullMinVal) * 0.03;
 
-    if (distToLeft < EDGE_THRESHOLD) return 'resize-left';
-    if (distToRight < EDGE_THRESHOLD) return 'resize-right';
-    if (distanceValue > zoomStartDist && distanceValue < zoomEndDist) return 'move-window';
+  const getInteractionMode = (val: number): InteractionMode => {
+    if (zoomStartVal === null || zoomEndVal === null) return 'new-selection';
+
+    if (Math.abs(val - zoomStartVal) < EDGE_THRESHOLD) return 'resize-left';
+    if (Math.abs(val - zoomEndVal) < EDGE_THRESHOLD) return 'resize-right';
+    if (val > zoomStartVal && val < zoomEndVal) return 'move-window';
+
     return 'new-selection';
   };
+
 
   const getCursorForMode = (mode: InteractionMode): string => {
     switch (mode) {
@@ -309,14 +317,14 @@ const SpeedElevationChart = ({
       return;
     }
 
-    // Identify start/end distances
-    let leftDist = parseFloat(refAreaLeft);
-    let rightDist = parseFloat(refAreaRight);
+    // Identify start/end values
+    let leftVal = parseFloat(refAreaLeft);
+    let rightVal = parseFloat(refAreaRight);
 
-    if (leftDist > rightDist) [leftDist, rightDist] = [rightDist, leftDist];
+    if (leftVal > rightVal) [leftVal, rightVal] = [rightVal, leftVal];
 
-    const startData = fullData.find(p => p.distance >= leftDist);
-    const endData = fullData.find(p => p.distance >= rightDist);
+    const startData = fullData.find(p => xAxisMode === 'time' ? p.elapsedTime >= leftVal : p.distance >= leftVal);
+    const endData = fullData.find(p => xAxisMode === 'time' ? p.elapsedTime >= rightVal : p.distance >= rightVal);
 
     if (startData && endData) {
       let startIndex = startData.pointIndex;
@@ -374,36 +382,36 @@ const SpeedElevationChart = ({
     if (refAreaLeft && activeChart === chartType) {
       // dragging
       if (e.activeLabel) {
-        const currentDist = parseFloat(e.activeLabel);
+        const currentVal = parseFloat(e.activeLabel);
 
-        if (interactionMode === 'move-window' && zoomStartDist && zoomEndDist && dragStartDist !== null) {
+        if (interactionMode === 'move-window' && zoomStartVal !== null && zoomEndVal !== null && dragStartDist !== null) {
           // Move entire window
-          const delta = currentDist - dragStartDist;
-          const windowSize = zoomEndDist - zoomStartDist;
+          const delta = currentVal - dragStartDist;
+          const windowSize = zoomEndVal - zoomStartVal;
 
-          let newStart = zoomStartDist + delta;
-          let newEnd = zoomEndDist + delta;
+          let newStart = zoomStartVal + delta;
+          let newEnd = zoomEndVal + delta;
 
           // Constrain to bounds
-          if (newStart < fullMinDistance) {
-            newStart = fullMinDistance;
+          if (newStart < fullMinVal) {
+            newStart = fullMinVal;
             newEnd = newStart + windowSize;
           }
-          if (newEnd > fullMaxDistance) {
-            newEnd = fullMaxDistance;
+          if (newEnd > fullMaxVal) {
+            newEnd = fullMaxVal;
             newStart = newEnd - windowSize;
           }
 
           setRefAreaLeft(newStart.toString());
           setRefAreaRight(newEnd.toString());
-        } else if (interactionMode === 'resize-left' && zoomEndDist) {
+        } else if (interactionMode === 'resize-left' && zoomEndVal !== null) {
           // Resize from left edge
-          setRefAreaLeft(currentDist.toString());
-          setRefAreaRight(zoomEndDist.toString());
-        } else if (interactionMode === 'resize-right' && zoomStartDist) {
+          setRefAreaLeft(currentVal.toString());
+          setRefAreaRight(zoomEndVal.toString());
+        } else if (interactionMode === 'resize-right' && zoomStartVal !== null) {
           // Resize from right edge
-          setRefAreaLeft(zoomStartDist.toString());
-          setRefAreaRight(currentDist.toString());
+          setRefAreaLeft(zoomStartVal.toString());
+          setRefAreaRight(currentVal.toString());
         } else {
           // New selection
           setRefAreaRight(e.activeLabel);
@@ -437,8 +445,8 @@ const SpeedElevationChart = ({
 
         if (mode === 'move-window') {
           setDragStartDist(dist);
-          setRefAreaLeft(zoomStartDist?.toString() || null);
-          setRefAreaRight(zoomEndDist?.toString() || null);
+          setRefAreaLeft(zoomStartVal?.toString() || null);
+          setRefAreaRight(zoomEndVal?.toString() || null);
           setCursorStyle('grabbing');
         } else {
           setRefAreaLeft(e.activeLabel);
