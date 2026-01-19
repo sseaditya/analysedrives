@@ -62,8 +62,8 @@ const Index = () => {
         <div className="hidden lg:block w-1/4 h-screen relative">
           <img
             src={isDark ? "/left_dark.jpg" : "/left_light.jpg"}
-            alt="Cyclists"
-            className="w-full h-full object-cover opacity-90 transition-opacity duration-500"
+            alt="Left_Image"
+            className="w-full h-full object-cover duration-500"
           />
           <div className="absolute inset-0 bg-gradient-to-r from-transparent to-[#FAFAF7]/40 mix-blend-multiply dark:hidden"></div>
         </div>
@@ -101,8 +101,8 @@ const Index = () => {
         <div className="hidden lg:block w-1/4 h-screen relative">
           <img
             src={isDark ? "/right_dark.jpg" : "/right_light.jpg"}
-            alt="Runner"
-            className="w-full h-full object-cover opacity-90 transition-opacity duration-500"
+            alt="Right_Image"
+            className="w-full h-full object-cover duration-500"
           />
           <div className="absolute inset-0 bg-gradient-to-l from-transparent to-[#FAFAF7]/40 mix-blend-multiply dark:hidden"></div>
         </div>
