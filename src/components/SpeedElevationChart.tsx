@@ -67,6 +67,81 @@ function haversineDistance(
   return R * c;
 }
 
+// Helper to calculate "nice" ticks (multiples of 10, 20, 50, etc.)
+function calculateNiceTicks(min: number, max: number, type: 'distance' | 'time', maxTicks = 8): number[] {
+  if (min === max) return [min];
+
+  const range = max - min;
+  // If range is 0 or negative, return min
+  if (range <= 0) return [min];
+
+  const roughStep = range / (maxTicks - 1);
+  let niceStep = 0;
+
+  if (type === 'distance') {
+    // Nice steps for distance: 1, 2, 5, 10 in respective powers of 10
+    const exponent = Math.floor(Math.log10(roughStep));
+    const fraction = roughStep / Math.pow(10, exponent);
+
+    let niceFraction = 1;
+    if (fraction <= 1) niceFraction = 1;
+    else if (fraction <= 2) niceFraction = 2;
+    else if (fraction <= 5) niceFraction = 5;
+    else niceFraction = 10;
+
+    niceStep = niceFraction * Math.pow(10, exponent);
+  } else {
+    // Nice steps for time (seconds)
+    // Custom set of nice intervals
+    const niceIntervals = [
+      1, 5, 10, 15, 30, // seconds
+      60, 120, 300, 600, 900, 1200, 1800, 3600, // 1m... 15m, 20m, 30m, 1h
+      7200, 10800, 14400, 18000, 21600, 43200, 86400 // 2h+
+    ];
+
+    // Find closest nice interval >= roughStep roughly
+    // We prefer larger steps to avoid crowding if roughStep matches somewhat
+    const closest = niceIntervals.reduce((prev, curr) => {
+      return Math.abs(curr - roughStep) < Math.abs(prev - roughStep) ? curr : prev;
+    });
+    niceStep = closest;
+
+    // Fallback for huge time ranges (use hour multiples)
+    if (roughStep > 86400) {
+      niceStep = Math.ceil(roughStep / 3600) * 3600;
+    }
+  }
+
+  // Generate ticks ensuring we include 0 if min is close to 0 (unzoomed)
+  const ticks: number[] = [];
+  // round min to nearest niceStep
+  let startTick = Math.ceil(min / niceStep) * niceStep;
+
+  // Correction: if min is 0, startTick is 0.
+  // We want to ensure we cover the range visually. 
+  // If startTick < min, it's fine (will be clipped or hidden, but Recharts handles it).
+  // Actually, we should filter ticks to be >= min and <= max to avoid empty space if axis is strict?
+  // User asked for "starts at 0" specifically.
+  if (min === 0) startTick = 0;
+
+  // Generate
+  let current = startTick;
+  // Safety break to prevent infinite loops
+  let safety = 0;
+  while (current <= max && safety < 100) {
+    if (current >= min) {
+      ticks.push(current);
+    }
+    current += niceStep;
+    // Precision fix for repeated addition
+    current = parseFloat(current.toPrecision(12));
+    safety++;
+  }
+
+  if (ticks.length === 0) return [min, max];
+  return ticks;
+}
+
 type InteractionMode = 'none' | 'new-selection' | 'resize-left' | 'resize-right' | 'move-window';
 
 const SpeedElevationChart = ({
@@ -276,6 +351,16 @@ const SpeedElevationChart = ({
   const zoomEndVal = xAxisMode === 'time' ? zoomEndTime : zoomEndDist;
   const fullMinVal = xAxisMode === 'time' ? fullMinTime : fullMinDistance;
   const fullMaxVal = xAxisMode === 'time' ? fullMaxTime : fullMaxDistance;
+
+  // Calculate strict ticks for synchro
+  const xAxisTicks = useMemo(() => {
+    return calculateNiceTicks(
+      speedXDomain[0],
+      speedXDomain[1],
+      xAxisMode,
+      8 // Approx 7-8 ticks
+    );
+  }, [speedXDomain, xAxisMode]);
 
   // Edge detection threshold - 3% for better UX
   const EDGE_THRESHOLD = (fullMaxVal - fullMinVal) * 0.03;
@@ -535,8 +620,7 @@ const SpeedElevationChart = ({
               fontSize={12}
               tickLine={false}
               axisLine={false}
-              tickCount={xAxisMode === 'time' ? 8 : undefined}
-              ticks={xAxisMode === 'distance' ? undefined : undefined} // Let Recharts handle ticks
+              ticks={xAxisTicks} // Use custom nice ticks
               tickFormatter={xAxisFormatter}
               allowDataOverflow
             />
@@ -625,13 +709,17 @@ const SpeedElevationChart = ({
               <XAxis
                 dataKey={xAxisDataKey}
                 type="number"
-                domain={fullXDomain}
+                domain={fullXDomain} // Note: Elevation chart X-axis is usually Full domain, not Zoom domain?
+                // Wait, user wants them "same markings (assuming no selection)".
+                // If selection exists, Elevation chart acts as a brush (full view).
+                // So its ticks should be based on FULL domain.
                 stroke="hsl(var(--foreground))"
                 strokeOpacity={0.6}
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
-                tickCount={8}
+                // Calculate ticks for full domain
+                ticks={calculateNiceTicks(fullXDomain[0], fullXDomain[1], xAxisMode, 8)}
                 tickFormatter={xAxisFormatter}
                 allowDataOverflow
               />
