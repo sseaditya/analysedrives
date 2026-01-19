@@ -16,7 +16,7 @@ const Terms = () => {
             </header>
             <main className="container mx-auto px-4 py-8 max-w-prose space-y-6 text-foreground">
                 <h2 className="text-2xl font-bold">1. Introduction</h2>
-                <p>By using AnalyseDrive, you agree to these terms.</p>
+                <p>By using DrivenStat, you agree to these terms.</p>
                 <h2 className="text-2xl font-bold">2. Usage</h2>
                 <p>You may upload GPX files for analysis. You retain ownership of your data.</p>
                 <h2 className="text-2xl font-bold">3. Disclaimer</h2>

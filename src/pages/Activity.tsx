@@ -239,18 +239,18 @@ const ActivityPage = () => {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="flex flex-col items-end">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-lg text-foreground">{data.fileName}</span>
+            <div className="flex flex-col items-end max-w-[50%] md:max-w-none">
+              <div className="flex items-center gap-2 max-w-full">
+                <span className="font-bold text-lg text-foreground truncate max-w-[150px] md:max-w-xs lg:max-w-none" title={data.fileName}>{data.fileName}</span>
                 {metadata && (
                   metadata.public ? (
-                    <Globe className="w-4 h-4 text-green-500" />
+                    <Globe className="w-4 h-4 text-green-500 shrink-0" />
                   ) : (
-                    <Lock className="w-4 h-4 text-muted-foreground" />
+                    <Lock className="w-4 h-4 text-muted-foreground shrink-0" />
                   )
                 )}
               </div>
-              <span className="text-xs text-muted-foreground">Activity Details</span>
+              <span className="text-xs text-muted-foreground hidden sm:inline">Activity Details</span>
             </div>
             {isOwner && metadata && (
               <>

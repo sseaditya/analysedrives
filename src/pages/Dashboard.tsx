@@ -353,7 +353,7 @@ const Dashboard = () => {
             <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
                 <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-2 flex-shrink-0 cursor-pointer" onClick={() => navigate('/dashboard')}>
-                        <span className="font-bold text-xl text-foreground hidden md:block">AnalyseDrive</span>
+                        <span className="font-bold text-xl text-foreground hidden md:block">DrivenStat</span>
                     </div>
 
                     {/* Search Bar */}
@@ -557,7 +557,7 @@ const Dashboard = () => {
                             <div className="text-center py-12 bg-muted/30 rounded-2xl border border-dashed border-border px-6">
                                 {activities.length === 0 ? (
                                     <>
-                                        <h3 className="text-lg font-bold mb-2">Welcome to AnalyseDrive!</h3>
+                                        <h3 className="text-lg font-bold mb-2">Welcome to DrivenStat!</h3>
                                         <p className="text-muted-foreground mb-4">You haven't uploaded any drives yet.</p>
                                         <p className="text-sm text-muted-foreground mb-6">
                                             Need help getting your GPX files?

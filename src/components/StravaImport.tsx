@@ -15,7 +15,7 @@ interface StravaImportProps {
 
 const createGPXContent = (points: GPXPoint[], activityName: string, startTime: string) => {
     return `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="AnalyseDrive">
+<gpx version="1.1" creator="DrivenStat">
   <metadata>
     <name>${activityName}</name>
     <time>${startTime}</time>

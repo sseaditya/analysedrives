@@ -1,4 +1,4 @@
-# AnalyseDrive - Metrics & Formulae Reference
+# DrivenStat - Metrics & Formulae Reference
 
 This document outlines the mathematical models and logic used to calculate the various metrics displayed throughout the application.
 

@@ -612,25 +612,22 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                               </div>
                             );
                           }
+
                           // Public viewer's speed cap (only if avgSpeed > speedCap)
                           if (cappedSelectionStats) {
                             return (
-                              <>
-                                <span className="text-lg font-normal tabular-nums text-muted-foreground/50 line-through">
-                                  {formatDuration(cappedSelectionStats.originalTime)}
+                              <div className="flex items-baseline gap-1.5 animate-in fade-in slide-in-from-left-2">
+                                <span className="text-lg font-normal text-blue-500 tabular-nums">
+                                  {formatDuration(cappedSelectionStats.simulatedTime)}
                                 </span>
-                                <div className="flex items-baseline gap-1.5 animate-in fade-in slide-in-from-left-2">
-                                  <span className="text-lg font-normal text-blue-500 tabular-nums">
-                                    {formatDuration(cappedSelectionStats.simulatedTime)}
-                                  </span>
-                                  <span className="flex items-center text-xs font-bold text-blue-500/90 gap-0.5">
-                                    <TrendingUp className="w-3 h-3" />
-                                    +{formatDuration(cappedSelectionStats.timeAdded)}
-                                  </span>
-                                </div>
-                              </>
+                                <span className="flex items-center text-xs font-bold text-blue-500/90 gap-0.5">
+                                  <TrendingUp className="w-3 h-3" />
+                                  +{formatDuration(cappedSelectionStats.timeAdded)}
+                                </span>
+                              </div>
                             );
                           }
+
                           // Default: show actual time
                           return (
                             <span className="text-lg font-normal tabular-nums text-foreground">
@@ -740,10 +737,10 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                           const elapsedTime = (hoveredPoint.time && points[0].time)
                             ? (hoveredPoint.time.getTime() - points[0].time.getTime()) / 1000
                             : 0;
+
                           const h = Math.floor(elapsedTime / 3600);
                           const m = Math.floor((elapsedTime % 3600) / 60);
-                          const s = Math.floor(elapsedTime % 60);
-                          const timeStr = `${h}h ${m}m ${s}s`;
+                          const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
 
                           return (
                             <>
@@ -810,37 +807,6 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                   />
                 </div>
               </div>
-
-              {/* Distance vs Time Chart */}
-              <div className="bg-card border border-border rounded-2xl p-3 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <Clock className="w-5 h-5 text-primary" />
-                    Distance vs Time
-                    {zoomRange && <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Filtered to selection</span>}
-                    <TooltipProvider delayDuration={300}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Info className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-xs text-xs">
-                          <p>Shows distance traveled over time, helping visualize the progress of your drive.</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </h3>
-                </div>
-                <div className="h-[200px]">
-                  <DistanceTimeChart
-                    points={filteredPoints}
-                    zoomRange={zoomRange}
-                    onZoomChange={setZoomRange}
-                    speedLimit={effectiveChartSpeedLimit}
-                    speedCap={!isOwner ? speedCap : null}
-                  />
-                </div>
-              </div>
-
               {/* Motion Time Profile (Moved to Overview) */}
               {/* Uses effective stats (subset if zoomed, full if not) */}
               <div className="bg-card border border-border rounded-2xl p-3 shadow-sm">

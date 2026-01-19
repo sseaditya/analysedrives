@@ -33,7 +33,7 @@ const Index = () => {
       {/* Header - Minimalist */}
       <header className="absolute top-0 left-0 right-0 z-50 p-6 flex justify-between items-center bg-transparent">
         <div className="flex items-center gap-2">
-          <span className="font-bold text-2xl tracking-tight text-[#CC785C]">ANALYSEDRIVE</span>
+          <span className="font-bold text-2xl tracking-tight text-[#CC785C]">DrivenStat</span>
         </div>
         <div>
           {!user ? (

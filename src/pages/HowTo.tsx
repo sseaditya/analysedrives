@@ -26,7 +26,7 @@ const HowTo = () => {
                         <h2 className="text-2xl font-bold">Strava</h2>
                     </div>
                     <p className="text-muted-foreground">
-                        The easiest way to get your data into AnalyseDrive is by exporting your original GPX files from Strava.
+                        The easiest way to get your data into DrivenStat is by exporting your original GPX files from Strava.
                     </p>
                     <div className="bg-card border border-border rounded-xl p-6 space-y-4">
                         <ol className="list-decimal list-inside space-y-3 marker:font-bold marker:text-primary">
