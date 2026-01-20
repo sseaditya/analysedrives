@@ -104,6 +104,32 @@ export interface SpeedBucket {
   distance: number; // km
 }
 
+// Current version for cache invalidation - increment when parsing logic changes
+export const PROCESSED_TRACK_VERSION = 1;
+
+// Pre-computed point data for cached tracks
+export interface ProcessedPoint {
+  lat: number;
+  lon: number;
+  ele?: number;
+  time?: string; // ISO string for serialization
+  smoothedLat: number;
+  smoothedLon: number;
+  smoothedEle?: number;
+  speed: number; // km/h
+  acceleration: number; // m/s²
+  distance: number; // cumulative km
+  elapsedTime: number; // seconds from start
+}
+
+// Cached processed track data
+export interface ProcessedTrack {
+  version: number;
+  points: ProcessedPoint[];
+  stats: GPXStats;
+  previewCoordinates: [number, number][];
+}
+
 // Haversine formula to calculate distance between two GPS points
 export function haversineDistance(
   lat1: number,
@@ -1107,3 +1133,136 @@ function calculateRobustSpeeds(points: GPXPoint[]): { speed: number; time: numbe
   return results;
 }
 
+/**
+ * Generates a complete ProcessedTrack for caching.
+ * This pre-computes all smoothed data so it doesn't need to be recalculated on every view.
+ */
+export function generateProcessedTrack(points: GPXPoint[]): ProcessedTrack {
+  const stats = calculateStats(points);
+  const previewCoordinates = generatePreviewPolyline(points);
+
+  if (points.length < 2) {
+    return {
+      version: PROCESSED_TRACK_VERSION,
+      points: points.map(p => ({
+        lat: p.lat,
+        lon: p.lon,
+        ele: p.ele,
+        time: p.time?.toISOString(),
+        smoothedLat: p.lat,
+        smoothedLon: p.lon,
+        smoothedEle: p.ele,
+        speed: 0,
+        acceleration: 0,
+        distance: 0,
+        elapsedTime: 0
+      })),
+      stats,
+      previewCoordinates
+    };
+  }
+
+  // Compute smoothed coordinates (same logic as calculateStats)
+  const smoothedPoints = points.map((p, i) => {
+    const window = COORDINATE_SMOOTHING_WINDOW;
+    const offset = Math.floor(window / 2);
+    let latSum = 0, lonSum = 0, count = 0;
+
+    for (let j = -offset; j <= offset; j++) {
+      const idx = i + j;
+      if (idx >= 0 && idx < points.length) {
+        latSum += points[idx].lat;
+        lonSum += points[idx].lon;
+        count++;
+      }
+    }
+
+    return {
+      lat: count > 0 ? latSum / count : p.lat,
+      lon: count > 0 ? lonSum / count : p.lon
+    };
+  });
+
+  // Compute smoothed elevations
+  const smoothedElevations: (number | undefined)[] = [];
+  for (let i = 0; i < points.length; i++) {
+    if (points[i].ele === undefined) {
+      smoothedElevations.push(undefined);
+      continue;
+    }
+    let sum = 0, count = 0;
+    const offset = Math.floor(ELEVATION_SMOOTHING_WINDOW / 2);
+    for (let j = -offset; j <= offset; j++) {
+      const idx = i + j;
+      if (idx >= 0 && idx < points.length && points[idx].ele !== undefined) {
+        sum += points[idx].ele!;
+        count++;
+      }
+    }
+    smoothedElevations.push(count > 0 ? sum / count : points[i].ele);
+  }
+
+  // Compute speeds using robust calculation
+  const robustSegments = calculateRobustSpeeds(points);
+
+  // Compute accelerations
+  const accelerations: number[] = [0];
+  for (let i = 1; i < robustSegments.length; i++) {
+    const prevSpeed = robustSegments[i - 1].speed / 3.6; // m/s
+    const currSpeed = robustSegments[i].speed / 3.6;
+    const timeDiff = robustSegments[i].time;
+    if (timeDiff > 0) {
+      accelerations.push((currSpeed - prevSpeed) / timeDiff);
+    } else {
+      accelerations.push(0);
+    }
+  }
+
+  // Smooth accelerations
+  const smoothedAccelerations: number[] = [];
+  for (let i = 0; i < accelerations.length; i++) {
+    let sum = 0, count = 0;
+    const offset = Math.floor(ACCEL_SMOOTHING_WINDOW / 2);
+    for (let j = -offset; j <= offset; j++) {
+      const idx = i + j;
+      if (idx >= 0 && idx < accelerations.length) {
+        sum += accelerations[idx];
+        count++;
+      }
+    }
+    smoothedAccelerations.push(count > 0 ? sum / count : 0);
+  }
+
+  // Build cumulative distances and elapsed times
+  let cumulativeDistance = 0;
+  const startTime = points[0]?.time?.getTime() || 0;
+
+  const processedPoints: ProcessedPoint[] = points.map((p, i) => {
+    if (i > 0) {
+      cumulativeDistance += robustSegments[i - 1]?.distance || 0;
+    }
+
+    const elapsedTime = p.time ? (p.time.getTime() - startTime) / 1000 : 0;
+
+    return {
+      lat: p.lat,
+      lon: p.lon,
+      ele: p.ele,
+      time: p.time?.toISOString(),
+      smoothedLat: smoothedPoints[i].lat,
+      smoothedLon: smoothedPoints[i].lon,
+      smoothedEle: smoothedElevations[i],
+      speed: i > 0 ? robustSegments[i - 1]?.speed || 0 : 0,
+      acceleration: i > 0 ? smoothedAccelerations[i - 1] || 0 : 0,
+      distance: cumulativeDistance,
+      elapsedTime
+    };
+  });
+
+  return {
+    version: PROCESSED_TRACK_VERSION,
+    points: processedPoints,
+    stats,
+    previewCoordinates
+  };
+}

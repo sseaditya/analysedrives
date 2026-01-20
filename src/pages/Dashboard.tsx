@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { MapPin, LogOut, Upload, Activity, Calendar, Clock, ArrowRight, TrendingUp, Pencil, Trash2, Check, X, Search, SlidersHorizontal, ChevronDown, ChevronUp, BarChart3 } from "lucide-react";
 import FileUploader from "@/components/FileUploader";
-import { parseGPX, calculateStats, formatDistance, formatDuration, generatePreviewPolyline, calculateSpeedDistribution, SpeedBucket } from "@/utils/gpxParser";
+import { parseGPX, calculateStats, formatDistance, formatDuration, generatePreviewPolyline, calculateSpeedDistribution, SpeedBucket, generateProcessedTrack } from "@/utils/gpxParser";
 import { supabase } from "@/lib/supabase";
 import ActivityMiniMap from "@/components/ActivityMiniMap";
 import { cn } from "@/lib/utils";
@@ -23,6 +23,7 @@ interface Profile {
 
 interface ActivityRecord {
     id: string;
+    slug: number | null;
     title: string;
     file_path: string;
     created_at: string;
@@ -294,28 +295,41 @@ const Dashboard = () => {
                         errorMessages.push(`Skipped ${name}: No GPS points.`);
                         continue;
                     }
-                    const calculatedStats = calculateStats(parsedPoints);
-                    const previewCoordinates = generatePreviewPolyline(parsedPoints);
 
-                    // 2. Upload to Supabase Storage
-                    const fileName = `${user.id}/${Date.now()}_${name}`;
+                    // 2. Generate processed track (includes stats and preview)
+                    const processedTrack = generateProcessedTrack(parsedPoints);
+
+                    // 3. Upload raw GPX to Supabase Storage
+                    const baseFileName = `${user.id}/${Date.now()}_${name}`;
+                    const gpxFileName = baseFileName.endsWith('.gpx') ? baseFileName : `${baseFileName}`;
                     const { error: uploadError } = await supabase.storage
                         .from('gpx-files')
-                        .upload(fileName, new Blob([content], { type: 'text/xml' }));
+                        .upload(gpxFileName, new Blob([content], { type: 'text/xml' }));
 
                     if (uploadError) throw uploadError;
 
-                    // 3. Insert Record into 'activities' table
+                    // 4. Upload processed.json for caching
+                    const processedFileName = gpxFileName.replace('.gpx', '.processed.json');
+                    const { error: processedUploadError } = await supabase.storage
+                        .from('gpx-files')
+                        .upload(processedFileName, new Blob([JSON.stringify(processedTrack)], { type: 'application/json' }));
+
+                    // Non-fatal if processed upload fails - we can regenerate on view
+                    if (processedUploadError) {
+                        console.warn(`Warning: Could not cache processed data for ${name}`);
+                    }
+
+                    // 5. Insert Record into 'activities' table
                     const { error: dbError } = await supabase
                         .from('activities')
                         .insert([
                             {
                                 user_id: user.id,
                                 title: name.replace('.gpx', ''),
-                                file_path: fileName,
+                                file_path: gpxFileName,
                                 stats: {
-                                    ...calculatedStats,
-                                    previewCoordinates
+                                    ...processedTrack.stats,
+                                    previewCoordinates: processedTrack.previewCoordinates
                                 },
                             }
                         ]);
@@ -579,7 +593,7 @@ const Dashboard = () => {
                                 {filteredActivities.map((activity) => (
                                     <div
                                         key={activity.id}
-                                        onClick={() => navigate(`/activity/${activity.id}`)}
+                                        onClick={() => navigate(`/activity/${activity.slug || activity.id}`)}
                                         className="group bg-card border border-border rounded-2xl overflow-hidden hover:shadow-xl hover:shadow-primary/5 transition-all cursor-pointer hover:-translate-y-1 flex flex-col relative"
                                     >
                                         {/* Mini Map */}

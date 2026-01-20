@@ -18,6 +18,7 @@ interface Profile {
 
 interface ActivityRecord {
     id: string;
+    slug: number | null;
     title: string;
     file_path: string;
     created_at: string;
@@ -196,7 +197,7 @@ const Feed = () => {
                             {filteredActivities.map((activity) => (
                                 <div
                                     key={activity.id}
-                                    onClick={() => navigate(`/activity/${activity.id}`)}
+                                    onClick={() => navigate(`/activity/${activity.slug || activity.id}`)}
                                     className="group bg-card border border-border rounded-2xl overflow-hidden hover:shadow-xl hover:shadow-primary/5 transition-all cursor-pointer hover:-translate-y-1 flex flex-col relative"
                                 >
                                     {/* Map Preview with Overlay */}

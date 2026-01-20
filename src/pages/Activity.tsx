@@ -3,7 +3,7 @@ import { ArrowLeft, MapPin, Pencil, ChevronDown, ChevronUp, Globe, Lock, LogIn }
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import GPSStats from "@/components/GPSStats";
-import { GPXStats, GPXPoint, parseGPX, calculateStats } from "@/utils/gpxParser";
+import { GPXStats, GPXPoint, parseGPX, calculateStats, ProcessedTrack } from "@/utils/gpxParser";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -65,11 +65,19 @@ const ActivityPage = () => {
           setAccessDenied(false);
 
           // 1. Get Metadata - RLS should allow public activities
-          const { data: record, error: dbError } = await supabase
+          // 1. Get Metadata - Support both UUID and numeric Slug
+          const isNumeric = /^\d+$/.test(id);
+          const query = supabase
             .from('activities')
-            .select('*')
-            .eq('id', id)
-            .single();
+            .select('*');
+
+          if (isNumeric) {
+            query.eq('slug', parseInt(id));
+          } else {
+            query.eq('id', id);
+          }
+
+          const { data: record, error: dbError } = await query.single();
 
           if (dbError) {
             console.error("DB Error:", dbError);
@@ -131,26 +139,50 @@ const ActivityPage = () => {
             });
           }
 
-          // 2. Download File
-          const { data: fileData, error: storageError } = await supabase.storage
+          let points: GPXPoint[] = [];
+          let stats: GPXStats;
+          let previewCoordinates: [number, number][];
+
+          // 2. Try to download pre-processed JSON first
+          const processedPath = record.file_path.replace('.gpx', '.processed.json');
+          const { data: processedData, error: processedError } = await supabase.storage
             .from('gpx-files')
-            .download(record.file_path);
+            .download(processedPath);
 
-          if (storageError) {
-            console.error("Storage Error:", storageError);
-            setErrorDetails(`Storage Error: ${storageError.message}`);
-            // Don't throw, just handle it
-            setAccessDenied(true);
-            setLoading(false);
-            return;
+          if (!processedError && processedData) {
+            // HIT: Use cached data
+            const text = await processedData.text();
+            const processedTrack = JSON.parse(text) as ProcessedTrack;
+
+            // Map back to GPXPoint structure for components that need it
+            points = processedTrack.points.map(p => ({
+              lat: p.lat,
+              lon: p.lon,
+              ele: p.ele,
+              time: p.time ? new Date(p.time) : undefined,
+            }));
+
+            // Use pre-computed stats
+            stats = processedTrack.stats;
+          } else {
+            // MISS: Fallback to raw GPX
+            const { data: fileData, error: storageError } = await supabase.storage
+              .from('gpx-files')
+              .download(record.file_path);
+
+            if (storageError) {
+              console.error("Storage Error:", storageError);
+              setErrorDetails(`Storage Error: ${storageError.message}`);
+              setAccessDenied(true);
+              setLoading(false);
+              return;
+            }
+
+            // 3. Parse Raw GPX
+            const text = await fileData.text();
+            points = parseGPX(text);
+            stats = calculateStats(points);
           }
-
-          // 3. Parse
-          const text = await fileData.text();
-          const points = parseGPX(text);
-
-          // Always recalculate stats to ensure we use the latest logic from gpxParser
-          const stats = calculateStats(points);
 
           setData({
             stats,
