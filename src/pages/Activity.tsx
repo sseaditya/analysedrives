@@ -3,7 +3,7 @@ import { ArrowLeft, MapPin, Pencil, ChevronDown, ChevronUp, Globe, Lock, LogIn }
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import GPSStats from "@/components/GPSStats";
-import { GPXStats, GPXPoint, parseGPX, calculateStats, ProcessedTrack } from "@/utils/gpxParser";
+import { GPXStats, GPXPoint, parseGPX, calculateStats, ProcessedTrack, generateProcessedTrack } from "@/utils/gpxParser";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -144,7 +144,8 @@ const ActivityPage = () => {
           let previewCoordinates: [number, number][];
 
           // 2. Try to download pre-processed JSON first
-          const processedPath = record.file_path.replace('.gpx', '.processed.json');
+          // Robust naming convention
+          const processedPath = record.file_path.replace(/\.gpx$/i, '') + '.processed.json';
           const { data: processedData, error: processedError } = await supabase.storage
             .from('gpx-files')
             .download(processedPath);
@@ -178,10 +179,24 @@ const ActivityPage = () => {
               return;
             }
 
-            // 3. Parse Raw GPX
+            // 3. Parse Raw GPX & Lazily Cache
             const text = await fileData.text();
             points = parseGPX(text);
-            stats = calculateStats(points);
+
+            // LAZY GENERATION: Create full processed track now
+            const processedTrack = generateProcessedTrack(points);
+            stats = processedTrack.stats;
+
+            // Fire-and-forget upload to cache for next time
+            // Use robust naming convention
+            const cachePath = record.file_path.replace(/\.gpx$/i, '') + '.processed.json';
+            supabase.storage
+              .from('gpx-files')
+              .upload(cachePath, new Blob([JSON.stringify(processedTrack)], { type: 'application/json' }))
+              .then(({ error }) => {
+                if (error) console.warn("Background cache upload failed:", error);
+                else console.log("Lazily cached processed track:", cachePath);
+              });
           }
 
           setData({
