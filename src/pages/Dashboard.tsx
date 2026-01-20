@@ -301,7 +301,11 @@ const Dashboard = () => {
 
                     // 3. Upload raw GPX to Supabase Storage
                     const baseFileName = `${user.id}/${Date.now()}_${name}`;
-                    const gpxFileName = baseFileName.endsWith('.gpx') ? baseFileName : `${baseFileName}`;
+                    // Ensure valid extension
+                    const gpxFileName = baseFileName.toLowerCase().endsWith('.gpx')
+                        ? baseFileName
+                        : `${baseFileName}.gpx`;
+
                     const { error: uploadError } = await supabase.storage
                         .from('gpx-files')
                         .upload(gpxFileName, new Blob([content], { type: 'text/xml' }));
@@ -309,7 +313,8 @@ const Dashboard = () => {
                     if (uploadError) throw uploadError;
 
                     // 4. Upload processed.json for caching
-                    const processedFileName = gpxFileName.replace('.gpx', '.processed.json');
+                    // Robust replacement of extension
+                    const processedFileName = gpxFileName.replace(/\.gpx$/i, '') + '.processed.json';
                     const { error: processedUploadError } = await supabase.storage
                         .from('gpx-files')
                         .upload(processedFileName, new Blob([JSON.stringify(processedTrack)], { type: 'application/json' }));

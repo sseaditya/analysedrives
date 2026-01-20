@@ -4,7 +4,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, RefreshCw } from "lucide-react";
 import { initiateStravaAuth, getActivities, getActivityStreams } from "@/lib/strava";
-import { GPXPoint, calculateStats, generatePreviewPolyline } from "@/utils/gpxParser";
+import { GPXPoint, calculateStats, generatePreviewPolyline, generateProcessedTrack } from "@/utils/gpxParser";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -110,9 +110,8 @@ export default function StravaImport({ onImportComplete }: StravaImportProps) {
 
                 if (points.length < 2) continue;
 
-                // Generate Stats
-                const stats = calculateStats(points);
-                const previewCoordinates = generatePreviewPolyline(points);
+                // Generate Stats & Processed Track
+                const processedTrack = generateProcessedTrack(points);
                 const fileName = `${user.id}/strava_${id}_${Date.now()}.gpx`;
 
                 // 1. Create and Upload GPX File
@@ -126,6 +125,13 @@ export default function StravaImport({ onImportComplete }: StravaImportProps) {
                         console.error(`Failed to upload GPX for ${activity.name}`, uploadError);
                         continue; // Skip DB insert if storage fails
                     }
+
+                    // 1.5 Upload Processed JSON (Silence errors)
+                    const processedFileName = fileName.replace(/\.gpx$/i, '') + '.processed.json';
+                    await supabase.storage
+                        .from('gpx-files')
+                        .upload(processedFileName, new Blob([JSON.stringify(processedTrack)], { type: 'application/json' }));
+
                 } catch (err) {
                     console.error("Error creating/uploading GPX", err);
                     continue;
@@ -136,9 +142,10 @@ export default function StravaImport({ onImportComplete }: StravaImportProps) {
                     user_id: user.id,
                     title: activity.name,
                     file_path: fileName,
+                    slug: null, // Let DB sequence handle it (or omit if default works)
                     stats: {
-                        ...stats,
-                        previewCoordinates
+                        ...processedTrack.stats,
+                        previewCoordinates: processedTrack.previewCoordinates
                     }
                 });
 
