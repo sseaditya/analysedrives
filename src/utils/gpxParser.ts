@@ -21,6 +21,34 @@ export const MIN_GAP_DURATION = 5.0; // Only filter if gap is > 5 seconds
 export const GAP_BUFFER_SECONDS = 10.0; // Ignore events ±10s around large gaps (Reduced from 30s)
 export const CANCELLATION_WINDOW = 30.0; // Cancel Accel/Brake pairs within 30s
 
+// Turn Detection Thresholds
+export const MIN_TURN_DISTANCE = 0.015; // km (15 meters) - minimum distance for a turn to be considered real
+export const TIGHT_TURN_ANGLE = 60; // degrees - angle threshold for tight turn
+export const HAIRPIN_ANGLE = 135; // degrees - angle threshold for hairpin
+export const TURN_DENSITY_THRESHOLD = 0.6; // deg/meter - minimum sharpness for turn classification
+export const NET_HEADING_CHANGE_MIN = 30; // degrees - minimum net heading change to avoid zig-zag false positives
+export const MICRO_JITTER_THRESHOLD = 1.0; // degrees - ignore bearing changes smaller than this
+export const STRAIGHT_SECTION_THRESHOLD = 5; // degrees - bearing change under this is considered straight
+export const STRAIGHT_FLUSH_DISTANCE = 0.025; // km - distance of straight travel to flush pending turn
+export const MIN_STRAIGHT_SECTION = 0.02; // km - minimum distance to count as straight section
+
+// Speed & Distance Thresholds
+export const MAX_SPEED_CAP = 200; // km/h - sanity cap for max speed
+export const MIN_DISTANCE_FOR_BEARING = 0.002; // km - minimum distance to calculate bearing
+export const MIN_DISTANCE_FOR_GRADIENT = 0.001; // km - minimum distance for gradient calculation
+export const MIN_DISTANCE_FOR_STEEP = 0.005; // km - minimum distance for steep grade calculation
+export const MIN_ELEVATION_FOR_STEEP = 0.5; // meters - minimum elevation change for steep grade
+
+// Gradient Classification
+export const CLIMBING_GRADE = 1.0; // % grade threshold for climbing
+export const DESCENDING_GRADE = -1.0; // % grade threshold for descending
+
+// Smoothing Window Sizes
+export const COORDINATE_SMOOTHING_WINDOW = 5;
+export const ELEVATION_SMOOTHING_WINDOW = 5;
+export const GRADIENT_SMOOTHING_WINDOW = 5;
+export const SPEED_MOVING_AVG_WINDOW = 5;
+
 export interface GPXStats {
   totalDistance: number; // in kilometers
   totalTime: number; // in seconds
@@ -435,20 +463,10 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
 
   let currentTurnStartBearing: number | null = null;
 
-  if (points[0].ele !== undefined) {
-    maxElevation = points[0].ele;
-    minElevation = points[0].ele;
-  }
-
-  if (points[0].ele !== undefined) {
-    maxElevation = points[0].ele;
-    minElevation = points[0].ele;
-  }
-
   // Coordinate Smoothing (5-point SMA)
   // To reduce "stray points" that cause fake turns and flatten wiggles
   const smoothedPoints = points.map((p, i) => {
-    const window = 5;
+    const window = COORDINATE_SMOOTHING_WINDOW;
     const offset = Math.floor(window / 2);
     let latSum = 0, lonSum = 0, count = 0;
 
@@ -472,7 +490,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
   // Let's keep speeds on raw points to capture acceleration physics, but use smoothed for BEARING.
   const isClampedArray = robustSegments.map(s => s.isClamped);
 
-  const elevationWindow = 5;
+  const elevationWindow = ELEVATION_SMOOTHING_WINDOW;
   const smoothedElevations: (number | undefined)[] = [];
   for (let i = 0; i < points.length; i++) {
     if (points[i].ele === undefined) { smoothedElevations.push(undefined); continue; }
@@ -506,7 +524,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
       if (eleDiff > 0) elevationGain += eleDiff;
       else if (eleDiff < 0) elevationLoss += Math.abs(eleDiff);
 
-      if (distance > 0.001) {
+      if (distance > MIN_DISTANCE_FOR_GRADIENT) {
         rawGradients.push((eleDiff / (distance * 1000)) * 100);
       } else {
         rawGradients.push(0);
@@ -514,7 +532,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
       if (currEle > maxElevation) maxElevation = currEle;
       if (currEle < minElevation) minElevation = currEle;
 
-      if (distance > 0.005 && Math.abs(eleDiff) > 0.5) {
+      if (distance > MIN_DISTANCE_FOR_STEEP && Math.abs(eleDiff) > MIN_ELEVATION_FOR_STEEP) {
         const grad = (eleDiff / (distance * 1000)) * 100;
         if (grad > steepestClimb) steepestClimb = grad;
         if (grad < steepestDescent) steepestDescent = grad;
@@ -527,7 +545,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
     // Updated Logic: Check Moving Average Speed > STOP_SPEED_THRESHOLD (Hysteresis)
     let isMoving = false;
     if (speeds.length > 0) {
-      const window = 5;
+      const window = SPEED_MOVING_AVG_WINDOW;
       let sum = 0;
       let count = 0;
       for (let k = 0; k < window; k++) {
@@ -540,7 +558,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
       isMoving = avgSpeed > STOP_SPEED_THRESHOLD;
     }
 
-    if (distance > 0.002 && isMoving) {
+    if (distance > MIN_DISTANCE_FOR_BEARING && isMoving) {
       const bearing = calculateBearing(prev.lat, prev.lon, curr.lat, curr.lon);
       if (lastBearing !== null) {
         let delta = bearing - lastBearing;
@@ -557,7 +575,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
           (Math.abs(delta) < 10 && Math.abs(currentTurnSum) > 30) // Minor jitter during a major turn is allowed
         );
 
-        if (Math.abs(delta) > 1.0) { // Ignore micro-jitters < 1 degree
+        if (Math.abs(delta) > MICRO_JITTER_THRESHOLD) { // Ignore micro-jitters
           if (isTurnContinuation) {
             if (currentTurnSum === 0) currentTurnStartBearing = lastBearing; // Capture start bearing
             currentTurnSum += delta;
@@ -569,12 +587,11 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
           } else {
             // Direction FLIP -> End previous turn, process it, start new one
 
-            // Turn must happen over minimum distance (15m) to be real
-            if (currentTurnDistance > 0.015) {
+            if (currentTurnDistance > MIN_TURN_DISTANCE) {
               // SHARPNESS CHECK:
-              // 1. Angle Threshold: Reverted to 60 degrees (User Request)
-              // 2. Density Threshold: Turn must be sharp (e.g. > 0.6 deg/meter)
-              // 3. Zig-Zag Filter: Net Heading Change must be > 30 degrees
+              // 1. Angle Threshold: Reverted to TIGHT_TURN_ANGLE degrees (User Request)
+              // 2. Density Threshold: Turn must be sharp (e.g. > TURN_DENSITY_THRESHOLD deg/meter)
+              // 3. Zig-Zag Filter: Net Heading Change must be > NET_HEADING_CHANGE_MIN degrees
               const turnDensity = Math.abs(currentTurnSum) / (currentTurnDistance * 1000 || 1);
 
               let netHeadingChange = 360;
@@ -585,9 +602,9 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
                 netHeadingChange = Math.abs(rawChange);
               }
 
-              if (Math.abs(currentTurnSum) > 60 && turnDensity > 0.6 && netHeadingChange > 30) {
+              if (Math.abs(currentTurnSum) > TIGHT_TURN_ANGLE && turnDensity > TURN_DENSITY_THRESHOLD && netHeadingChange > NET_HEADING_CHANGE_MIN) {
                 tightTurnsCount++;
-                if (Math.abs(currentTurnSum) > 135) {
+                if (Math.abs(currentTurnSum) > HAIRPIN_ANGLE) {
                   hairpinCount++;
                   hairpinPoints.push([currentTurnPeak.lat, currentTurnPeak.lon]);
                 } else {
@@ -608,13 +625,13 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
         }
 
         // Straight Section Logic
-        if (Math.abs(delta) < 5) { // < 5 degrees is effectively straight
+        if (Math.abs(delta) < STRAIGHT_SECTION_THRESHOLD) { // < 5 degrees is effectively straight
           currentStraightDist += distance;
 
           // --- FLUSH TURN ON STRAIGHT ---
-          if (currentStraightDist > 0.025 && Math.abs(currentTurnSum) > 0) {
+          if (currentStraightDist > STRAIGHT_FLUSH_DISTANCE && Math.abs(currentTurnSum) > 0) {
             // Min Dist Check
-            if (currentTurnDistance > 0.015) {
+            if (currentTurnDistance > MIN_TURN_DISTANCE) {
               const turnDensity = Math.abs(currentTurnSum) / (currentTurnDistance * 1000 || 1);
 
               let netHeadingChange = 360;
@@ -625,9 +642,9 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
                 netHeadingChange = Math.abs(rawChange);
               }
 
-              if (Math.abs(currentTurnSum) > 60 && turnDensity > 0.6 && netHeadingChange > 30) {
+              if (Math.abs(currentTurnSum) > TIGHT_TURN_ANGLE && turnDensity > TURN_DENSITY_THRESHOLD && netHeadingChange > NET_HEADING_CHANGE_MIN) {
                 tightTurnsCount++;
-                if (Math.abs(currentTurnSum) > 135) {
+                if (Math.abs(currentTurnSum) > HAIRPIN_ANGLE) {
                   hairpinCount++;
                   hairpinPoints.push([currentTurnPeak.lat, currentTurnPeak.lon]);
                 } else {
@@ -643,7 +660,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
           }
 
         } else {
-          if (currentStraightDist > 0.02) {
+          if (currentStraightDist > MIN_STRAIGHT_SECTION) {
             straightSections.push(currentStraightDist);
             totalStraightDistance += currentStraightDist;
           }
@@ -660,7 +677,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
   }
 
   // Flush any pending turn at the end of the loop
-  if (currentTurnDistance > 0.015) {
+  if (currentTurnDistance > MIN_TURN_DISTANCE) {
     const finalTurnDensity = Math.abs(currentTurnSum) / (currentTurnDistance * 1000 || 1);
     // Net heading might be tricky here as we don't have a 'current' bearing to check against readily available or maybe we do (lastBearing)
     // Assuming lastBearing is valid
@@ -672,9 +689,9 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
       netHeadingChange = Math.abs(rawChange);
     }
 
-    if (Math.abs(currentTurnSum) > 60 && finalTurnDensity > 0.6 && netHeadingChange > 30) {
+    if (Math.abs(currentTurnSum) > TIGHT_TURN_ANGLE && finalTurnDensity > TURN_DENSITY_THRESHOLD && netHeadingChange > NET_HEADING_CHANGE_MIN) {
       tightTurnsCount++;
-      if (Math.abs(currentTurnSum) > 135) {
+      if (Math.abs(currentTurnSum) > HAIRPIN_ANGLE) {
         hairpinCount++;
         hairpinPoints.push([currentTurnPeak.lat, currentTurnPeak.lon]);
       } else {
@@ -684,7 +701,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
   }
 
   // Terrain Classification
-  const gradientWindow = 5;
+  const gradientWindow = GRADIENT_SMOOTHING_WINDOW;
   const smoothedGradients: number[] = [];
   for (let i = 0; i < rawGradients.length; i++) {
     let sum = 0, count = 0;
@@ -699,12 +716,12 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
     const grade = smoothedGradients[i];
     const t = timeDeltas[i];
     const d = robustSegments[i].distance;
-    if (grade > 1.0) { timeClimbing += t; climbDistance += d; }
-    else if (grade < -1.0) { timeDescending += t; }
+    if (grade > CLIMBING_GRADE) { timeClimbing += t; climbDistance += d; }
+    else if (grade < DESCENDING_GRADE) { timeDescending += t; }
     else { timeLevel += t; }
   }
 
-  if (currentStraightDist > 0.02) {
+  if (currentStraightDist > MIN_STRAIGHT_SECTION) {
     straightSections.push(currentStraightDist);
     totalStraightDistance += currentStraightDist;
   }
@@ -721,7 +738,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
     }
     const avg = count > 0 ? sum / count : 0;
     smoothedSpeeds.push(avg);
-    if (avg > maxSpeed && avg < 200) maxSpeed = avg;
+    if (avg > maxSpeed && avg < MAX_SPEED_CAP) maxSpeed = avg;
   }
 
   const rawAccelerations: number[] = [];
@@ -991,7 +1008,7 @@ export function calculateLimitedStats(points: GPXPoint[], speedLimitKmh: number)
 
         const segmentSpeedKmh = dist / (segmentTimeSeconds / 3600);
 
-        if (segmentSpeedKmh > speedLimitKmh && segmentSpeedKmh < 200) { // 200 is sanity cap
+        if (segmentSpeedKmh > speedLimitKmh && segmentSpeedKmh < MAX_SPEED_CAP) { // Sanity cap
           // Time if we traveled at speed limit instead
           const newTimeSeconds = (dist / speedLimitKmh) * 3600;
           simulatedTime += newTimeSeconds;
