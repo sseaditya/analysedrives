@@ -21,7 +21,7 @@ import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 
 const App = () => (
-  <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
+  <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
