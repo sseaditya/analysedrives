@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 import ActivityMiniMap from "@/components/ActivityMiniMap";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import ProfileEditor from "@/components/ProfileEditor";
+import { Logo } from "@/components/Logo";
 
 interface Profile {
     id: string;
@@ -102,8 +103,9 @@ const Feed = () => {
             {/* Header */}
             <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
                 <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-2 flex-shrink-0 cursor-pointer" onClick={() => navigate('/dashboard')}>
-                        <span className="font-serif font-bold text-xl text-foreground hidden md:block tracking-tight">DrivenStat</span>
+                    <div className="flex items-center gap-3 flex-shrink-0 cursor-pointer" onClick={() => navigate('/dashboard')}>
+                        <Logo className="w-8 h-8" />
+                        <span className="font-bold text-xl text-foreground hidden md:block tracking-tight">DrivenStat</span>
                     </div>
 
                     {/* Search Bar */}
