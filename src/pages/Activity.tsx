@@ -7,7 +7,6 @@ import { GPXStats, GPXPoint, parseGPX, calculateStats, ProcessedTrack, generateP
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
-import { Logo } from "@/components/Logo";
 import ActivityEditor from "@/components/ActivityEditor";
 
 interface ActivityState {
@@ -280,7 +279,6 @@ const ActivityPage = () => {
             </Button>
             <div className="h-6 w-px bg-border" />
             <div className="flex items-center gap-2">
-              <Logo className="w-10 h-10 shadow-lg shadow-primary/20" />
               <span className="font-bold text-xl text-foreground">DrivenStat</span>
             </div>
           </div>

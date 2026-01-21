@@ -13,7 +13,6 @@ import ProfileEditor from "@/components/ProfileEditor";
 import { Slider } from "@/components/ui/slider";
 import SpeedDistributionChart from "@/components/SpeedDistributionChart";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { Logo } from "@/components/Logo";
 
 interface Profile {
     id: string;
@@ -373,7 +372,6 @@ const Dashboard = () => {
             <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
                 <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3 flex-shrink-0 cursor-pointer" onClick={() => navigate('/dashboard')}>
-                        <Logo className="w-8 h-8 md:w-10 md:h-10 shadow-lg shadow-primary/20" />
                         <span className="font-bold text-xl text-foreground hidden md:block">DrivenStat</span>
                     </div>
 

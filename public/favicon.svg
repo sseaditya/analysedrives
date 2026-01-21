@@ -1,0 +1,21 @@
+<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <style>
+        /* Default (Light Mode) -> Gentle Black */
+        text { fill: #191919; }
+        
+        /* Dark Mode -> Gentle White */
+        @media (prefers-color-scheme: dark) {
+            text { fill: #FAFAF7; }
+        }
+    </style>
+    <text 
+        x="50" 
+        y="54" 
+        dominant-baseline="middle" 
+        text-anchor="middle" 
+        font-size="65" 
+        font-weight="900" 
+        font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+        letter-spacing="-3"
+    >DS</text>
+</svg>
