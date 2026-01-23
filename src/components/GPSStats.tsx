@@ -354,9 +354,11 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                               )}
                             </p>
                           )}
-                          <p className="text-xs text-muted-foreground leading-tight">
-                            {new Date(stats.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} on {new Date(stats.startTime).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
-                          </p>
+                          {isOwner && (
+                            <p className="text-xs text-muted-foreground leading-tight">
+                              {new Date(stats.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} on {new Date(stats.startTime).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                            </p>
+                          )}
                           <span className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5"><MapPin className="w-3 h-3" /> {stats.pointCount.toLocaleString()} points recorded</span>
                         </div>
                       </div>
