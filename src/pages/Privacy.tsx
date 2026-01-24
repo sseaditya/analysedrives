@@ -23,37 +23,61 @@ const Privacy = () => {
                 </section>
 
                 <section className="space-y-4">
-                    <h2 className="text-2xl font-bold text-foreground">2. Information We Collect</h2>
-                    <div className="space-y-2">
-                        <h3 className="text-lg font-semibold">Account Information</h3>
-                        <p className="leading-relaxed">
-                            When you sign up via Google, we collect your email address and basic profile information (name, avatar) to create and manage your account.
+                    <h2 className="text-2xl font-bold text-foreground">2. Google User Data</h2>
+                    <div className="p-4 border border-primary/20 bg-primary/5 rounded-lg space-y-4">
+                        <p className="font-medium text-foreground">
+                            DrivenStat accesses Google user data solely for authentication and account management purposes.
                         </p>
-                    </div>
-                    <div className="space-y-2 mt-4">
-                        <h3 className="text-lg font-semibold">Uploaded Data</h3>
-                        <p className="leading-relaxed">
-                            We collect the GPX files you upload. These files contain GPS coordinates, timestamps, elevation, and speed data. This data is processed solely to generate the visualizations and statistics you see on the dashboard.
-                        </p>
+
+                        <div className="space-y-2">
+                            <h3 className="text-lg font-semibold text-foreground">Data Accessed</h3>
+                            <p className="leading-relaxed">
+                                We request access to the following Google user data:
+                                <ul className="list-disc pl-6 mt-1 space-y-1">
+                                    <li><strong>Google Account Email:</strong> Used to uniquely identify your account and for service-related communications.</li>
+                                    <li><strong>Public Profile Information:</strong> Specifically your name and profile picture (avatar), used to personalize your dashboard and public activity pages.</li>
+                                </ul>
+                            </p>
+                        </div>
+
+                        <div className="space-y-2">
+                            <h3 className="text-lg font-semibold text-foreground">Data Usage</h3>
+                            <p className="leading-relaxed">
+                                How we use this Google user data:
+                                <ul className="list-disc pl-6 mt-1 space-y-1">
+                                    <li><strong>Authentication:</strong> To verify your identity and allow you to log in securely.</li>
+                                    <li><strong>Account Management:</strong> To create and maintain your DrivenStat user profile.</li>
+                                    <li><strong>Display:</strong> To display your name and avatar on your activities if you choose to make them public.</li>
+                                </ul>
+                            </p>
+                        </div>
+
+                        <div className="space-y-2">
+                            <h3 className="text-lg font-semibold text-foreground">Limited Use Disclosure</h3>
+                            <p className="leading-relaxed text-sm">
+                                DrivenStat's use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Google API Services User Data Policy</a>, including the Limited Use requirements.
+                            </p>
+                        </div>
                     </div>
                 </section>
 
                 <section className="space-y-4">
-                    <h2 className="text-2xl font-bold text-foreground">3. How We Use Your Data</h2>
-                    <ul className="list-disc pl-6 space-y-2">
-                        <li>To provide the core Service functionality (map rendering, speed analysis).</li>
-                        <li>To maintain and improve the performance of our application.</li>
-                        <li>To communicate with you regarding your account or service updates.</li>
-                    </ul>
+                    <h2 className="text-2xl font-bold text-foreground">3. Other Information We Collect</h2>
+                    <div className="space-y-2">
+                        <h3 className="text-lg font-semibold">Uploaded GPX Data</h3>
+                        <p className="leading-relaxed">
+                            We collect the GPX files you upload. These files contain GPS coordinates, timestamps, elevation, and speed data. This data is processed specifically to generate the visualizations and statistics you see on the dashboard. You retain full ownership of this data.
+                        </p>
+                    </div>
                 </section>
 
                 <section className="space-y-4">
                     <h2 className="text-2xl font-bold text-foreground">4. Data Storage & Security</h2>
                     <p className="leading-relaxed">
-                        Your files are stored in secure cloud storage buckets (Supabase) protected by Row Level Security (RLS) policies. This means:
+                        Your files are stored in secure cloud storage buckets (Supabase) protected by strict Row Level Security (RLS) policies.
                         <ul className="list-disc pl-6 mt-2 space-y-1">
-                            <li><strong>Private Activities:</strong> Only YOU can access the raw files and analysis.</li>
-                            <li><strong>Public Activities:</strong> If you explicitly mark an activity as public, the analyzed data becomes accessible to anyone with the link.</li>
+                            <li><strong>Private By Default:</strong> Only YOU can access the raw files and analysis.</li>
+                            <li><strong>Public Sharing:</strong> If you explicitly mark an activity as public, the analyzed data becomes accessible to anyone with the link. You control this setting per-activity.</li>
                         </ul>
                     </p>
                 </section>
@@ -61,14 +85,19 @@ const Privacy = () => {
                 <section className="space-y-4">
                     <h2 className="text-2xl font-bold text-foreground">5. Data Retention & Deletion</h2>
                     <p className="leading-relaxed">
-                        We retain your data as long as your account is active. You have the right to request the deletion of your account and all associated data at any time. You can also delete individual activities directly from your dashboard, which permanently removes the associated files from our storage.
+                        We retain your data as long as your account is active. You have the right to request the deletion of your account and all associated data at any time. You can delete individual activities directly from your dashboard, which immediately and permanently removes the associated files from our storage.
                     </p>
                 </section>
 
                 <section className="space-y-4">
-                    <h2 className="text-2xl font-bold text-foreground">6. Third-Party Services</h2>
+                    <h2 className="text-2xl font-bold text-foreground">6. Third-Party Services & Data Sharing</h2>
                     <p className="leading-relaxed">
-                        We use third-party services for authentication (Google) and infrastructure (Supabase). We do not sell your personal data to advertisers or third parties.
+                        We use reliable third-party providers for infrastructure:
+                        <ul className="list-disc pl-6 mt-2 space-y-1">
+                            <li><strong>Google Identity Services:</strong> For secure authentication.</li>
+                            <li><strong>Supabase:</strong> For database and file storage.</li>
+                        </ul>
+                        We do <strong>not</strong> sell your personal data or Google user data to advertisers or third parties. We do not use your data for advertising purposes.
                     </p>
                 </section>
 
