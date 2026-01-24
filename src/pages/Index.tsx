@@ -71,12 +71,12 @@ const Index = () => {
         {/* Center Content */}
         <div className="flex-1 flex flex-col items-center justify-center text-center px-6 z-10 max-w-2xl mx-auto py-12 lg:py-0">
           <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 leading-[1.1]">
-            The #1 app for <br />
-            <span className="text-[#CC785C]">precision telemetry.</span>
+            A platform for <br />
+            <span className="text-[#CC785C]">Analysing Drives</span>
           </h1>
 
           <p className="text-xl text-muted-foreground mb-10 max-w-lg mx-auto font-medium leading-relaxed">
-            Track your drives, analyze your cornering, and master your speed with professional-grade GPS tools.
+            Analyse, store and share your drives, get insights and improve your driving.
           </p>
 
           <div className="flex flex-col items-center gap-4 w-full max-w-xs mx-auto">
@@ -123,7 +123,7 @@ const Index = () => {
             <div className="p-6 rounded-xl border border-border hover:border-[#CC785C]/50 transition-colors bg-background/50">
               <Zap className="w-8 h-8 text-[#CC785C] mx-auto mb-4" />
               <h3 className="font-bold text-foreground mb-2">Motion Profiling</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">Break down your acceleration, braking, and cornering g-forces with millisecond precision.</p>
+              <p className="text-sm text-muted-foreground leading-relaxed">Break down your acceleration, braking, and crusing.</p>
             </div>
             <div className="p-6 rounded-xl border border-border hover:border-[#CC785C]/50 transition-colors bg-background/50">
               <Activity className="w-8 h-8 text-[#CC785C] mx-auto mb-4" />
