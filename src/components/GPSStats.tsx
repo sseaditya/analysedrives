@@ -460,7 +460,32 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
 
               {/* Map Section */}
               <div className="bg-card border border-border rounded-2xl p-3 shadow-sm">
-                <h3 className="text-lg font-semibold mb-2 text-foreground">Route Map</h3>
+                <div className="flex items-center gap-2 mb-2">
+                  <h3 className="text-lg font-semibold text-foreground">Route Map</h3>
+                  <TooltipProvider delayDuration={300}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs text-xs space-y-2 z-[1100]">
+                        <p>
+                          <strong>Visualization:</strong> The path is colored by speed. Markers indicate stops and sharp turns.
+                        </p>
+                        <div className="border-t border-border/50 pt-2">
+                          {isOwner ? (
+                            <p className="text-muted-foreground">
+                              <strong>Privacy Zone:</strong> A {hideRadius}km radius around the start/end is visible to you, but hidden from public links.
+                            </p>
+                          ) : (
+                            <p className="text-muted-foreground">
+                              <strong>Privacy Zone:</strong> The first few kilometers of this drive are hidden to protect the owner's privacy.
+                            </p>
+                          )}
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
                 <TrackMap
                   points={mapPoints}
                   hoveredPoint={hoveredPoint}
