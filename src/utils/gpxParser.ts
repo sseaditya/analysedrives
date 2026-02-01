@@ -49,6 +49,9 @@ export const ELEVATION_SMOOTHING_WINDOW = 5;
 export const GRADIENT_SMOOTHING_WINDOW = 5;
 export const SPEED_MOVING_AVG_WINDOW = 5;
 
+// Pause Detection
+export const PAUSE_THRESHOLD = 60.0; // seconds - exclude gaps larger than this
+
 export interface GPXStats {
   totalDistance: number; // in kilometers
   totalTime: number; // in seconds
@@ -279,7 +282,8 @@ function applyAdvancedFiltering(
   smoothedAccelerations: number[],
   timeDeltas: number[],
   points: GPXPoint[],
-  isClampedArray: boolean[]
+  isClampedArray: boolean[],
+  segmentIndices?: number[]
 ): FilterResult {
   const finalAccelerations = [...smoothedAccelerations];
   let hardAccelerationCount = 0;
@@ -335,10 +339,12 @@ function applyAdvancedFiltering(
     const t = timeMap[i].end;
 
     if (val > HARD_ACCEL_THRESHOLD) {
-      const p = points[i + 1];
+      const pointIndex = segmentIndices ? segmentIndices[i] + 1 : i + 1;
+      const p = points[pointIndex];
       if (p) candidateEvents.push({ index: i, type: 'ACCEL', time: t, lat: p.lat, lon: p.lon, magnitude: val });
     } else if (val < HARD_BRAKE_THRESHOLD) {
-      const p = points[i + 1];
+      const pointIndex = segmentIndices ? segmentIndices[i] + 1 : i + 1;
+      const p = points[pointIndex];
       if (p) candidateEvents.push({ index: i, type: 'BRAKE', time: t, lat: p.lat, lon: p.lon, magnitude: Math.abs(val) });
     }
   }
@@ -476,6 +482,8 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
   const hairpinPoints: [number, number][] = [];
   const speeds: number[] = [];
   const timeDeltas: number[] = [];
+  const segmentIndices: number[] = [];
+  let accumulatedTime = 0;
 
   // Turn Detection State
   let currentTurnSum = 0;
@@ -535,6 +543,15 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
   const rawGradients: number[] = [];
   for (let i = 0; i < robustSegments.length; i++) {
     const { speed, time: timeDiff, distance } = robustSegments[i];
+
+    // PAUSE DETECTION: Skip segments longer than PAUSE_THRESHOLD
+    if (timeDiff > PAUSE_THRESHOLD) {
+      continue;
+    }
+
+    accumulatedTime += timeDiff;
+    segmentIndices.push(i);
+
     // Use SMOOTHED points for Bearing calculation
     const prev = smoothedPoints[i];
     const curr = smoothedPoints[i + 1];
@@ -786,7 +803,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
     smoothedAccelerations.push(count > 0 ? sum / count : 0);
   }
 
-  const { finalAccelerations, hardAccelPoints, hardBrakePoints, hardAccelerationCount, hardBrakingCount } = applyAdvancedFiltering(smoothedAccelerations, timeDeltas, points, isClampedArray);
+  const { finalAccelerations, hardAccelPoints, hardBrakePoints, hardAccelerationCount, hardBrakingCount } = applyAdvancedFiltering(smoothedAccelerations, timeDeltas, points, isClampedArray, segmentIndices);
 
   // Motion Buckets
   let stoppedTime = 0;
@@ -829,8 +846,14 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
     if (stopStart >= 0) stopPoints.push([points[stopStart].lat, points[stopStart].lon]);
   }
 
-  let totalTime = 0;
-  if (points[0].time && points[points.length - 1].time) totalTime = (points[points.length - 1].time!.getTime() - points[0].time!.getTime()) / 1000;
+  // Calculate Total Time from accumulated active time (excluding pauses)
+  let totalTime = accumulatedTime;
+  // Fallback if empty (though stats would be empty too)
+  if (totalTime === 0 && points.length > 1 && points[0].time && points[points.length - 1].time) {
+    // Only use raw diff if we have no segments? But robustSegments check handles length < 2.
+    // So this is just a safety fallback.
+    // totalTime = (points[points.length - 1].time!.getTime() - points[0].time!.getTime()) / 1000;
+  }
 
   const twistinessScore = totalDistance > 0 ? totalHeadingChange / totalDistance : 0;
   const percentStraight = totalDistance > 0 ? (totalStraightDistance / totalDistance) * 100 : 0;
@@ -869,9 +892,16 @@ export function analyzeSegments(points: GPXPoint[]): TrackSegment[] {
 
   const segments: TrackSegment[] = [];
   const robustSegments = calculateRobustSpeeds(points);
-  const speeds = robustSegments.map(s => s.speed);
-  const timeDeltas = robustSegments.map(s => s.time);
-  const isClampedArray = robustSegments.map(s => s.isClamped);
+
+  // Filter out pauses
+  const activeData = robustSegments
+    .map((s, i) => ({ s, i }))
+    .filter(item => item.s.time <= PAUSE_THRESHOLD);
+
+  const speeds = activeData.map(d => d.s.speed);
+  const timeDeltas = activeData.map(d => d.s.time);
+  const isClampedArray = activeData.map(d => d.s.isClamped);
+  const segmentIndices = activeData.map(d => d.i);
 
   // 1. Smooth Speeds (Moving Average)
   const smoothedSpeeds: number[] = [];
@@ -926,7 +956,7 @@ export function analyzeSegments(points: GPXPoint[]): TrackSegment[] {
   }
 
   // GAP & ADVANCED FILTERING
-  const { finalAccelerations } = applyAdvancedFiltering(smoothedAccelerations, timeDeltas, points, isClampedArray);
+  const { finalAccelerations } = applyAdvancedFiltering(smoothedAccelerations, timeDeltas, points, isClampedArray, segmentIndices);
 
   // 4. Build Segments with Smoothed Data (Acceleration) but Raw/Robust Speed
   for (let i = 0; i < smoothedSpeeds.length; i++) {
@@ -1235,14 +1265,26 @@ export function generateProcessedTrack(points: GPXPoint[]): ProcessedTrack {
 
   // Build cumulative distances and elapsed times
   let cumulativeDistance = 0;
-  const startTime = points[0]?.time?.getTime() || 0;
+  // Use cumulative time to hide pauses (stitches the track in time dimension)
+  let cumulativeTime = 0;
+  // const startTime = points[0]?.time?.getTime() || 0; 
 
   const processedPoints: ProcessedPoint[] = points.map((p, i) => {
+    let isPause = false;
     if (i > 0) {
-      cumulativeDistance += robustSegments[i - 1]?.distance || 0;
+      const seg = robustSegments[i - 1];
+      if (seg) {
+        if (seg.time <= PAUSE_THRESHOLD) {
+          cumulativeDistance += seg.distance;
+          cumulativeTime += seg.time;
+        } else {
+          isPause = true;
+          // Do not increment distance/time -> Gap gets stitched
+        }
+      }
     }
 
-    const elapsedTime = p.time ? (p.time.getTime() - startTime) / 1000 : 0;
+    // const elapsedTime = p.time ? (p.time.getTime() - startTime) / 1000 : 0;
 
     return {
       lat: p.lat,
@@ -1252,10 +1294,12 @@ export function generateProcessedTrack(points: GPXPoint[]): ProcessedTrack {
       smoothedLat: smoothedPoints[i].lat,
       smoothedLon: smoothedPoints[i].lon,
       smoothedEle: smoothedElevations[i],
-      speed: i > 0 ? robustSegments[i - 1]?.speed || 0 : 0,
-      acceleration: i > 0 ? smoothedAccelerations[i - 1] || 0 : 0,
+      speed: (i > 0 && !isPause) ? robustSegments[i - 1]?.speed || 0 : 0,
+      acceleration: (i > 0 && !isPause) ? smoothedAccelerations[i - 1] || 0 : 0, // Note: smoothedAccelerations alignment relies on no filtering in THIS function yet?
+      // Wait, smoothedAccelerations in generateProcessedTrack uses ALL robustSegments currently.
+      // If robustSegments includes pauses, smoothedAccelerations[i-1] aligns with robustSegments[i-1].
       distance: cumulativeDistance,
-      elapsedTime
+      elapsedTime: cumulativeTime
     };
   });
 
