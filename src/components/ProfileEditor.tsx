@@ -66,7 +66,7 @@ const ProfileEditor = ({ children, onProfileUpdate }: ProfileEditorProps) => {
             }
 
             if (data) {
-                setDisplayName(data.display_name || "");
+                setDisplayName(data.display_name || user?.user_metadata?.full_name || "");
                 setCar(data.car || "");
                 setAvatarUrl(data.avatar_url);
             }

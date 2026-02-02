@@ -407,8 +407,8 @@ const Dashboard = () => {
                                 ) : (
                                     <>
                                         <img
-                                            src={profile?.avatar_url || user?.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.display_name || user?.email || "U")}&background=random`}
-                                            alt={profile?.display_name || user?.email || "User"}
+                                            src={profile?.avatar_url || user?.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.display_name || user?.user_metadata?.full_name || user?.email || "U")}&background=random`}
+                                            alt={profile?.display_name || user?.user_metadata?.full_name || user?.email || "User"}
                                             className="w-8 h-8 rounded-full border border-border object-cover"
                                             crossOrigin="anonymous"
                                         />
