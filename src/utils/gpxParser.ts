@@ -178,7 +178,10 @@ export function calculateSpeedDistribution(points: GPXPoint[], bucketSize: numbe
   // However, for distribution we can do a simplified calculation or call it if hoisted.
   // Functions are hoisted.
   const robustSegments = calculateRobustSpeeds(points);
-  const speeds = robustSegments.map(s => s.speed);
+
+  // Filter out pauses for distribution calculation
+  const activeSegments = robustSegments.filter(s => s.time <= PAUSE_THRESHOLD);
+  const speeds = activeSegments.map(s => s.speed);
 
   // Smooth Speeds
   const WINDOW_SIZE = 5;
@@ -203,7 +206,7 @@ export function calculateSpeedDistribution(points: GPXPoint[], bucketSize: numbe
   const buckets: Record<number, { time: number; distance: number }> = {};
   let maxBucketIndex = 0;
 
-  robustSegments.forEach((seg, i) => {
+  activeSegments.forEach((seg, i) => {
     const speed = smoothedSpeeds[i];
     if (speed < 0.1) return; // Ignore stops
 

@@ -478,7 +478,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                             </p>
                           ) : (
                             <p className="text-muted-foreground">
-                              <strong>Privacy Zone:</strong> The first few kilometers of this drive are hidden to protect the owner's privacy.
+                              <strong>Privacy Zone:</strong> The first/last few kilometers of this drive are hidden to protect the owner's privacy.
                             </p>
                           )}
                         </div>
@@ -737,14 +737,26 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                         {/* Calculate cumulative distance to this point */}
                         {(() => {
                           let cumDist = 0;
+                          let cumTime = 0;
                           const hoveredIndex = points.findIndex(p => p === hoveredPoint);
+
+                          // Calculate accurately up to the point, respecting pauses
                           for (let i = 1; i <= hoveredIndex && i < points.length; i++) {
-                            cumDist += haversineDistance(
-                              points[i - 1].lat,
-                              points[i - 1].lon,
-                              points[i].lat,
-                              points[i].lon
-                            );
+                            const prev = points[i - 1];
+                            const curr = points[i];
+                            const timeDiff = (curr.time && prev.time) ? (curr.time.getTime() - prev.time.getTime()) / 1000 : 0;
+
+                            // 60s Pause Threshold check - must match gpxParser.ts logic
+                            // Ideally import PAUSE_THRESHOLD but simpler to hardcode 60 for UI or move logic to parser
+                            if (timeDiff <= 60.0) {
+                              cumDist += haversineDistance(
+                                prev.lat,
+                                prev.lon,
+                                curr.lat,
+                                curr.lon
+                              );
+                              cumTime += timeDiff;
+                            }
                           }
 
                           // Calculate speed for this point
@@ -761,12 +773,9 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                             }
                           }
 
-                          const elapsedTime = (hoveredPoint.time && points[0].time)
-                            ? (hoveredPoint.time.getTime() - points[0].time.getTime()) / 1000
-                            : 0;
-
-                          const h = Math.floor(elapsedTime / 3600);
-                          const m = Math.floor((elapsedTime % 3600) / 60);
+                          // Use accumulated time instead of raw elapsed time (which includes pauses)
+                          const h = Math.floor(cumTime / 3600);
+                          const m = Math.floor((cumTime % 3600) / 60);
                           const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
 
                           return (
