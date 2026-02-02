@@ -12,6 +12,7 @@ import ProfileEditor from "@/components/ProfileEditor";
 interface Profile {
     id: string;
     display_name: string | null;
+    full_name: string | null;
     car: string | null;
     avatar_url: string | null;
 }
@@ -26,6 +27,7 @@ interface ActivityRecord {
     user_id: string;
     profiles?: {
         display_name: string | null;
+        full_name: string | null;
         car: string | null;
         avatar_url: string | null;
     };
@@ -51,7 +53,7 @@ const Feed = () => {
             setIsLoadingProfile(true);
             const { data, error } = await supabase
                 .from('profiles')
-                .select('id, display_name, car, avatar_url')
+                .select('id, display_name, full_name, car, avatar_url')
                 .eq('id', user.id)
                 .single();
 
@@ -67,7 +69,7 @@ const Feed = () => {
         try {
             const { data, error } = await supabase
                 .from('activities')
-                .select('*, profiles:user_id(display_name, car, avatar_url)')
+                .select('*, profiles:user_id(display_name, full_name, car, avatar_url)')
                 .eq('public', true)
                 .order('created_at', { ascending: false });
 
@@ -138,13 +140,13 @@ const Feed = () => {
                                 ) : (
                                     <>
                                         <img
-                                            src={profile?.avatar_url || user?.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.display_name || user?.user_metadata?.full_name || user?.email || "U")}&background=random`}
-                                            alt={profile?.display_name || user?.user_metadata?.full_name || user?.email || "User"}
+                                            src={profile?.avatar_url || user?.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.display_name || profile?.full_name || user?.user_metadata?.full_name || user?.email || "U")}&background=random`}
+                                            alt={profile?.display_name || profile?.full_name || user?.user_metadata?.full_name || user?.email || "User"}
                                             className="w-8 h-8 rounded-full border border-border object-cover"
                                             crossOrigin="anonymous"
                                         />
                                         <span className="text-sm font-medium hidden md:block">
-                                            {profile?.display_name || user?.user_metadata?.full_name || user?.email}
+                                            {profile?.display_name || profile?.full_name || user?.user_metadata?.full_name || user?.email}
                                         </span>
                                     </>
                                 )}
@@ -209,15 +211,15 @@ const Feed = () => {
                                             <div className="flex items-center gap-2">
                                                 <div className="w-8 h-8 rounded-full border border-white/20 bg-muted overflow-hidden shrink-0">
                                                     <img
-                                                        src={activity.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(activity.profiles?.display_name || "U")}&background=random`}
-                                                        alt={activity.profiles?.display_name || "User"}
+                                                        src={activity.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(activity.profiles?.display_name || activity.profiles?.full_name || "U")}&background=random`}
+                                                        alt={activity.profiles?.display_name || activity.profiles?.full_name || "User"}
                                                         className="w-full h-full object-cover"
                                                         crossOrigin="anonymous"
                                                     />
                                                 </div>
                                                 <div className="text-white min-w-0">
                                                     <p className="text-sm font-bold truncate">
-                                                        {activity.profiles?.display_name || "Anonymous User"}
+                                                        {activity.profiles?.display_name || activity.profiles?.full_name || "Anonymous User"}
                                                     </p>
                                                     {activity.profiles?.car && (
                                                         <p className="text-xs text-white/80 truncate flex items-center gap-1">

@@ -20,6 +20,7 @@ import { toast } from "sonner";
 interface Profile {
     id: string;
     display_name: string | null;
+    full_name: string | null;
     car: string | null;
     avatar_url: string | null;
 }
@@ -56,7 +57,7 @@ const ProfileEditor = ({ children, onProfileUpdate }: ProfileEditorProps) => {
         try {
             const { data, error } = await supabase
                 .from("profiles")
-                .select("id, display_name, car, avatar_url")
+                .select("id, display_name, full_name, car, avatar_url")
                 .eq("id", user.id)
                 .single();
 
@@ -142,6 +143,7 @@ const ProfileEditor = ({ children, onProfileUpdate }: ProfileEditorProps) => {
                 .upsert({
                     id: user.id,
                     display_name: displayName.trim() || null,
+                    full_name: user.user_metadata?.full_name || null,
                     car: car.trim() || null,
                     avatar_url: finalAvatarUrl,
                     updated_at: new Date().toISOString(),

@@ -17,6 +17,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 interface Profile {
     id: string;
     display_name: string | null;
+    full_name: string | null;
     car: string | null;
     avatar_url: string | null;
 }
@@ -136,7 +137,7 @@ const Dashboard = () => {
             setIsLoadingProfile(true);
             const { data, error } = await supabase
                 .from('profiles')
-                .select('id, display_name, car, avatar_url')
+                .select('id, display_name, full_name, car, avatar_url')
                 .eq('id', user.id)
                 .single();
 
@@ -413,7 +414,7 @@ const Dashboard = () => {
                                             crossOrigin="anonymous"
                                         />
                                         <span className="text-sm font-medium hidden md:block">
-                                            {profile?.display_name || user?.user_metadata?.full_name || user?.email}
+                                            {profile?.display_name || profile?.full_name || user?.user_metadata?.full_name || user?.email}
                                         </span>
                                     </>
                                 )}
