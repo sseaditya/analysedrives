@@ -20,6 +20,7 @@ export const MAX_VALID_GAP_PERCENTILE = 0.90; // Ignore acceleration on top 10% 
 export const MIN_GAP_DURATION = 5.0; // Only filter if gap is > 5 seconds
 export const GAP_BUFFER_SECONDS = 10.0; // Ignore events ±10s around large gaps (Reduced from 30s)
 export const CANCELLATION_WINDOW = 30.0; // Cancel Accel/Brake pairs within 30s
+export const PAUSE_THRESHOLD = 60.0; // Ignore stops > 60s for active time calculations
 
 // Turn Detection Thresholds
 export const MIN_TURN_DISTANCE = 0.015; // km (15 meters) - minimum distance for a turn to be considered real
@@ -48,9 +49,6 @@ export const COORDINATE_SMOOTHING_WINDOW = 5;
 export const ELEVATION_SMOOTHING_WINDOW = 5;
 export const GRADIENT_SMOOTHING_WINDOW = 5;
 export const SPEED_MOVING_AVG_WINDOW = 5;
-
-// Pause Detection
-export const PAUSE_THRESHOLD = 60.0; // seconds - exclude gaps larger than this
 
 export interface GPXStats {
   totalDistance: number; // in kilometers
@@ -1061,7 +1059,8 @@ export function calculateLimitedStats(points: GPXPoint[], speedLimitKmh: number)
     if (prev.time && curr.time) {
       const segmentTimeSeconds = (curr.time.getTime() - prev.time.getTime()) / 1000;
 
-      if (segmentTimeSeconds > 0) {
+      // PAUSE DETECTION: Skip segments longer than PAUSE_THRESHOLD (60s)
+      if (segmentTimeSeconds > 0 && segmentTimeSeconds <= PAUSE_THRESHOLD) {
         originalTime += segmentTimeSeconds;
         totalSegments++;
 

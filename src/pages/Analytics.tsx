@@ -9,7 +9,7 @@ import SpeedDistributionChart from "@/components/SpeedDistributionChart";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import React from "react";
-import { SpeedBucket, parseGPX, calculateStats, generatePreviewPolyline, formatDistance } from "@/utils/gpxParser";
+import { SpeedBucket, parseGPX, calculateStats, generatePreviewPolyline, formatDistance, generateProcessedTrack } from "@/utils/gpxParser";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -83,17 +83,34 @@ const Analytics = () => {
                     // 2. Parse & Recalculate
                     const text = await fileData.text();
                     const points = parseGPX(text);
-                    const newStats = calculateStats(points);
 
-                    // Generate Preview Polyline (Critical for Map Previews & Heatmap)
-                    const previewCoordinates = generatePreviewPolyline(points);
+                    // Generate FULL processed track (includes stats, preview, and detailed points)
+                    // This uses the new pause handling logic in gpxParser.
+                    const processedTrack = generateProcessedTrack(points);
 
+                    // 3. Upload processed.json (Overwrite existing)
+                    // Construct cache filename: activity.file_path is like "uid/timestamp_name.gpx"
+                    // We need to replace .gpx with .processed.json
+                    const gpxPath = activity.file_path;
+                    const jsonPath = gpxPath.replace(/\.gpx$/i, '') + '.processed.json';
+
+                    const { error: uploadError } = await supabase.storage
+                        .from('gpx-files')
+                        .upload(jsonPath, new Blob([JSON.stringify(processedTrack)], { type: 'application/json' }), {
+                            upsert: true // Overwrite if exists
+                        });
+
+                    if (uploadError) {
+                        console.warn(`Failed to update JSON for ${activity.id}:`, uploadError);
+                        // We continue, as DB update is more critical for listing, but this is suboptimal.
+                    }
+
+                    // 4. Update DB
                     const finalStats = {
-                        ...newStats,
-                        previewCoordinates
+                        ...processedTrack.stats,
+                        previewCoordinates: processedTrack.previewCoordinates
                     };
 
-                    // 3. Update DB
                     const { error: updateError } = await supabase
                         .from('activities')
                         .update({ stats: finalStats })

@@ -9,7 +9,7 @@ import {
   ReferenceArea,
   ReferenceLine,
 } from "recharts";
-import { GPXPoint, haversineDistance } from "@/utils/gpxParser";
+import { GPXPoint, haversineDistance, PAUSE_THRESHOLD } from "@/utils/gpxParser";
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -154,8 +154,10 @@ const SpeedElevationChart = ({
   // Calculate combined data for chart - Keep MORE points for better zoom detail
   const fullData: ChartDataPoint[] = useMemo(() => {
     const rawData: { dist: number; speed: number; ele: number | null; time: Date | undefined; elapsed: number }[] = [];
+
+    // Track cumulative active time (excluding pauses)
+    let cumulativeActiveTime = 0;
     let cumulativeDistance = 0;
-    const startTime = points[0]?.time?.getTime() || 0;
 
     // Dynamic Acceleration Limit
     const getMaxAccel = (speedKmh: number) => {
@@ -164,36 +166,85 @@ const SpeedElevationChart = ({
 
     let prevSpeedMps = 0;
 
+    // Use rawData to push processed points.
+    // Initialize first point
+    if (points.length > 0) {
+      rawData.push({
+        dist: 0,
+        speed: 0,
+        ele: points[0].ele !== undefined ? points[0].ele : null,
+        time: points[0].time,
+        elapsed: 0
+      });
+    }
+
+    // PAUSE_THRESHOLD derived from gpxParser
+    // const PAUSE_THRESHOLD = 60.0; // Already imported
+
     for (let i = 1; i < points.length; i++) {
       const prev = points[i - 1];
       const curr = points[i];
 
       const distance = haversineDistance(prev.lat, prev.lon, curr.lat, curr.lon);
+      // NOTE: We only add distance if it's NOT a pause? 
+      // gpxParser stops adding cumulative distance during pause too.
+      // But here we need to decide if we filter the point entirely or just freeze time/dist.
+      // If we freeze, we get multiple points at same X.
+      // Better to check time diff first.
+
+      let timeDiff = 0;
+      if (prev.time && curr.time) {
+        timeDiff = (curr.time.getTime() - prev.time.getTime()) / 1000;
+      }
+
+      // If Pause, SKIP adding this segment to stats/accumulators
+      //effectively stitching the graph
+      if (timeDiff > PAUSE_THRESHOLD) {
+        // We still iterate, but we don't increment cumulative Time or Distance?
+        // If we don't increment Time, x-axis stays same.
+        // If we don't increment Distance, distance-axis stays same.
+        // But the point 'curr' exists. If we push it with same X, we get a vertical stack.
+        // The user complained "paused section turns up as a line".
+        // To fix, we should probably SKIP pushing this point to rawData, or push it with same coords (invisible)?
+        // gpxParser's generateProcessedTrack effectively freezes time/dist.
+        // Let's replicate that: timeDiff is effectively ignored for accumulation.
+        continue; // Skip this point entirely? 
+        // If we skip, we lose the point 'curr'.
+        // But 'curr' is the start of the next segment.
+        // If we skip 'curr', the next iteration will be i+1 vs i=curr.
+        // Wait, loop is 1..length.
+        // If we continue, we don't push 'curr'.
+        // The next iteration calculates dist(points[i], points[i+1]). 
+        // So we strictly lose 'curr' from the chart. That seems correct for a "gap".
+      }
+
       cumulativeDistance += distance;
+      cumulativeActiveTime += timeDiff;
 
       let speedKmh = 0;
       let speedMps = 0;
 
-      if (prev.time && curr.time) {
-        const timeDiff = (curr.time.getTime() - prev.time.getTime()) / 1000;
-        if (timeDiff > 0) {
-          const rawSpeedKmh = distance / (timeDiff / 3600);
-          const rawSpeedMps = rawSpeedKmh / 3.6;
+      if (timeDiff > 0) {
+        const rawSpeedKmh = distance / (timeDiff / 3600);
+        const rawSpeedMps = rawSpeedKmh / 3.6;
 
-          const prevSpeedKmh = prevSpeedMps * 3.6;
-          const maxAccel = getMaxAccel(prevSpeedKmh);
-          const accel = (rawSpeedMps - prevSpeedMps) / timeDiff;
+        const prevSpeedKmh = prevSpeedMps * 3.6;
+        const maxAccel = getMaxAccel(prevSpeedKmh);
+        // const accel = (rawSpeedMps - prevSpeedMps) / timeDiff;
 
-          if (accel > maxAccel) {
-            speedMps = prevSpeedMps + (maxAccel * timeDiff);
-            speedKmh = speedMps * 3.6;
-          } else {
-            speedKmh = rawSpeedKmh;
-            speedMps = rawSpeedMps;
-          }
-
-          if (speedKmh > 350) speedKmh = prevSpeedMps * 3.6;
+        // Simple Accel Limit Check (Replicating gpxParser but locally)
+        // Ideally we used processedPoints but this component takes raw points.
+        // For now, simple check:
+        const accel = (rawSpeedMps - prevSpeedMps) / timeDiff;
+        if (accel > maxAccel) {
+          speedMps = prevSpeedMps + (maxAccel * timeDiff);
+          speedKmh = speedMps * 3.6;
+        } else {
+          speedKmh = rawSpeedKmh;
+          speedMps = rawSpeedMps;
         }
+
+        if (speedKmh > 350) speedKmh = prevSpeedMps * 3.6;
       }
 
       prevSpeedMps = speedMps;
@@ -203,7 +254,7 @@ const SpeedElevationChart = ({
         speed: speedKmh,
         ele: curr.ele !== undefined ? curr.ele : null,
         time: curr.time,
-        elapsed: curr.time ? (curr.time.getTime() - startTime) / 1000 : 0
+        elapsed: cumulativeActiveTime // Use accumulated active time
       });
     }
 
