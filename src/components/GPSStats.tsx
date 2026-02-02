@@ -40,6 +40,7 @@ interface GPSStatsProps {
   hideRadius?: number; // km
   ownerProfile?: {
     display_name: string | null;
+    full_name: string | null;
     avatar_url: string | null;
     car: string | null;
   } | null;
@@ -329,13 +330,13 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                         {ownerProfile?.avatar_url ? (
                           <img
                             src={ownerProfile.avatar_url}
-                            alt={ownerProfile.display_name || "User"}
+                            alt={ownerProfile.display_name || ownerProfile.full_name || "User"}
                             className="w-full h-full object-cover"
                             crossOrigin="anonymous"
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-muted-foreground font-bold">
-                            {ownerProfile?.display_name?.charAt(0)?.toUpperCase() || "U"}
+                            {(ownerProfile?.display_name || ownerProfile?.full_name || "U").charAt(0).toUpperCase()}
                           </div>
                         )}
                       </div>
@@ -346,9 +347,9 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                         </div>
 
                         <div className="flex flex-col gap-0.5">
-                          {ownerProfile?.display_name && (
+                          {(ownerProfile?.display_name || ownerProfile?.full_name) && (
                             <p className="text-sm font-medium text-foreground">
-                              {ownerProfile.display_name}
+                              {ownerProfile.display_name || ownerProfile.full_name}
                               {ownerProfile.car && (
                                 <span className="text-muted-foreground font-normal"> • {ownerProfile.car}</span>
                               )}

@@ -28,6 +28,7 @@ interface ActivityMetadata {
 
 interface OwnerProfile {
   display_name: string | null;
+  full_name: string | null;
   avatar_url: string | null;
   car: string | null;
 }
@@ -118,7 +119,7 @@ const ActivityPage = () => {
           // 1.5 Fetch owner profile
           const { data: profileData } = await supabase
             .from('profiles')
-            .select('display_name, avatar_url, car')
+            .select('display_name, full_name, avatar_url, car')
             .eq('id', record.user_id)
             .single();
 
