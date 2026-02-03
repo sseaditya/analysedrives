@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { MapPin, LogOut, Upload, Activity, Calendar, Clock, ArrowRight, TrendingUp, Pencil, Trash2, Check, X, Search, SlidersHorizontal, ChevronDown, ChevronUp, BarChart3 } from "lucide-react";
+import { MapPin, LogOut, Upload, Activity, Calendar, Clock, ArrowRight, TrendingUp, Pencil, Trash2, Check, X, Search, SlidersHorizontal, ChevronDown, ChevronUp, BarChart3, ChevronLeft, ChevronRight } from "lucide-react";
 import FileUploader from "@/components/FileUploader";
 import { parseGPX, calculateStats, formatDistance, formatDuration, generatePreviewPolyline, calculateSpeedDistribution, SpeedBucket, generateProcessedTrack } from "@/utils/gpxParser";
 import { supabase } from "@/lib/supabase";
@@ -55,6 +55,10 @@ const Dashboard = () => {
     // Edit State
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editTitle, setEditTitle] = useState("");
+
+    // Pagination
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 12;
 
     const handleStartEdit = (e: React.MouseEvent, activity: ActivityRecord) => {
         e.stopPropagation();
@@ -211,6 +215,18 @@ const Dashboard = () => {
             return true;
         });
     }, [activities, searchQuery, timeFilter, distFilter, speedFilter]);
+
+    // Reset to page 1 when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery, timeFilter, distFilter, speedFilter]);
+
+    // Pagination computed values
+    const totalPages = Math.ceil(filteredActivities.length / itemsPerPage);
+    const paginatedActivities = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        return filteredActivities.slice(startIndex, startIndex + itemsPerPage);
+    }, [filteredActivities, currentPage, itemsPerPage]);
 
     const cumulativeStats = useMemo(() => {
         // First filter by Time Period
@@ -595,88 +611,122 @@ const Dashboard = () => {
                                 )}
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                {filteredActivities.map((activity) => (
-                                    <div
-                                        key={activity.id}
-                                        onClick={() => navigate(`/activity/${activity.slug || activity.id}`)}
-                                        className="group bg-card border border-border rounded-2xl overflow-hidden hover:shadow-xl hover:shadow-primary/5 transition-all cursor-pointer hover:-translate-y-1 flex flex-col relative"
-                                    >
-                                        {/* Mini Map */}
-                                        <div className="h-40 w-full relative bg-muted/30">
-                                            <ActivityMiniMap coordinates={activity.stats?.previewCoordinates} />
-                                        </div>
-
-                                        {/* Details */}
-                                        <div className="p-4 flex-1 flex flex-col justify-between">
-                                            <div className="mb-4">
-                                                {editingId === activity.id ? (
-                                                    <div className="flex items-center gap-2 mb-2" onClick={(e) => e.stopPropagation()}>
-                                                        <input
-                                                            type="text"
-                                                            value={editTitle}
-                                                            onChange={(e) => setEditTitle(e.target.value)}
-                                                            className="flex-1 bg-background border border-primary rounded px-2 py-1 text-sm focus:outline-none"
-                                                            autoFocus
-                                                        />
-                                                        <Button size="icon" variant="ghost" className="h-6 w-6 text-green-500" onClick={(e) => handleSaveEdit(e, activity.id)}>
-                                                            <Check className="w-4 h-4" />
-                                                        </Button>
-                                                        <Button size="icon" variant="ghost" className="h-6 w-6 text-red-500" onClick={handleCancelEdit}>
-                                                            <X className="w-4 h-4" />
-                                                        </Button>
-                                                    </div>
-                                                ) : (
-                                                    <div className="flex justify-between items-start gap-2">
-                                                        <h4 className="font-bold text-foreground truncate flex-1" title={activity.title}>
-                                                            {activity.title}
-                                                        </h4>
-                                                    </div>
-                                                )}
-
-                                                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                                    <Calendar className="w-3 h-3" />
-                                                    {new Date(activity.stats?.startTime || activity.created_at).toLocaleDateString(undefined, {
-                                                        weekday: 'short',
-                                                        year: 'numeric',
-                                                        month: 'short',
-                                                        day: 'numeric'
-                                                    })}
-                                                </p>
+                            <>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                    {paginatedActivities.map((activity) => (
+                                        <div
+                                            key={activity.id}
+                                            onClick={() => navigate(`/activity/${activity.slug || activity.id}`)}
+                                            className="group bg-card border border-border rounded-2xl overflow-hidden hover:shadow-xl hover:shadow-primary/5 transition-all cursor-pointer hover:-translate-y-1 flex flex-col relative"
+                                        >
+                                            {/* Mini Map */}
+                                            <div className="h-40 w-full relative bg-muted/30">
+                                                <ActivityMiniMap coordinates={activity.stats?.previewCoordinates} />
                                             </div>
 
-                                            <div className="grid grid-cols-3 gap-2 mt-auto pt-4 border-t border-border/50">
-                                                <div className="flex flex-col">
-                                                    <span className="text-[10px] uppercase text-muted-foreground font-medium">Dist</span>
-                                                    <span className="text-sm font-bold flex items-center gap-1">
-                                                        <MapPin className="w-3 h-3 text-primary" />
-                                                        {formatDistance(activity.stats?.totalDistance || 0)}
-                                                    </span>
+                                            {/* Details */}
+                                            <div className="p-4 flex-1 flex flex-col justify-between">
+                                                <div className="mb-4">
+                                                    {editingId === activity.id ? (
+                                                        <div className="flex items-center gap-2 mb-2" onClick={(e) => e.stopPropagation()}>
+                                                            <input
+                                                                type="text"
+                                                                value={editTitle}
+                                                                onChange={(e) => setEditTitle(e.target.value)}
+                                                                className="flex-1 bg-background border border-primary rounded px-2 py-1 text-sm focus:outline-none"
+                                                                autoFocus
+                                                            />
+                                                            <Button size="icon" variant="ghost" className="h-6 w-6 text-green-500" onClick={(e) => handleSaveEdit(e, activity.id)}>
+                                                                <Check className="w-4 h-4" />
+                                                            </Button>
+                                                            <Button size="icon" variant="ghost" className="h-6 w-6 text-red-500" onClick={handleCancelEdit}>
+                                                                <X className="w-4 h-4" />
+                                                            </Button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex justify-between items-start gap-2">
+                                                            <h4 className="font-bold text-foreground truncate flex-1" title={activity.title}>
+                                                                {activity.title}
+                                                            </h4>
+                                                        </div>
+                                                    )}
+
+                                                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                                        <Calendar className="w-3 h-3" />
+                                                        {new Date(activity.stats?.startTime || activity.created_at).toLocaleDateString(undefined, {
+                                                            weekday: 'short',
+                                                            year: 'numeric',
+                                                            month: 'short',
+                                                            day: 'numeric'
+                                                        })}
+                                                    </p>
                                                 </div>
-                                                <div className="flex flex-col">
-                                                    <span className="text-[10px] uppercase text-muted-foreground font-medium">Time</span>
-                                                    <span className="text-sm font-bold flex items-center gap-1 whitespace-nowrap">
-                                                        <Clock className="w-3 h-3 text-primary" />
-                                                        {(() => {
-                                                            const totalSeconds = activity.stats?.totalTime || 0;
-                                                            const h = Math.floor(totalSeconds / 3600);
-                                                            const m = Math.floor((totalSeconds % 3600) / 60);
-                                                            return h > 0 ? `${h}h ${m}m` : `${m}m`;
-                                                        })()}
-                                                    </span>
-                                                </div>
-                                                <div className="flex flex-col">
-                                                    <span className="text-[10px] uppercase text-muted-foreground font-medium">Avg</span>
-                                                    <span className="text-sm font-bold flex items-center gap-1 whitespace-nowrap">
-                                                        <Activity className="w-3 h-3 text-primary" />
-                                                        {activity.stats?.avgSpeed ? `${activity.stats.avgSpeed.toFixed(1)}` : '-'}
-                                                    </span>
+
+                                                <div className="grid grid-cols-3 gap-2 mt-auto pt-4 border-t border-border/50">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[10px] uppercase text-muted-foreground font-medium">Dist</span>
+                                                        <span className="text-sm font-bold flex items-center gap-1">
+                                                            <MapPin className="w-3 h-3 text-primary" />
+                                                            {formatDistance(activity.stats?.totalDistance || 0)}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[10px] uppercase text-muted-foreground font-medium">Time</span>
+                                                        <span className="text-sm font-bold flex items-center gap-1 whitespace-nowrap">
+                                                            <Clock className="w-3 h-3 text-primary" />
+                                                            {(() => {
+                                                                const totalSeconds = activity.stats?.totalTime || 0;
+                                                                const h = Math.floor(totalSeconds / 3600);
+                                                                const m = Math.floor((totalSeconds % 3600) / 60);
+                                                                return h > 0 ? `${h}h ${m}m` : `${m}m`;
+                                                            })()}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[10px] uppercase text-muted-foreground font-medium">Avg</span>
+                                                        <span className="text-sm font-bold flex items-center gap-1 whitespace-nowrap">
+                                                            <Activity className="w-3 h-3 text-primary" />
+                                                            {activity.stats?.avgSpeed ? `${activity.stats.avgSpeed.toFixed(1)}` : '-'}
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
+                                    ))}
+                                </div>
+
+                                {/* Pagination Controls */}
+                                {totalPages > 1 && (
+                                    <div className="flex items-center justify-center gap-4 mt-8 pt-6 border-t border-border">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                            disabled={currentPage === 1}
+                                            className="gap-1"
+                                        >
+                                            <ChevronLeft className="w-4 h-4" />
+                                            Previous
+                                        </Button>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm text-muted-foreground">
+                                                Page <span className="font-bold text-foreground">{currentPage}</span> of <span className="font-bold text-foreground">{totalPages}</span>
+                                            </span>
+                                            <span className="text-xs text-muted-foreground">({filteredActivities.length} activities)</span>
+                                        </div>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                            disabled={currentPage === totalPages}
+                                            className="gap-1"
+                                        >
+                                            Next
+                                            <ChevronRight className="w-4 h-4" />
+                                        </Button>
                                     </div>
-                                ))}
-                            </div>
+                                )}
+                            </>
                         )}
                     </div>
                 </div>

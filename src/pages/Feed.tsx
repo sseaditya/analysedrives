@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { MapPin, LogOut, Clock, Activity, Search, LayoutDashboard, Globe, Car, User, BarChart3 } from "lucide-react";
+import { MapPin, LogOut, Clock, Activity, Search, LayoutDashboard, Globe, Car, User, BarChart3, ChevronLeft, ChevronRight } from "lucide-react";
 import { formatDistance, formatDuration } from "@/utils/gpxParser";
 import { supabase } from "@/lib/supabase";
 import ActivityMiniMap from "@/components/ActivityMiniMap";
@@ -41,6 +41,10 @@ const Feed = () => {
     const [searchQuery, setSearchQuery] = useState("");
     const [profile, setProfile] = useState<Profile | null>(null);
     const [isLoadingProfile, setIsLoadingProfile] = useState(false);
+
+    // Pagination
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 12;
 
     useEffect(() => {
         fetchPublicActivities();
@@ -98,6 +102,18 @@ const Feed = () => {
         a.profiles?.display_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         a.profiles?.car?.toLowerCase().includes(searchQuery.toLowerCase())
     );
+
+    // Reset to page 1 when search changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery]);
+
+    // Pagination computed values
+    const totalPages = Math.ceil(filteredActivities.length / itemsPerPage);
+    const paginatedActivities = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        return filteredActivities.slice(startIndex, startIndex + itemsPerPage);
+    }, [filteredActivities, currentPage, itemsPerPage]);
 
     return (
         <div className="min-h-screen bg-background flex flex-col font-sans">
@@ -195,82 +211,116 @@ const Feed = () => {
                             <p className="text-muted-foreground text-lg">No public activities found.</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                            {filteredActivities.map((activity) => (
-                                <div
-                                    key={activity.id}
-                                    onClick={() => navigate(`/activity/${activity.slug || activity.id}`)}
-                                    className="group bg-card border border-border rounded-2xl overflow-hidden hover:shadow-xl hover:shadow-primary/5 transition-all cursor-pointer hover:-translate-y-1 flex flex-col relative"
-                                >
-                                    {/* Map Preview with Overlay */}
-                                    <div className="h-48 w-full relative bg-muted/30">
-                                        <ActivityMiniMap coordinates={activity.stats?.previewCoordinates} />
+                        <>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                {paginatedActivities.map((activity) => (
+                                    <div
+                                        key={activity.id}
+                                        onClick={() => navigate(`/activity/${activity.slug || activity.id}`)}
+                                        className="group bg-card border border-border rounded-2xl overflow-hidden hover:shadow-xl hover:shadow-primary/5 transition-all cursor-pointer hover:-translate-y-1 flex flex-col relative"
+                                    >
+                                        {/* Map Preview with Overlay */}
+                                        <div className="h-48 w-full relative bg-muted/30">
+                                            <ActivityMiniMap coordinates={activity.stats?.previewCoordinates} />
 
-                                        {/* User Info Overlay */}
-                                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 flex items-end justify-between">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-8 h-8 rounded-full border border-white/20 bg-muted overflow-hidden shrink-0">
-                                                    <img
-                                                        src={activity.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(activity.profiles?.display_name || activity.profiles?.full_name || "U")}&background=random`}
-                                                        alt={activity.profiles?.display_name || activity.profiles?.full_name || "User"}
-                                                        className="w-full h-full object-cover"
-                                                        crossOrigin="anonymous"
-                                                    />
-                                                </div>
-                                                <div className="text-white min-w-0">
-                                                    <p className="text-sm font-bold truncate">
-                                                        {activity.profiles?.display_name || activity.profiles?.full_name || "Anonymous User"}
-                                                    </p>
-                                                    {activity.profiles?.car && (
-                                                        <p className="text-xs text-white/80 truncate flex items-center gap-1">
-                                                            <Car className="w-3 h-3" />
-                                                            {activity.profiles.car}
+                                            {/* User Info Overlay */}
+                                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 flex items-end justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-8 h-8 rounded-full border border-white/20 bg-muted overflow-hidden shrink-0">
+                                                        <img
+                                                            src={activity.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(activity.profiles?.display_name || activity.profiles?.full_name || "U")}&background=random`}
+                                                            alt={activity.profiles?.display_name || activity.profiles?.full_name || "User"}
+                                                            className="w-full h-full object-cover"
+                                                            crossOrigin="anonymous"
+                                                        />
+                                                    </div>
+                                                    <div className="text-white min-w-0">
+                                                        <p className="text-sm font-bold truncate">
+                                                            {activity.profiles?.display_name || activity.profiles?.full_name || "Anonymous User"}
                                                         </p>
-                                                    )}
+                                                        {activity.profiles?.car && (
+                                                            <p className="text-xs text-white/80 truncate flex items-center gap-1">
+                                                                <Car className="w-3 h-3" />
+                                                                {activity.profiles.car}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Details */}
+                                        <div className="p-4 flex-1">
+                                            <h3 className="font-bold text-foreground mb-4 truncate" title={activity.title}>
+                                                {activity.title}
+                                            </h3>
+
+                                            <div className="grid grid-cols-3 gap-2 border-t border-border/50 pt-4">
+                                                <div>
+                                                    <span className="text-[10px] uppercase text-muted-foreground font-semibold">Dist</span>
+                                                    <div className="flex items-center gap-1 font-bold text-sm">
+                                                        <MapPin className="w-3 h-3 text-primary" />
+                                                        {formatDistance(activity.stats?.totalDistance || 0)}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <span className="text-[10px] uppercase text-muted-foreground font-semibold">Time</span>
+                                                    <div className="flex items-center gap-1 font-bold text-sm">
+                                                        <Clock className="w-3 h-3 text-primary" />
+                                                        {(() => {
+                                                            const totalSeconds = activity.stats?.totalTime || 0;
+                                                            const h = Math.floor(totalSeconds / 3600);
+                                                            const m = Math.floor((totalSeconds % 3600) / 60);
+                                                            return h > 0 ? `${h}h ${m}m` : `${m}m`;
+                                                        })()}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <span className="text-[10px] uppercase text-muted-foreground font-semibold">Avg</span>
+                                                    <div className="flex items-center gap-1 font-bold text-sm">
+                                                        <Activity className="w-3 h-3 text-primary" />
+                                                        {activity.stats?.avgSpeed ? `${activity.stats.avgSpeed.toFixed(0)}` : '-'}
+                                                        <span className="text-[10px] font-normal text-muted-foreground">km/h</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
+                                ))}
+                            </div>
 
-                                    {/* Details */}
-                                    <div className="p-4 flex-1">
-                                        <h3 className="font-bold text-foreground mb-4 truncate" title={activity.title}>
-                                            {activity.title}
-                                        </h3>
-
-                                        <div className="grid grid-cols-3 gap-2 border-t border-border/50 pt-4">
-                                            <div>
-                                                <span className="text-[10px] uppercase text-muted-foreground font-semibold">Dist</span>
-                                                <div className="flex items-center gap-1 font-bold text-sm">
-                                                    <MapPin className="w-3 h-3 text-primary" />
-                                                    {formatDistance(activity.stats?.totalDistance || 0)}
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <span className="text-[10px] uppercase text-muted-foreground font-semibold">Time</span>
-                                                <div className="flex items-center gap-1 font-bold text-sm">
-                                                    <Clock className="w-3 h-3 text-primary" />
-                                                    {(() => {
-                                                        const totalSeconds = activity.stats?.totalTime || 0;
-                                                        const h = Math.floor(totalSeconds / 3600);
-                                                        const m = Math.floor((totalSeconds % 3600) / 60);
-                                                        return h > 0 ? `${h}h ${m}m` : `${m}m`;
-                                                    })()}
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <span className="text-[10px] uppercase text-muted-foreground font-semibold">Avg</span>
-                                                <div className="flex items-center gap-1 font-bold text-sm">
-                                                    <Activity className="w-3 h-3 text-primary" />
-                                                    {activity.stats?.avgSpeed ? `${activity.stats.avgSpeed.toFixed(0)}` : '-'}
-                                                    <span className="text-[10px] font-normal text-muted-foreground">km/h</span>
-                                                </div>
-                                            </div>
-                                        </div>
+                            {/* Pagination Controls */}
+                            {totalPages > 1 && (
+                                <div className="flex items-center justify-center gap-4 mt-8 pt-6 border-t border-border">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                        disabled={currentPage === 1}
+                                        className="gap-1"
+                                    >
+                                        <ChevronLeft className="w-4 h-4" />
+                                        Previous
+                                    </Button>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm text-muted-foreground">
+                                            Page <span className="font-bold text-foreground">{currentPage}</span> of <span className="font-bold text-foreground">{totalPages}</span>
+                                        </span>
+                                        <span className="text-xs text-muted-foreground">({filteredActivities.length} activities)</span>
                                     </div>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                        disabled={currentPage === totalPages}
+                                        className="gap-1"
+                                    >
+                                        Next
+                                        <ChevronRight className="w-4 h-4" />
+                                    </Button>
                                 </div>
-                            ))}
-                        </div>
+                            )}
+                        </>
                     )}
                 </div>
             </main>
