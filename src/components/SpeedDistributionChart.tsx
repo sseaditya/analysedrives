@@ -14,7 +14,7 @@ import { GPXPoint, calculateSpeedDistribution, SpeedBucket } from "@/utils/gpxPa
 function calculateNiceYTicks(dataMax: number, targetTickCount = 5): { domain: [number, number], ticks: number[] } {
     if (dataMax <= 0) return { domain: [0, 10], ticks: [0, 2, 4, 6, 8, 10] };
 
-    const niceSteps = [1, 2, 5, 10, 20, 25, 40, 50, 100, 200, 250, 500, 1000];
+    const niceSteps = [1, 2, 5, 10, 20, 40, 50, 100, 200, 400, 500, 1000];
     const roughStep = dataMax / (targetTickCount - 1);
 
     let bestStep = niceSteps[0];

@@ -135,7 +135,7 @@ function calculateNiceYTicks(dataMin: number, dataMax: number, targetTickCount =
   if (dataMax <= 0) return { domain: [0, 100], ticks: [0, 20, 40, 60, 80, 100] };
 
   // Nice step increments to choose from
-  const niceSteps = [1, 2, 5, 10, 20, 25, 40, 50, 100, 200, 250, 500, 1000];
+  const niceSteps = [1, 2, 5, 10, 20, 40, 50, 100, 200, 400, 500, 1000];
 
   // Calculate the rough step needed
   const range = dataMax - Math.max(0, dataMin);
@@ -716,7 +716,7 @@ const SpeedElevationChart = ({
                 <stop offset="95%" stopColor="hsl(15, 52%, 58%)" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground))" opacity={0.15} />
+            <CartesianGrid stroke="hsl(var(--border))" strokeWidth={0.5} opacity={0.3} />
             <XAxis
               dataKey={xAxisDataKey}
               type="number"
@@ -810,7 +810,7 @@ const SpeedElevationChart = ({
                   <stop offset="95%" stopColor="hsl(0, 0%, 60%)" stopOpacity={0.1} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground))" opacity={0.15} />
+              <CartesianGrid stroke="hsl(var(--border))" strokeWidth={0.5} opacity={0.3} />
               <XAxis
                 dataKey={xAxisDataKey}
                 type="number"

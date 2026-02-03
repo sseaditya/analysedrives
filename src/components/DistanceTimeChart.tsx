@@ -43,7 +43,7 @@ function formatTimeAxis(seconds: number): string {
 function calculateNiceYTicks(dataMin: number, dataMax: number, targetTickCount = 5): { domain: [number, number], ticks: number[] } {
     if (dataMax <= dataMin) return { domain: [0, 10], ticks: [0, 2, 4, 6, 8, 10] };
 
-    const niceSteps = [0.5, 1, 2, 5, 10, 20, 25, 40, 50, 100, 200, 250, 500, 1000];
+    const niceSteps = [0.5, 1, 2, 5, 10, 20, 40, 50, 100, 200, 400, 500, 1000];
     const range = dataMax - dataMin;
     const roughStep = range / (targetTickCount - 1);
 
