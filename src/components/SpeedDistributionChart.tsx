@@ -6,46 +6,13 @@ import {
     CartesianGrid,
     Tooltip,
     ResponsiveContainer,
+    ReferenceLine,
 } from "recharts";
 import { useMemo } from "react";
 import { GPXPoint, calculateSpeedDistribution, SpeedBucket } from "@/utils/gpxParser";
+import { calculateNiceYTicks } from "@/utils/chartUtils";
 
-// Helper to calculate "nice" ticks for Y axis
-function calculateNiceYTicks(dataMax: number, targetTickCount = 7): { domain: [number, number], ticks: number[] } {
-    if (dataMax <= 0) return { domain: [0, 10], ticks: [0, 2, 4, 6, 8, 10] };
 
-    const niceSteps = [1, 2, 5, 10, 20, 40, 50, 100, 200, 400, 500, 1000];
-    const roughStep = dataMax / (targetTickCount - 1);
-
-    let bestStep = niceSteps[0];
-    for (const step of niceSteps) {
-        if (step >= roughStep) {
-            bestStep = step;
-            break;
-        }
-        bestStep = step;
-    }
-
-    if (roughStep > niceSteps[niceSteps.length - 1]) {
-        const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
-        const fraction = roughStep / magnitude;
-        if (fraction <= 1) bestStep = magnitude;
-        else if (fraction <= 2) bestStep = 2 * magnitude;
-        else if (fraction <= 5) bestStep = 5 * magnitude;
-        else bestStep = 10 * magnitude;
-    }
-
-    const niceMax = Math.ceil(dataMax / bestStep) * bestStep;
-
-    const ticks: number[] = [];
-    for (let val = 0; val <= niceMax; val += bestStep) {
-        // Use float-safe start and step accumulation
-        // Round to avoid floating point errors
-        ticks.push(Math.round(val * 10000) / 10000);
-    }
-
-    return { domain: [0, niceMax], ticks };
-}
 
 interface SpeedDistributionChartProps {
     points?: GPXPoint[];
@@ -177,7 +144,18 @@ const SpeedDistributionChart = ({ points, speedLimit, buckets }: SpeedDistributi
                         <stop offset="95%" stopColor="hsl(var(--foreground))" stopOpacity={0.1} />
                     </linearGradient>
                 </defs>
-                <CartesianGrid stroke="hsl(var(--muted-foreground))" strokeWidth={0.5} vertical={false} opacity={0.6} horizontal={true} syncWithTicks={true} />
+                {/* Custom Grid using ReferenceLines */}
+                {yAxisConfig.ticks.map((tickVal) => (
+                    <ReferenceLine
+                        key={`grid-h-${tickVal}`}
+                        y={tickVal}
+                        yAxisId="left"
+                        stroke="hsl(var(--muted-foreground))"
+                        strokeWidth={0.5}
+                        strokeOpacity={0.6}
+                        isFront={false}
+                    />
+                ))}
                 <XAxis
                     dataKey="range"
                     stroke="hsl(var(--foreground))"

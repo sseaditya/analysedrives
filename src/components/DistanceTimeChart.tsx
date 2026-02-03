@@ -11,6 +11,7 @@ import {
     ReferenceLine,
 } from "recharts";
 import { GPXPoint, haversineDistance } from "@/utils/gpxParser";
+import { calculateNiceYTicks, calculateNiceTicks } from "@/utils/chartUtils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface DistanceTimeChartProps {
@@ -39,42 +40,7 @@ function formatTimeAxis(seconds: number): string {
     return `${minutes}m`;
 }
 
-// Helper to calculate "nice" ticks for Y axis
-function calculateNiceYTicks(dataMin: number, dataMax: number, targetTickCount = 7): { domain: [number, number], ticks: number[] } {
-    if (dataMax <= dataMin) return { domain: [0, 10], ticks: [0, 2, 4, 6, 8, 10] };
 
-    const niceSteps = [0.5, 1, 2, 5, 10, 20, 40, 50, 100, 200, 400, 500, 1000];
-    const range = dataMax - dataMin;
-    const roughStep = range / (targetTickCount - 1);
-
-    let bestStep = niceSteps[0];
-    for (const step of niceSteps) {
-        if (step >= roughStep) {
-            bestStep = step;
-            break;
-        }
-        bestStep = step;
-    }
-
-    if (roughStep > niceSteps[niceSteps.length - 1]) {
-        const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
-        const fraction = roughStep / magnitude;
-        if (fraction <= 1) bestStep = magnitude;
-        else if (fraction <= 2) bestStep = 2 * magnitude;
-        else if (fraction <= 5) bestStep = 5 * magnitude;
-        else bestStep = 10 * magnitude;
-    }
-
-    const niceMin = Math.floor(dataMin / bestStep) * bestStep;
-    const niceMax = Math.ceil(dataMax / bestStep) * bestStep;
-
-    const ticks: number[] = [];
-    for (let val = niceMin; val <= niceMax; val += bestStep) {
-        ticks.push(parseFloat(val.toFixed(2)));
-    }
-
-    return { domain: [niceMin, niceMax], ticks };
-}
 
 const DistanceTimeChart = ({
     points,
@@ -157,6 +123,9 @@ const DistanceTimeChart = ({
     // Use nice tick calculation for Y-axis
     const yAxisConfig = useMemo(() => calculateNiceYTicks(minDist, maxDist * 1.05, 7), [minDist, maxDist]);
 
+    // Calculate nice X-axis ticks (Time) explicitly to map ReferenceLines
+    const xAxisTicks = useMemo(() => calculateNiceTicks(minTime, maxTime, 'time', 8), [minTime, maxTime]);
+
     const zoom = () => {
         if (refAreaLeft === refAreaRight || refAreaRight === null || refAreaLeft === null) {
             setRefAreaLeft(null);
@@ -225,7 +194,28 @@ const DistanceTimeChart = ({
                         <stop offset="95%" stopColor="hsl(15, 52%, 58%)" stopOpacity={0} />
                     </linearGradient>
                 </defs>
-                <CartesianGrid stroke="hsl(var(--muted-foreground))" strokeWidth={0.5} opacity={0.6} syncWithTicks={true} />
+                {/* Horizontal Grid (Y-Axis) */}
+                {yAxisConfig.ticks.map((tickVal) => (
+                    <ReferenceLine
+                        key={`grid-y-${tickVal}`}
+                        y={tickVal}
+                        stroke="hsl(var(--muted-foreground))"
+                        strokeWidth={0.5}
+                        strokeOpacity={0.6}
+                        isFront={false}
+                    />
+                ))}
+                {/* Vertical Grid (X-Axis) */}
+                {xAxisTicks.map((tickVal) => (
+                    <ReferenceLine
+                        key={`grid-x-${tickVal}`}
+                        x={tickVal}
+                        stroke="hsl(var(--muted-foreground))"
+                        strokeWidth={0.5}
+                        strokeOpacity={0.6}
+                        isFront={false}
+                    />
+                ))}
                 <XAxis
                     dataKey="elapsedTime"
                     type="number"
@@ -235,7 +225,7 @@ const DistanceTimeChart = ({
                     fontSize={12}
                     tickLine={false}
                     axisLine={false}
-                    tickCount={8}
+                    ticks={xAxisTicks}
                     tickFormatter={formatTimeAxis}
                     allowDataOverflow
                 />

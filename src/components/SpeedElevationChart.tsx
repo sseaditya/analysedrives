@@ -10,6 +10,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import { GPXPoint, haversineDistance, PAUSE_THRESHOLD } from "@/utils/gpxParser";
+import { calculateNiceTicks, calculateNiceYTicks } from "@/utils/chartUtils";
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -50,142 +51,7 @@ function formatTimeAxis(seconds: number): string {
 
 
 // Helper to calculate "nice" ticks (multiples of 10, 20, 50, etc.)
-function calculateNiceTicks(min: number, max: number, type: 'distance' | 'time', maxTicks = 8): number[] {
-  if (min === max) return [min];
 
-  const range = max - min;
-  // If range is 0 or negative, return min
-  if (range <= 0) return [min];
-
-  const roughStep = range / (maxTicks - 1);
-  let niceStep = 0;
-
-  if (type === 'distance') {
-    // Nice steps for distance: 1, 2, 5, 10 in respective powers of 10
-    const exponent = Math.floor(Math.log10(roughStep));
-    const fraction = roughStep / Math.pow(10, exponent);
-
-    let niceFraction = 1;
-    if (fraction <= 1) niceFraction = 1;
-    else if (fraction <= 2) niceFraction = 2;
-    else if (fraction <= 5) niceFraction = 5;
-    else niceFraction = 10;
-
-    niceStep = niceFraction * Math.pow(10, exponent);
-
-    // Prefer integer steps for distance unless range is very small (< 1.5km)
-    if (niceStep < 1 && range >= 1.5) {
-      niceStep = 1;
-    }
-  } else {
-    // Nice steps for time (seconds)
-    // Custom set of nice intervals
-    const niceIntervals = [
-      1, 5, 10, 15, 30, // seconds
-      60, 120, 300, 600, 900, 1200, 1800, 3600, // 1m... 15m, 20m, 30m, 1h
-      7200, 10800, 14400, 18000, 21600, 43200, 86400 // 2h+
-    ];
-
-    // Find closest nice interval >= roughStep roughly
-    // We prefer larger steps to avoid crowding if roughStep matches somewhat
-    const closest = niceIntervals.reduce((prev, curr) => {
-      return Math.abs(curr - roughStep) < Math.abs(prev - roughStep) ? curr : prev;
-    });
-    niceStep = closest;
-
-    // Fallback for huge time ranges (use hour multiples)
-    if (roughStep > 86400) {
-      niceStep = Math.ceil(roughStep / 3600) * 3600;
-    }
-  }
-
-  // Generate ticks ensuring we include 0 if min is close to 0 (unzoomed)
-  const ticks: number[] = [];
-  // round min to nearest niceStep
-  let startTick = Math.ceil(min / niceStep) * niceStep;
-
-  // Correction: if min is 0, startTick is 0.
-  // We want to ensure we cover the range visually. 
-  // If startTick < min, it's fine (will be clipped or hidden, but Recharts handles it).
-  // Actually, we should filter ticks to be >= min and <= max to avoid empty space if axis is strict?
-  // User asked for "starts at 0" specifically.
-  if (min === 0) startTick = 0;
-
-  // Generate
-  let current = startTick;
-  // Safety break to prevent infinite loops
-  let safety = 0;
-  while (current <= max && safety < 100) {
-    if (current >= min) {
-      ticks.push(current);
-    }
-    current += niceStep;
-    // Precision fix for repeated addition
-    current = parseFloat(current.toPrecision(12));
-    safety++;
-  }
-
-  if (ticks.length === 0) return [min, max];
-  return ticks;
-}
-
-// Helper to calculate "nice" ticks for Y axis (speed, elevation, etc)
-// Returns nice tick values with proper step sizes (5, 10, 20, 40, 50, 100, etc)
-function calculateNiceYTicks(dataMin: number, dataMax: number, targetTickCount = 7): { domain: [number, number], ticks: number[] } {
-  if (dataMax <= 0) return { domain: [0, 100], ticks: [0, 20, 40, 60, 80, 100] };
-
-  // Nice step increments to choose from
-  const niceSteps = [1, 2, 5, 10, 20, 40, 50, 100, 200, 400, 500, 1000];
-
-  // Calculate the rough step needed
-  const range = dataMax - Math.max(0, dataMin);
-  const roughStep = range / (targetTickCount - 1);
-
-  // Find the best nice step
-  let bestStep = niceSteps[0];
-  for (const step of niceSteps) {
-    if (step >= roughStep) {
-      bestStep = step;
-      break;
-    }
-    bestStep = step;
-  }
-
-  // If roughStep is larger than our largest nice step, calculate a custom one
-  if (roughStep > niceSteps[niceSteps.length - 1]) {
-    const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
-    const fraction = roughStep / magnitude;
-    if (fraction <= 1) bestStep = magnitude;
-    else if (fraction <= 2) bestStep = 2 * magnitude;
-    else if (fraction <= 5) bestStep = 5 * magnitude;
-    else bestStep = 10 * magnitude;
-  }
-
-  // Calculate nice max (round up to next step)
-  const niceMax = Math.ceil(dataMax / bestStep) * bestStep;
-  const niceMin = Math.max(0, Math.floor(dataMin / bestStep) * bestStep);
-
-  // Generate ticks
-  const ticks: number[] = [];
-  for (let val = niceMin; val <= niceMax; val += bestStep) {
-    // Use float-safe start and step accumulation
-    // Round to avoid floating point errors (e.g. 0.300000000004)
-    const rawVal = niceMin + (val - niceMin);
-    ticks.push(Math.round(rawVal * 10000) / 10000);
-  }
-
-  // Limit to reasonable number of ticks (5-7)
-  if (ticks.length > 7) {
-    // Skip every other tick
-    const filtered = ticks.filter((_, i) => i % 2 === 0);
-    if (filtered[filtered.length - 1] < niceMax) {
-      filtered.push(niceMax);
-    }
-    return { domain: [niceMin, niceMax], ticks: filtered };
-  }
-
-  return { domain: [niceMin, niceMax], ticks };
-}
 
 type InteractionMode = 'none' | 'new-selection' | 'resize-left' | 'resize-right' | 'move-window';
 
@@ -731,8 +597,18 @@ const SpeedElevationChart = ({
                 isFront={false}
               />
             ))}
-            {/* Keeping vertical Grid from CartesianGrid only */}
-            <CartesianGrid stroke="hsl(var(--muted-foreground))" strokeWidth={0.5} opacity={0.6} horizontal={false} vertical={true} syncWithTicks={true} />
+            {/* Vertical Grid using ReferenceLines for X-Axis to ensure Safari visibility */}
+            {xAxisTicks.map((tickVal) => (
+              <ReferenceLine
+                key={`grid-x-${tickVal}`}
+                x={tickVal}
+                stroke="hsl(var(--muted-foreground))"
+                strokeWidth={0.5}
+                strokeOpacity={0.6}
+                isFront={false}
+              />
+            ))}
+            {/* Remove CartesianGrid entirely since we now handle both H and V manually */}
             <XAxis
               dataKey={xAxisDataKey}
               type="number"
@@ -827,7 +703,30 @@ const SpeedElevationChart = ({
                   <stop offset="95%" stopColor="hsl(0, 0%, 60%)" stopOpacity={0.1} />
                 </linearGradient>
               </defs>
-              <CartesianGrid stroke="hsl(var(--muted-foreground))" strokeWidth={0.5} opacity={0.6} syncWithTicks={true} />
+              {/* Explicit Grid Lines for Elevation Chart */}
+              {/* Horizontal (Y) */}
+              {elevationYAxisConfig.ticks.map((tickVal) => (
+                <ReferenceLine
+                  key={`grid-ele-y-${tickVal}`}
+                  y={tickVal}
+                  stroke="hsl(var(--muted-foreground))"
+                  strokeWidth={0.5}
+                  strokeOpacity={0.6}
+                  isFront={false}
+                />
+              ))}
+              {/* Vertical (X) - using same ticks as speed chart */}
+              {/* We need to recalculate or reuse ticks. The XAxis below uses calculateNiceTicks */}
+              {calculateNiceTicks(fullXDomain[0], fullXDomain[1], xAxisMode, 8).map((tickVal) => (
+                <ReferenceLine
+                  key={`grid-ele-x-${tickVal}`}
+                  x={tickVal}
+                  stroke="hsl(var(--muted-foreground))"
+                  strokeWidth={0.5}
+                  strokeOpacity={0.6}
+                  isFront={false}
+                />
+              ))}
               <XAxis
                 dataKey={xAxisDataKey}
                 type="number"
