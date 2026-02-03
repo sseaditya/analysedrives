@@ -341,7 +341,7 @@ const ActivityPage = () => {
         </div>
       </header>
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-4 space-y-6">
+      <main className={`container mx-auto px-4 py-4 space-y-6 ${!user ? 'pb-32 md:pb-28' : ''}`}>
         <div className="max-w-[1600px] mx-auto">
           <GPSStats
             stats={data.stats}
