@@ -412,7 +412,7 @@ const SpeedElevationChart = ({
 
   // Calculate nice elevation Y-axis ticks
   const elevationYAxisConfig = useMemo(() => {
-    return calculateNiceYTicks(minElevation - elevationRange * 0.05, maxElevation + elevationRange * 0.05, 5);
+    return calculateNiceYTicks(minElevation - elevationRange * 0.05, maxElevation + elevationRange * 0.05, 7);
   }, [minElevation, maxElevation, elevationRange]);
 
   // Calculate distance domains
@@ -694,7 +694,7 @@ const SpeedElevationChart = ({
   // Use original speed max to prevent rescaling when visual limit is applied
   const speedYAxisConfig = useMemo(() => {
     const maxSpeed = speedCap ? speedCap : trueMaxSpeed;
-    return calculateNiceYTicks(0, maxSpeed, 6);
+    return calculateNiceYTicks(0, maxSpeed, 7);
   }, [speedCap, trueMaxSpeed]);
 
   return (
@@ -716,7 +716,7 @@ const SpeedElevationChart = ({
                 <stop offset="95%" stopColor="hsl(15, 52%, 58%)" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid stroke="hsl(var(--border))" strokeWidth={0.5} opacity={0.6} />
+            <CartesianGrid stroke="hsl(var(--muted-foreground))" strokeWidth={0.5} opacity={0.4} />
             <XAxis
               dataKey={xAxisDataKey}
               type="number"
@@ -810,7 +810,7 @@ const SpeedElevationChart = ({
                   <stop offset="95%" stopColor="hsl(0, 0%, 60%)" stopOpacity={0.1} />
                 </linearGradient>
               </defs>
-              <CartesianGrid stroke="hsl(var(--border))" strokeWidth={0.5} opacity={0.6} />
+              <CartesianGrid stroke="hsl(var(--muted-foreground))" strokeWidth={0.5} opacity={0.4} />
               <XAxis
                 dataKey={xAxisDataKey}
                 type="number"

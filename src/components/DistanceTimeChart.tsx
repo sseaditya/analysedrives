@@ -155,7 +155,7 @@ const DistanceTimeChart = ({
     const maxDist = chartData[chartData.length - 1]?.distance || 0;
 
     // Use nice tick calculation for Y-axis
-    const yAxisConfig = useMemo(() => calculateNiceYTicks(minDist, maxDist * 1.05, 6), [minDist, maxDist]);
+    const yAxisConfig = useMemo(() => calculateNiceYTicks(minDist, maxDist * 1.05, 7), [minDist, maxDist]);
 
     const zoom = () => {
         if (refAreaLeft === refAreaRight || refAreaRight === null || refAreaLeft === null) {
@@ -225,7 +225,7 @@ const DistanceTimeChart = ({
                         <stop offset="95%" stopColor="hsl(15, 52%, 58%)" stopOpacity={0} />
                     </linearGradient>
                 </defs>
-                <CartesianGrid stroke="hsl(var(--border))" strokeWidth={0.5} opacity={0.6} />
+                <CartesianGrid stroke="hsl(var(--muted-foreground))" strokeWidth={0.5} opacity={0.4} />
                 <XAxis
                     dataKey="elapsedTime"
                     type="number"

@@ -157,7 +157,7 @@ const SpeedDistributionChart = ({ points, speedLimit, buckets }: SpeedDistributi
     const rawMax = Math.max(maxTime, maxDist);
 
     // Use nice tick calculation
-    const yAxisConfig = useMemo(() => calculateNiceYTicks(rawMax * 1.1, 6), [rawMax]);
+    const yAxisConfig = useMemo(() => calculateNiceYTicks(rawMax * 1.1, 7), [rawMax]);
 
     return (
         <ResponsiveContainer width="100%" height="100%">
@@ -175,7 +175,7 @@ const SpeedDistributionChart = ({ points, speedLimit, buckets }: SpeedDistributi
                         <stop offset="95%" stopColor="hsl(var(--foreground))" stopOpacity={0.1} />
                     </linearGradient>
                 </defs>
-                <CartesianGrid stroke="hsl(var(--border))" strokeWidth={0.5} vertical={false} opacity={0.6} horizontal={true} />
+                <CartesianGrid stroke="hsl(var(--muted-foreground))" strokeWidth={0.5} vertical={false} opacity={0.4} horizontal={true} />
                 <XAxis
                     dataKey="range"
                     stroke="hsl(var(--foreground))"
