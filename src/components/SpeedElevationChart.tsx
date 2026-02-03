@@ -416,7 +416,7 @@ const SpeedElevationChart = ({
 
   // Calculate nice elevation Y-axis ticks
   const elevationYAxisConfig = useMemo(() => {
-    return calculateNiceYTicks(minElevation - elevationRange * 0.05, maxElevation + elevationRange * 0.05, 7);
+    return calculateNiceYTicks(minElevation - elevationRange * 0.05, maxElevation + elevationRange * 0.05, 3);
   }, [minElevation, maxElevation, elevationRange]);
 
   // Calculate distance domains
@@ -720,7 +720,19 @@ const SpeedElevationChart = ({
                 <stop offset="95%" stopColor="hsl(15, 52%, 58%)" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid stroke="hsl(var(--muted-foreground))" strokeWidth={0.5} opacity={0.6} syncWithTicks={true} />
+            {/* Custom Grid using ReferenceLines for Y-Axis (Horizontal) to ensure they ALWAYS render in Safari */}
+            {speedYAxisConfig.ticks.map((tickVal) => (
+              <ReferenceLine
+                key={`grid-${tickVal}`}
+                y={tickVal}
+                stroke="hsl(var(--muted-foreground))"
+                strokeWidth={0.5}
+                strokeOpacity={0.6}
+                isFront={false}
+              />
+            ))}
+            {/* Keeping vertical Grid from CartesianGrid only */}
+            <CartesianGrid stroke="hsl(var(--muted-foreground))" strokeWidth={0.5} opacity={0.6} horizontal={false} vertical={true} syncWithTicks={true} />
             <XAxis
               dataKey={xAxisDataKey}
               type="number"
@@ -842,7 +854,6 @@ const SpeedElevationChart = ({
                 width={60}
                 domain={elevationYAxisConfig.domain}
                 ticks={elevationYAxisConfig.ticks}
-                interval={0}
               />
               {/* Tooltip disabled - hover data shown in header */}
               <Area

@@ -428,8 +428,8 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
     <div className="rounded-2xl overflow-hidden border border-border bg-card relative shadow-2xl">
       <div ref={mapRef} className="w-full h-[400px]" />
 
-      {/* Map Controls Overlay (Bottom Right - to avoid Leaflet zoom controls on top-left) */}
-      <div className="absolute bottom-4 right-4 z-[400] bg-card/90 backdrop-blur-md border border-border rounded-2xl p-1 shadow-2xl flex flex-col sm:flex-row items-center gap-2">
+      {/* Map Controls Overlay (Top Right) */}
+      <div className="absolute top-4 right-4 z-[400] bg-card/90 backdrop-blur-md border border-border rounded-2xl p-1 shadow-2xl flex flex-col sm:flex-row items-center gap-2">
         {/* Mode Selector */}
         <div className="flex bg-muted/40 rounded-xl p-1 gap-1">
           <button
