@@ -68,11 +68,11 @@ const Analytics = () => {
             if (myError) throw myError;
             setMyActivities(myData || []);
 
-            // Fetch all public activities for global heatmap
+            // Fetch ALL activities for global heatmap (same as original behavior)
+            // We apply privacy clipping when displaying, not when fetching
             const { data: allData, error: allError } = await supabase
                 .from('activities')
                 .select('*')
-                .eq('is_public', true)
                 .order('created_at', { ascending: false });
 
             if (allError) throw allError;
