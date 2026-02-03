@@ -168,7 +168,10 @@ function calculateNiceYTicks(dataMin: number, dataMax: number, targetTickCount =
   // Generate ticks
   const ticks: number[] = [];
   for (let val = niceMin; val <= niceMax; val += bestStep) {
-    ticks.push(val);
+    // Use float-safe start and step accumulation
+    // Round to avoid floating point errors (e.g. 0.300000000004)
+    const rawVal = niceMin + (val - niceMin);
+    ticks.push(Math.round(rawVal * 10000) / 10000);
   }
 
   // Limit to reasonable number of ticks (5-7)
@@ -717,7 +720,7 @@ const SpeedElevationChart = ({
                 <stop offset="95%" stopColor="hsl(15, 52%, 58%)" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid stroke="hsl(var(--muted-foreground))" strokeWidth={0.5} opacity={0.4} syncWithTicks={true} />
+            <CartesianGrid stroke="hsl(var(--muted-foreground))" strokeWidth={0.5} opacity={0.6} syncWithTicks={true} />
             <XAxis
               dataKey={xAxisDataKey}
               type="number"
@@ -741,6 +744,7 @@ const SpeedElevationChart = ({
               width={60}
               domain={speedYAxisConfig.domain}
               ticks={speedYAxisConfig.ticks}
+              interval={0}
             />
             {/* Tooltip disabled - hover data shown in header */}
             <Area
@@ -811,7 +815,7 @@ const SpeedElevationChart = ({
                   <stop offset="95%" stopColor="hsl(0, 0%, 60%)" stopOpacity={0.1} />
                 </linearGradient>
               </defs>
-              <CartesianGrid stroke="hsl(var(--muted-foreground))" strokeWidth={0.5} opacity={0.4} syncWithTicks={true} />
+              <CartesianGrid stroke="hsl(var(--muted-foreground))" strokeWidth={0.5} opacity={0.6} syncWithTicks={true} />
               <XAxis
                 dataKey={xAxisDataKey}
                 type="number"
@@ -838,6 +842,7 @@ const SpeedElevationChart = ({
                 width={60}
                 domain={elevationYAxisConfig.domain}
                 ticks={elevationYAxisConfig.ticks}
+                interval={0}
               />
               {/* Tooltip disabled - hover data shown in header */}
               <Area

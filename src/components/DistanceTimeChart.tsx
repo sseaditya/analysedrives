@@ -225,7 +225,7 @@ const DistanceTimeChart = ({
                         <stop offset="95%" stopColor="hsl(15, 52%, 58%)" stopOpacity={0} />
                     </linearGradient>
                 </defs>
-                <CartesianGrid stroke="hsl(var(--muted-foreground))" strokeWidth={0.5} opacity={0.4} syncWithTicks={true} />
+                <CartesianGrid stroke="hsl(var(--muted-foreground))" strokeWidth={0.5} opacity={0.6} syncWithTicks={true} />
                 <XAxis
                     dataKey="elapsedTime"
                     type="number"
@@ -249,6 +249,7 @@ const DistanceTimeChart = ({
                     width={60}
                     domain={yAxisConfig.domain}
                     ticks={yAxisConfig.ticks}
+                    interval={0}
                 />
                 <Tooltip
                     contentStyle={{

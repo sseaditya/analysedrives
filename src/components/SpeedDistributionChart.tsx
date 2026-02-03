@@ -39,7 +39,9 @@ function calculateNiceYTicks(dataMax: number, targetTickCount = 7): { domain: [n
 
     const ticks: number[] = [];
     for (let val = 0; val <= niceMax; val += bestStep) {
-        ticks.push(val);
+        // Use float-safe start and step accumulation
+        // Round to avoid floating point errors
+        ticks.push(Math.round(val * 10000) / 10000);
     }
 
     return { domain: [0, niceMax], ticks };
@@ -175,7 +177,7 @@ const SpeedDistributionChart = ({ points, speedLimit, buckets }: SpeedDistributi
                         <stop offset="95%" stopColor="hsl(var(--foreground))" stopOpacity={0.1} />
                     </linearGradient>
                 </defs>
-                <CartesianGrid stroke="hsl(var(--muted-foreground))" strokeWidth={0.5} vertical={false} opacity={0.4} horizontal={true} syncWithTicks={true} />
+                <CartesianGrid stroke="hsl(var(--muted-foreground))" strokeWidth={0.5} vertical={false} opacity={0.6} horizontal={true} syncWithTicks={true} />
                 <XAxis
                     dataKey="range"
                     stroke="hsl(var(--foreground))"
@@ -195,6 +197,7 @@ const SpeedDistributionChart = ({ points, speedLimit, buckets }: SpeedDistributi
                     tickFormatter={(val) => `${val}m`}
                     domain={yAxisConfig.domain}
                     ticks={yAxisConfig.ticks}
+                    interval={0}
                 />
                 <YAxis
                     yAxisId="right"
@@ -206,6 +209,7 @@ const SpeedDistributionChart = ({ points, speedLimit, buckets }: SpeedDistributi
                     tickFormatter={(val) => `${val}km`}
                     domain={yAxisConfig.domain}
                     ticks={yAxisConfig.ticks}
+                    interval={0}
                 />
                 <Tooltip
                     contentStyle={{
