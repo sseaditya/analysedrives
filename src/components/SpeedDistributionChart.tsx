@@ -110,6 +110,18 @@ const SpeedDistributionChart = ({ points, speedLimit, buckets }: SpeedDistributi
         return collapsedData.sort((a, b) => a.minSpeed - b.minSpeed);
     }, [points, speedLimit]);
 
+    // Calculate max value to synchronize axes 1:1
+    // We find the absolute maximum value across both time(min) and distance(km)
+    // and set the domain of BOTH axes to [0, maxVal]
+    // Use nice tick calculation
+    const maxTime = data && data.length > 0 ? Math.max(...data.map(d => d.time)) : 10;
+    const maxDist = data && data.length > 0 ? Math.max(...data.map(d => d.distance)) : 10;
+    const rawMax = Math.max(maxTime, maxDist);
+
+    // We want the domain to be [0, niceMax] where niceMax is "nice" for rawMax.
+    // Ensure we don't apply an arbitrary 1.1 scale which might break integer alignment if not handled carefully by utils.
+    const yAxisConfig = useMemo(() => calculateNiceYTicks(0, rawMax, 7), [rawMax]);
+
     if (!data || data.length === 0) {
         return (
             <div className="h-[300px] w-full flex items-center justify-center bg-card border border-border rounded-xl">
@@ -117,19 +129,6 @@ const SpeedDistributionChart = ({ points, speedLimit, buckets }: SpeedDistributi
             </div>
         );
     }
-
-    // Calculate max value to synchronize axes 1:1
-    // We find the absolute maximum value across both time(min) and distance(km)
-    // and set the domain of BOTH axes to [0, maxVal]
-    // Use nice tick calculation
-    // Calculate max value to synchronize axes 1:1
-    const maxTime = Math.max(...data.map(d => d.time));
-    const maxDist = Math.max(...data.map(d => d.distance));
-    const rawMax = Math.max(maxTime, maxDist);
-
-    // We want the domain to be [0, niceMax] where niceMax is "nice" for rawMax.
-    // Ensure we don't apply an arbitrary 1.1 scale which might break integer alignment if not handled carefully by utils.
-    const yAxisConfig = useMemo(() => calculateNiceYTicks(0, rawMax, 7), [rawMax]);
 
     return (
         <ResponsiveContainer width="100%" height="100%">

@@ -233,6 +233,7 @@ const SpeedElevationChart = ({
     return result;
   }, [points, speedCap, visualLimit]);
 
+  /* REMOVED EARLY RETURN TO FIX REACT ERROR #300 (HOOKS ORDER) 
   if (fullData.length === 0) {
     return (
       <div className="rounded-2xl border border-border bg-card p-6 text-center text-muted-foreground">
@@ -240,14 +241,17 @@ const SpeedElevationChart = ({
       </div>
     );
   }
+  */
 
-  const hasElevation = fullData.some((d) => d.elevation !== null);
+  const hasElevation = fullData.length > 0 && fullData.some((d) => d.elevation !== null);
 
   // Calculate True Max Speed from ORIGINAL data (unaffected by clamping)
-  const trueMaxSpeed = Math.max(...fullData.map(d => d.originalSpeed), 0);
+  const trueMaxSpeed = fullData.length > 0 ? Math.max(...fullData.map(d => d.originalSpeed), 0) : 0;
 
   // Speed chart data: filter by zoom, then sample to EXACTLY 300 points
   const speedChartData = useMemo(() => {
+    if (fullData.length === 0) return [];
+
     const filtered = zoomRange
       ? fullData.filter(d => d.pointIndex >= zoomRange[0] && d.pointIndex <= zoomRange[1])
       : fullData;
@@ -339,6 +343,7 @@ const SpeedElevationChart = ({
   const EDGE_THRESHOLD = (fullMaxVal - fullMinVal) * 0.03;
 
   const getInteractionMode = (val: number): InteractionMode => {
+    // Safety check for empty data
     if (zoomStartVal === null || zoomEndVal === null) return 'new-selection';
 
     if (Math.abs(val - zoomStartVal) < EDGE_THRESHOLD) return 'resize-left';
@@ -566,6 +571,14 @@ const SpeedElevationChart = ({
     const maxSpeed = speedCap ? speedCap : trueMaxSpeed;
     return calculateNiceYTicks(0, maxSpeed, 7);
   }, [speedCap, trueMaxSpeed]);
+
+  if (fullData.length === 0) {
+    return (
+      <div className="rounded-2xl border border-border bg-card p-6 text-center text-muted-foreground">
+        No data available to display chart
+      </div>
+    );
+  }
 
   return (
     <div className="h-full w-full rounded-2xl border border-border bg-card p-3 select-none flex flex-col cursor-crosshair">
