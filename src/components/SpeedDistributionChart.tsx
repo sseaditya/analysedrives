@@ -163,7 +163,7 @@ const SpeedDistributionChart = ({ points, speedLimit, buckets }: SpeedDistributi
         <ResponsiveContainer width="100%" height="100%">
             <BarChart
                 data={data}
-                margin={{ top: 0, right: 0, left: -20, bottom: 20 }}
+                margin={{ top: 10, right: 0, left: -20, bottom: 20 }}
             >
                 <defs>
                     <linearGradient id="colorTime" x1="0" y1="0" x2="0" y2="1">
@@ -175,7 +175,7 @@ const SpeedDistributionChart = ({ points, speedLimit, buckets }: SpeedDistributi
                         <stop offset="95%" stopColor="hsl(var(--foreground))" stopOpacity={0.1} />
                     </linearGradient>
                 </defs>
-                <CartesianGrid stroke="hsl(var(--muted-foreground))" strokeWidth={0.5} vertical={false} opacity={0.4} horizontal={true} />
+                <CartesianGrid stroke="hsl(var(--muted-foreground))" strokeWidth={0.5} vertical={false} opacity={0.4} horizontal={true} syncWithTicks={true} />
                 <XAxis
                     dataKey="range"
                     stroke="hsl(var(--foreground))"
