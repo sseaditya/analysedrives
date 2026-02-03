@@ -467,7 +467,9 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                   <TooltipProvider delayDuration={300}>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Info className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
+                        <button type="button" className="focus:outline-none" aria-label="More Information">
+                          <Info className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
+                        </button>
                       </TooltipTrigger>
                       <TooltipContent className="max-w-xs text-xs space-y-2 z-[1100]">
                         <p>
@@ -511,7 +513,9 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                         <TooltipProvider delayDuration={300}>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Info className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
+                              <button type="button" className="focus:outline-none" aria-label="More Information">
+                                <Info className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
+                              </button>
                             </TooltipTrigger>
                             <TooltipContent className="max-w-xs text-xs z-[1100]">
                               <p>Interactive timeline showing speed (upper chart) and elevation (lower chart). Select speed/elevation chart to zoom, drag and interact. Use speed limiter to understand how longer your drive takes if you stick to a speed limit.</p>
@@ -829,7 +833,9 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                     <TooltipProvider delayDuration={300}>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Info className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
+                          <button type="button" className="focus:outline-none" aria-label="More Information">
+                            <Info className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
+                          </button>
                         </TooltipTrigger>
                         <TooltipContent className="max-w-xs text-xs">
                           <p>Histogram showing how much time/distance was spent at each speed range.</p>

@@ -318,9 +318,10 @@ const SpeedElevationChart = ({
     const offset = Math.floor(WINDOW_SIZE / 2);
     const result: ChartDataPoint[] = [];
 
-    // Sample to ~1000 points to keep good granularity for zooming
-    // This gives us enough detail when we zoom in and re-sample to 300
-    const sampleRate = Math.max(1, Math.floor(points.length / 1000));
+    // Sample points - fewer on mobile for better performance
+    // Mobile: ~400 points, Desktop: ~1000 points
+    const targetPoints = isMobile ? 400 : 1000;
+    const sampleRate = Math.max(1, Math.floor(points.length / targetPoints));
 
     for (let i = 0; i < rawData.length; i++) {
       const originalIndex = i + 1;
