@@ -23,6 +23,7 @@ interface ActivityRecord {
     title: string;
     file_path: string;
     hide_radius: number | null;
+    is_public: boolean;
     stats: {
         previewCoordinates?: [number, number][];
         speedDistribution?: SpeedBucket[];
@@ -273,14 +274,22 @@ const Analytics = () => {
 
     // Heatmap Preparation - depends on toggle
     const heatmapTracks = useMemo(() => {
-        const sourceActivities = showGlobalHeatmap ? allActivities : myActivities;
+        let sourceActivities: ActivityRecord[];
+
+        if (showGlobalHeatmap) {
+            // Global: Only show public drives from all users
+            sourceActivities = allActivities.filter(a => a.is_public);
+        } else {
+            // Your: Show all your drives (public and private)
+            sourceActivities = myActivities;
+        }
 
         return sourceActivities
             .filter(a => a.stats?.previewCoordinates && a.stats.previewCoordinates.length > 0)
             .map(a => {
                 let coordinates = a.stats!.previewCoordinates!;
 
-                // For global heatmap, clip ends by hide_radius for privacy
+                // For global heatmap, clip ends by hide_radius for privacy (only for other users' tracks)
                 if (showGlobalHeatmap && a.user_id !== user?.id && a.hide_radius && a.hide_radius > 0) {
                     coordinates = clipTrackByRadius(coordinates, a.hide_radius);
                 }
@@ -375,7 +384,14 @@ const Analytics = () => {
                         color: '#eb4034', // Red-ish/Orange
                         weight: 2,
                         opacity: 0.2 // 20% opacity for heatmap effect
-                    }).bindTooltip(track.title, { sticky: true });
+                    });
+
+                    // Create clickable popup with link to activity
+                    const popupContent = `<a href="/activity/${track.id}" style="color: inherit; text-decoration: underline; font-weight: 500;">${track.title}</a>`;
+                    polyline.bindPopup(popupContent, { closeButton: false });
+
+                    // Also keep a tooltip for quick preview on hover
+                    polyline.bindTooltip(track.title, { sticky: true });
 
                     polyline.addTo(layerGroup);
                     bounds.extend(polyline.getBounds());
@@ -386,7 +402,7 @@ const Analytics = () => {
                 map.fitBounds(bounds, { padding: [50, 50] });
             }
         }
-    }, [heatmapTracks]);
+    }, [heatmapTracks, navigate]);
 
     return (
         <div className="min-h-screen bg-background flex flex-col">
