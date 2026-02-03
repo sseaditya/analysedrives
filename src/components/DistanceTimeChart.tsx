@@ -225,7 +225,7 @@ const DistanceTimeChart = ({
                         <stop offset="95%" stopColor="hsl(15, 52%, 58%)" stopOpacity={0} />
                     </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(23, 5%, 82%)" opacity={0.25} />
+                <CartesianGrid stroke="hsl(var(--border))" strokeWidth={0.5} opacity={0.3} />
                 <XAxis
                     dataKey="elapsedTime"
                     type="number"
