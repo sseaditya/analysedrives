@@ -710,7 +710,7 @@ const Dashboard = () => {
                                         </Button>
                                         <div className="flex items-center gap-2">
                                             <span className="text-sm text-muted-foreground">
-                                                Page <span className="font-bold text-foreground">{currentPage}</span> of <span className="font-bold text-foreground">{totalPages}</span>
+                                                Page {currentPage} of {totalPages}
                                             </span>
                                             <span className="text-xs text-muted-foreground">({filteredActivities.length} activities)</span>
                                         </div>
