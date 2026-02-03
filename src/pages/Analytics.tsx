@@ -2,26 +2,47 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, BarChart3, Map as MapIcon, RefreshCcw, Loader2, TrendingUp } from "lucide-react";
+import { ArrowLeft, BarChart3, Map as MapIcon, RefreshCcw, Loader2, TrendingUp, User, Globe } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import SpeedDistributionChart from "@/components/SpeedDistributionChart";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import React from "react";
-import { SpeedBucket, parseGPX, calculateStats, generatePreviewPolyline, formatDistance, generateProcessedTrack } from "@/utils/gpxParser";
+import { SpeedBucket, parseGPX, calculateStats, generatePreviewPolyline, formatDistance, generateProcessedTrack, haversineDistance } from "@/utils/gpxParser";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 type TimePeriod = 'week' | 'month' | 'year' | 'all';
+
+interface ActivityRecord {
+    id: string;
+    user_id: string;
+    title: string;
+    file_path: string;
+    hide_radius: number | null;
+    stats: {
+        previewCoordinates?: [number, number][];
+        speedDistribution?: SpeedBucket[];
+        totalDistance?: number;
+        totalTime?: number;
+        maxSpeed?: number;
+        startTime?: string;
+    } | null;
+    created_at: string;
+}
 
 const Analytics = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [loading, setLoading] = useState(true);
-    const [activities, setActivities] = useState<any[]>([]);
+    const [myActivities, setMyActivities] = useState<ActivityRecord[]>([]);
+    const [allActivities, setAllActivities] = useState<ActivityRecord[]>([]);
     const [timePeriod, setTimePeriod] = useState<TimePeriod>('all');
+    const [showGlobalHeatmap, setShowGlobalHeatmap] = useState(false);
 
     const [isRepairing, setIsRepairing] = useState(false);
     const [repairProgress, setRepairProgress] = useState(0);
@@ -37,13 +58,25 @@ const Analytics = () => {
     const fetchActivities = async () => {
         if (!user) return;
         try {
-            const { data, error } = await supabase
+            // Fetch user's own activities
+            const { data: myData, error: myError } = await supabase
                 .from('activities')
                 .select('*')
+                .eq('user_id', user.id)
                 .order('created_at', { ascending: false });
 
-            if (error) throw error;
-            setActivities(data || []);
+            if (myError) throw myError;
+            setMyActivities(myData || []);
+
+            // Fetch all public activities for global heatmap
+            const { data: allData, error: allError } = await supabase
+                .from('activities')
+                .select('*')
+                .eq('is_public', true)
+                .order('created_at', { ascending: false });
+
+            if (allError) throw allError;
+            setAllActivities(allData || []);
         } catch (err) {
             console.error("Error fetching activities:", err);
         } finally {
@@ -67,9 +100,9 @@ const Analytics = () => {
         let failCount = 0;
 
         try {
-            const total = activities.length;
+            const total = myActivities.length;
             for (let i = 0; i < total; i++) {
-                const activity = activities[i];
+                const activity = myActivities[i];
                 setRepairProgress(Math.round(((i + 1) / total) * 100));
 
                 try {
@@ -139,10 +172,10 @@ const Analytics = () => {
         }
     };
 
-    // Cumulative Stats with Time Period Filtering
+    // Cumulative Stats with Time Period Filtering (User's own activities only)
     const cumulativeStats = useMemo(() => {
         const now = new Date();
-        const periodActivities = activities.filter(a => {
+        const periodActivities = myActivities.filter(a => {
             if (timePeriod === 'all') return true;
             const date = new Date(a.stats?.startTime || a.created_at);
             const diffTime = Math.abs(now.getTime() - date.getTime());
@@ -167,14 +200,14 @@ const Analytics = () => {
             avgSpeed,
             maxSpeed
         };
-    }, [activities, timePeriod]);
+    }, [myActivities, timePeriod]);
 
-    // 1. Global Speed Profile Aggregation
+    // Speed Profile Aggregation (User's own activities only)
     const aggregatedSpeedDistribution = useMemo(() => {
         const bucketMap = new Map<number, { minSpeed: number, time: number, distance: number }>();
 
-        activities.forEach(activity => {
-            const dist: SpeedBucket[] = activity.stats?.speedDistribution;
+        myActivities.forEach(activity => {
+            const dist: SpeedBucket[] | undefined = activity.stats?.speedDistribution;
             if (Array.isArray(dist)) {
                 dist.forEach((bucket) => {
                     const existing = bucketMap.get(bucket.minSpeed) || { minSpeed: bucket.minSpeed, time: 0, distance: 0 };
@@ -191,18 +224,75 @@ const Analytics = () => {
                 ...b,
                 range: `${b.minSpeed}-${b.minSpeed + 10}`
             }));
-    }, [activities]);
+    }, [myActivities]);
 
-    // 2. Heatmap Preparation (Extract all Polylines)
-    const allTracks = useMemo(() => {
-        return activities
+    // Helper function to clip track coordinates by hide_radius
+    const clipTrackByRadius = (coordinates: [number, number][], hideRadius: number): [number, number][] => {
+        if (!hideRadius || hideRadius <= 0 || coordinates.length < 2) {
+            return coordinates;
+        }
+
+        let cumulativeDist = 0;
+        let startIndex = 0;
+
+        // Find start index (distance > hideRadius from start)
+        for (let i = 1; i < coordinates.length; i++) {
+            const dist = haversineDistance(
+                coordinates[i - 1][0], coordinates[i - 1][1],
+                coordinates[i][0], coordinates[i][1]
+            );
+            cumulativeDist += dist;
+            if (cumulativeDist >= hideRadius) {
+                startIndex = i;
+                break;
+            }
+        }
+
+        // Find end index (distance > hideRadius from end)
+        cumulativeDist = 0;
+        let endIndex = coordinates.length - 1;
+        for (let i = coordinates.length - 2; i >= 0; i--) {
+            const dist = haversineDistance(
+                coordinates[i][0], coordinates[i][1],
+                coordinates[i + 1][0], coordinates[i + 1][1]
+            );
+            cumulativeDist += dist;
+            if (cumulativeDist >= hideRadius) {
+                endIndex = i;
+                break;
+            }
+        }
+
+        // Safety check: if start crosses end, return empty
+        if (startIndex >= endIndex) {
+            return [];
+        }
+
+        return coordinates.slice(startIndex, endIndex + 1);
+    };
+
+    // Heatmap Preparation - depends on toggle
+    const heatmapTracks = useMemo(() => {
+        const sourceActivities = showGlobalHeatmap ? allActivities : myActivities;
+
+        return sourceActivities
             .filter(a => a.stats?.previewCoordinates && a.stats.previewCoordinates.length > 0)
-            .map(a => ({
-                id: a.id,
-                coordinates: a.stats.previewCoordinates,
-                title: a.title
-            }));
-    }, [activities]);
+            .map(a => {
+                let coordinates = a.stats!.previewCoordinates!;
+
+                // For global heatmap, clip ends by hide_radius for privacy
+                if (showGlobalHeatmap && a.user_id !== user?.id && a.hide_radius && a.hide_radius > 0) {
+                    coordinates = clipTrackByRadius(coordinates, a.hide_radius);
+                }
+
+                return {
+                    id: a.id,
+                    coordinates,
+                    title: a.title
+                };
+            })
+            .filter(t => t.coordinates.length > 0); // Filter out empty tracks after clipping
+    }, [showGlobalHeatmap, allActivities, myActivities, user?.id]);
 
     const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
@@ -276,10 +366,10 @@ const Analytics = () => {
 
         layerGroup.clearLayers();
 
-        if (allTracks.length > 0) {
+        if (heatmapTracks.length > 0) {
             const bounds = L.latLngBounds([]);
 
-            allTracks.forEach(track => {
+            heatmapTracks.forEach(track => {
                 if (track.coordinates.length > 0) {
                     const polyline = L.polyline(track.coordinates, {
                         color: '#eb4034', // Red-ish/Orange
@@ -296,7 +386,7 @@ const Analytics = () => {
                 map.fitBounds(bounds, { padding: [50, 50] });
             }
         }
-    }, [allTracks]);
+    }, [heatmapTracks]);
 
     return (
         <div className="min-h-screen bg-background flex flex-col">
@@ -334,11 +424,11 @@ const Analytics = () => {
 
             <main className="container mx-auto px-4 py-8 flex-1 space-y-8">
 
-                {/* Your Progress Section */}
+                {/* Your Drives Section */}
                 <div className="bg-card border border-border rounded-2xl p-6">
                     <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
                         <TrendingUp className="w-5 h-5 text-primary" />
-                        Your Progress
+                        Your Drives
                     </h3>
 
                     {/* Time Period Tabs */}
@@ -382,11 +472,11 @@ const Analytics = () => {
                     </div>
                 </div>
 
-                {/* Global Speed Profile Section */}
+                {/* Your Speed Profile Section */}
                 <div className="bg-card border border-border rounded-2xl p-6">
                     <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
                         <BarChart3 className="w-5 h-5 text-muted-foreground" />
-                        Global Speed Profile
+                        Your Speed Profile
                     </h3>
                     <div className="h-[300px] w-full">
                         {aggregatedSpeedDistribution.length > 0 ? (
@@ -401,10 +491,35 @@ const Analytics = () => {
 
                 {/* Heatmap Section */}
                 <div className="bg-card border border-border rounded-2xl p-6 h-[600px] flex flex-col">
-                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                        <MapIcon className="w-5 h-5 text-muted-foreground" />
-                        Global Activity Heatmap
-                    </h3>
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold flex items-center gap-2">
+                            <MapIcon className="w-5 h-5 text-muted-foreground" />
+                            {showGlobalHeatmap ? 'Global' : 'Your'} Activity Heatmap
+                        </h3>
+
+                        {/* Toggle for Your/Global Heatmap */}
+                        <div className="flex items-center gap-3 bg-muted/50 px-3 py-2 rounded-full border border-border/50">
+                            <div className={cn(
+                                "flex items-center gap-1.5 text-sm font-medium transition-colors",
+                                !showGlobalHeatmap ? "text-foreground" : "text-muted-foreground"
+                            )}>
+                                <User className="w-4 h-4" />
+                                Your
+                            </div>
+                            <Switch
+                                id="heatmap-toggle"
+                                checked={showGlobalHeatmap}
+                                onCheckedChange={setShowGlobalHeatmap}
+                            />
+                            <div className={cn(
+                                "flex items-center gap-1.5 text-sm font-medium transition-colors",
+                                showGlobalHeatmap ? "text-foreground" : "text-muted-foreground"
+                            )}>
+                                <Globe className="w-4 h-4" />
+                                Global
+                            </div>
+                        </div>
+                    </div>
                     <div className="flex-1 rounded-xl overflow-hidden border border-border relative z-0">
                         <div ref={mapRef} className="h-full w-full bg-muted/10" />
                     </div>

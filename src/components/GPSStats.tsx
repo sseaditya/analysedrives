@@ -174,8 +174,9 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
     // Apply speed cap override for public view if needed
     if (!isOwner && speedCap && calculated.avgSpeed > speedCap) {
       calculated.avgSpeed = speedCap;
-      // Adjust time roughly? Or just accept the capped avg.
-      // For simple display, capping avg is enough.
+      // Recalculate time based on traveling at the capped speed
+      // Time (seconds) = Distance (km) / Speed (km/h) * 3600
+      calculated.totalTime = (calculated.totalDistance / speedCap) * 3600;
     }
 
     return {
