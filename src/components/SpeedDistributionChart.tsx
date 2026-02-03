@@ -121,12 +121,15 @@ const SpeedDistributionChart = ({ points, speedLimit, buckets }: SpeedDistributi
     // Calculate max value to synchronize axes 1:1
     // We find the absolute maximum value across both time(min) and distance(km)
     // and set the domain of BOTH axes to [0, maxVal]
+    // Use nice tick calculation
+    // Calculate max value to synchronize axes 1:1
     const maxTime = Math.max(...data.map(d => d.time));
     const maxDist = Math.max(...data.map(d => d.distance));
     const rawMax = Math.max(maxTime, maxDist);
 
-    // Use nice tick calculation
-    const yAxisConfig = useMemo(() => calculateNiceYTicks(rawMax * 1.1, 7), [rawMax]);
+    // We want the domain to be [0, niceMax] where niceMax is "nice" for rawMax.
+    // Ensure we don't apply an arbitrary 1.1 scale which might break integer alignment if not handled carefully by utils.
+    const yAxisConfig = useMemo(() => calculateNiceYTicks(0, rawMax, 7), [rawMax]);
 
     return (
         <ResponsiveContainer width="100%" height="100%">
