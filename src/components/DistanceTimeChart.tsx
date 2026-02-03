@@ -40,7 +40,7 @@ function formatTimeAxis(seconds: number): string {
 }
 
 // Helper to calculate "nice" ticks for Y axis
-function calculateNiceYTicks(dataMin: number, dataMax: number, targetTickCount = 5): { domain: [number, number], ticks: number[] } {
+function calculateNiceYTicks(dataMin: number, dataMax: number, targetTickCount = 7): { domain: [number, number], ticks: number[] } {
     if (dataMax <= dataMin) return { domain: [0, 10], ticks: [0, 2, 4, 6, 8, 10] };
 
     const niceSteps = [0.5, 1, 2, 5, 10, 20, 40, 50, 100, 200, 400, 500, 1000];
@@ -225,7 +225,7 @@ const DistanceTimeChart = ({
                         <stop offset="95%" stopColor="hsl(15, 52%, 58%)" stopOpacity={0} />
                     </linearGradient>
                 </defs>
-                <CartesianGrid stroke="hsl(var(--border))" strokeWidth={0.5} opacity={0.3} />
+                <CartesianGrid stroke="hsl(var(--border))" strokeWidth={0.5} opacity={0.6} />
                 <XAxis
                     dataKey="elapsedTime"
                     type="number"

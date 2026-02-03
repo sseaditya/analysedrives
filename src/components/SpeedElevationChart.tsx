@@ -131,7 +131,7 @@ function calculateNiceTicks(min: number, max: number, type: 'distance' | 'time',
 
 // Helper to calculate "nice" ticks for Y axis (speed, elevation, etc)
 // Returns nice tick values with proper step sizes (5, 10, 20, 40, 50, 100, etc)
-function calculateNiceYTicks(dataMin: number, dataMax: number, targetTickCount = 5): { domain: [number, number], ticks: number[] } {
+function calculateNiceYTicks(dataMin: number, dataMax: number, targetTickCount = 7): { domain: [number, number], ticks: number[] } {
   if (dataMax <= 0) return { domain: [0, 100], ticks: [0, 20, 40, 60, 80, 100] };
 
   // Nice step increments to choose from
@@ -716,7 +716,7 @@ const SpeedElevationChart = ({
                 <stop offset="95%" stopColor="hsl(15, 52%, 58%)" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid stroke="hsl(var(--border))" strokeWidth={0.5} opacity={0.3} />
+            <CartesianGrid stroke="hsl(var(--border))" strokeWidth={0.5} opacity={0.6} />
             <XAxis
               dataKey={xAxisDataKey}
               type="number"
@@ -810,7 +810,7 @@ const SpeedElevationChart = ({
                   <stop offset="95%" stopColor="hsl(0, 0%, 60%)" stopOpacity={0.1} />
                 </linearGradient>
               </defs>
-              <CartesianGrid stroke="hsl(var(--border))" strokeWidth={0.5} opacity={0.3} />
+              <CartesianGrid stroke="hsl(var(--border))" strokeWidth={0.5} opacity={0.6} />
               <XAxis
                 dataKey={xAxisDataKey}
                 type="number"

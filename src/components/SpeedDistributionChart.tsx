@@ -11,7 +11,7 @@ import { useMemo } from "react";
 import { GPXPoint, calculateSpeedDistribution, SpeedBucket } from "@/utils/gpxParser";
 
 // Helper to calculate "nice" ticks for Y axis
-function calculateNiceYTicks(dataMax: number, targetTickCount = 5): { domain: [number, number], ticks: number[] } {
+function calculateNiceYTicks(dataMax: number, targetTickCount = 7): { domain: [number, number], ticks: number[] } {
     if (dataMax <= 0) return { domain: [0, 10], ticks: [0, 2, 4, 6, 8, 10] };
 
     const niceSteps = [1, 2, 5, 10, 20, 40, 50, 100, 200, 400, 500, 1000];
@@ -175,7 +175,7 @@ const SpeedDistributionChart = ({ points, speedLimit, buckets }: SpeedDistributi
                         <stop offset="95%" stopColor="hsl(var(--foreground))" stopOpacity={0.1} />
                     </linearGradient>
                 </defs>
-                <CartesianGrid stroke="hsl(var(--border))" strokeWidth={0.5} vertical={false} opacity={0.3} horizontal={true} />
+                <CartesianGrid stroke="hsl(var(--border))" strokeWidth={0.5} vertical={false} opacity={0.6} horizontal={true} />
                 <XAxis
                     dataKey="range"
                     stroke="hsl(var(--foreground))"
