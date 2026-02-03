@@ -23,7 +23,7 @@ interface ActivityRecord {
     title: string;
     file_path: string;
     hide_radius: number | null;
-    is_public: boolean;
+    public: boolean;
     stats: {
         previewCoordinates?: [number, number][];
         speedDistribution?: SpeedBucket[];
@@ -278,7 +278,7 @@ const Analytics = () => {
 
         if (showGlobalHeatmap) {
             // Global: Only show public drives from all users
-            sourceActivities = allActivities.filter(a => a.is_public);
+            sourceActivities = allActivities.filter(a => a.public === true);
         } else {
             // Your: Show all your drives (public and private)
             sourceActivities = myActivities;
