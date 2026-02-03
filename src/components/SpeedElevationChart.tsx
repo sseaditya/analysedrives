@@ -129,6 +129,61 @@ function calculateNiceTicks(min: number, max: number, type: 'distance' | 'time',
   return ticks;
 }
 
+// Helper to calculate "nice" ticks for Y axis (speed, elevation, etc)
+// Returns nice tick values with proper step sizes (5, 10, 20, 40, 50, 100, etc)
+function calculateNiceYTicks(dataMin: number, dataMax: number, targetTickCount = 5): { domain: [number, number], ticks: number[] } {
+  if (dataMax <= 0) return { domain: [0, 100], ticks: [0, 20, 40, 60, 80, 100] };
+
+  // Nice step increments to choose from
+  const niceSteps = [1, 2, 5, 10, 20, 25, 40, 50, 100, 200, 250, 500, 1000];
+
+  // Calculate the rough step needed
+  const range = dataMax - Math.max(0, dataMin);
+  const roughStep = range / (targetTickCount - 1);
+
+  // Find the best nice step
+  let bestStep = niceSteps[0];
+  for (const step of niceSteps) {
+    if (step >= roughStep) {
+      bestStep = step;
+      break;
+    }
+    bestStep = step;
+  }
+
+  // If roughStep is larger than our largest nice step, calculate a custom one
+  if (roughStep > niceSteps[niceSteps.length - 1]) {
+    const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
+    const fraction = roughStep / magnitude;
+    if (fraction <= 1) bestStep = magnitude;
+    else if (fraction <= 2) bestStep = 2 * magnitude;
+    else if (fraction <= 5) bestStep = 5 * magnitude;
+    else bestStep = 10 * magnitude;
+  }
+
+  // Calculate nice max (round up to next step)
+  const niceMax = Math.ceil(dataMax / bestStep) * bestStep;
+  const niceMin = Math.max(0, Math.floor(dataMin / bestStep) * bestStep);
+
+  // Generate ticks
+  const ticks: number[] = [];
+  for (let val = niceMin; val <= niceMax; val += bestStep) {
+    ticks.push(val);
+  }
+
+  // Limit to reasonable number of ticks (5-7)
+  if (ticks.length > 7) {
+    // Skip every other tick
+    const filtered = ticks.filter((_, i) => i % 2 === 0);
+    if (filtered[filtered.length - 1] < niceMax) {
+      filtered.push(niceMax);
+    }
+    return { domain: [niceMin, niceMax], ticks: filtered };
+  }
+
+  return { domain: [niceMin, niceMax], ticks };
+}
+
 type InteractionMode = 'none' | 'new-selection' | 'resize-left' | 'resize-right' | 'move-window';
 
 const SpeedElevationChart = ({
@@ -354,6 +409,11 @@ const SpeedElevationChart = ({
   const minElevation = elevations.length > 0 ? Math.min(...elevations) : 0;
   const maxElevation = elevations.length > 0 ? Math.max(...elevations) : 1000;
   const elevationRange = maxElevation - minElevation || 100;
+
+  // Calculate nice elevation Y-axis ticks
+  const elevationYAxisConfig = useMemo(() => {
+    return calculateNiceYTicks(minElevation - elevationRange * 0.05, maxElevation + elevationRange * 0.05, 5);
+  }, [minElevation, maxElevation, elevationRange]);
 
   // Calculate distance domains
   const fullMinDistance = fullData[0]?.distance || 0;
@@ -632,7 +692,10 @@ const SpeedElevationChart = ({
   // Calculate Y-axis domain for speed chart
   // ONLY speedCap affects the domain, speedLimit does NOT
   // Use original speed max to prevent rescaling when visual limit is applied
-  const speedYDomain = [0, speedCap ? speedCap : Math.ceil(trueMaxSpeed / 10) * 10];
+  const speedYAxisConfig = useMemo(() => {
+    const maxSpeed = speedCap ? speedCap : trueMaxSpeed;
+    return calculateNiceYTicks(0, maxSpeed, 6);
+  }, [speedCap, trueMaxSpeed]);
 
   return (
     <div className="h-full w-full rounded-2xl border border-border bg-card p-3 select-none flex flex-col cursor-crosshair">
@@ -653,7 +716,7 @@ const SpeedElevationChart = ({
                 <stop offset="95%" stopColor="hsl(15, 52%, 58%)" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(23, 5%, 82%)" opacity={0.5} />
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground))" opacity={0.15} />
             <XAxis
               dataKey={xAxisDataKey}
               type="number"
@@ -675,9 +738,8 @@ const SpeedElevationChart = ({
               tickFormatter={(value) => Math.round(value).toString()}
               label={{ value: "Speed (km/h)", angle: -90, position: "insideLeft", fontSize: 12, fill: "hsl(15, 52%, 58%)" }}
               width={60}
-              domain={speedYDomain}
-              tickCount={6}
-              ticks={speedCap ? undefined : undefined} // Let Recharts handle ticks for now but limit count
+              domain={speedYAxisConfig.domain}
+              ticks={speedYAxisConfig.ticks}
             />
             {/* Tooltip disabled - hover data shown in header */}
             <Area
@@ -748,7 +810,7 @@ const SpeedElevationChart = ({
                   <stop offset="95%" stopColor="hsl(0, 0%, 60%)" stopOpacity={0.1} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(23, 5%, 82%)" opacity={0.3} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground))" opacity={0.15} />
               <XAxis
                 dataKey={xAxisDataKey}
                 type="number"
@@ -773,7 +835,8 @@ const SpeedElevationChart = ({
                 axisLine={false}
                 tickFormatter={(value) => Math.round(value).toString()}
                 width={60}
-                domain={[minElevation - elevationRange * 0.1, maxElevation + elevationRange * 0.1]}
+                domain={elevationYAxisConfig.domain}
+                ticks={elevationYAxisConfig.ticks}
               />
               {/* Tooltip disabled - hover data shown in header */}
               <Area

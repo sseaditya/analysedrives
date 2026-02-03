@@ -39,6 +39,43 @@ function formatTimeAxis(seconds: number): string {
     return `${minutes}m`;
 }
 
+// Helper to calculate "nice" ticks for Y axis
+function calculateNiceYTicks(dataMin: number, dataMax: number, targetTickCount = 5): { domain: [number, number], ticks: number[] } {
+    if (dataMax <= dataMin) return { domain: [0, 10], ticks: [0, 2, 4, 6, 8, 10] };
+
+    const niceSteps = [0.5, 1, 2, 5, 10, 20, 25, 40, 50, 100, 200, 250, 500, 1000];
+    const range = dataMax - dataMin;
+    const roughStep = range / (targetTickCount - 1);
+
+    let bestStep = niceSteps[0];
+    for (const step of niceSteps) {
+        if (step >= roughStep) {
+            bestStep = step;
+            break;
+        }
+        bestStep = step;
+    }
+
+    if (roughStep > niceSteps[niceSteps.length - 1]) {
+        const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
+        const fraction = roughStep / magnitude;
+        if (fraction <= 1) bestStep = magnitude;
+        else if (fraction <= 2) bestStep = 2 * magnitude;
+        else if (fraction <= 5) bestStep = 5 * magnitude;
+        else bestStep = 10 * magnitude;
+    }
+
+    const niceMin = Math.floor(dataMin / bestStep) * bestStep;
+    const niceMax = Math.ceil(dataMax / bestStep) * bestStep;
+
+    const ticks: number[] = [];
+    for (let val = niceMin; val <= niceMax; val += bestStep) {
+        ticks.push(parseFloat(val.toFixed(2)));
+    }
+
+    return { domain: [niceMin, niceMax], ticks };
+}
+
 const DistanceTimeChart = ({
     points,
     zoomRange,
@@ -117,6 +154,9 @@ const DistanceTimeChart = ({
     const minDist = chartData[0]?.distance || 0;
     const maxDist = chartData[chartData.length - 1]?.distance || 0;
 
+    // Use nice tick calculation for Y-axis
+    const yAxisConfig = useMemo(() => calculateNiceYTicks(minDist, maxDist * 1.05, 6), [minDist, maxDist]);
+
     const zoom = () => {
         if (refAreaLeft === refAreaRight || refAreaRight === null || refAreaLeft === null) {
             setRefAreaLeft(null);
@@ -185,7 +225,7 @@ const DistanceTimeChart = ({
                         <stop offset="95%" stopColor="hsl(15, 52%, 58%)" stopOpacity={0} />
                     </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(23, 5%, 82%)" opacity={0.5} />
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(23, 5%, 82%)" opacity={0.25} />
                 <XAxis
                     dataKey="elapsedTime"
                     type="number"
@@ -207,7 +247,8 @@ const DistanceTimeChart = ({
                     tickFormatter={(value) => `${value.toFixed(1)} km`}
                     label={{ value: "Distance (km)", angle: -90, position: "insideLeft", fontSize: 12, fill: "hsl(15, 52%, 58%)" }}
                     width={60}
-                    domain={[minDist, maxDist + (maxDist - minDist) * 0.1]}
+                    domain={yAxisConfig.domain}
+                    ticks={yAxisConfig.ticks}
                 />
                 <Tooltip
                     contentStyle={{

@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import {
     BarChart,
     Bar,
@@ -8,7 +7,43 @@ import {
     Tooltip,
     ResponsiveContainer,
 } from "recharts";
+import { useMemo } from "react";
 import { GPXPoint, calculateSpeedDistribution, SpeedBucket } from "@/utils/gpxParser";
+
+// Helper to calculate "nice" ticks for Y axis
+function calculateNiceYTicks(dataMax: number, targetTickCount = 5): { domain: [number, number], ticks: number[] } {
+    if (dataMax <= 0) return { domain: [0, 10], ticks: [0, 2, 4, 6, 8, 10] };
+
+    const niceSteps = [1, 2, 5, 10, 20, 25, 40, 50, 100, 200, 250, 500, 1000];
+    const roughStep = dataMax / (targetTickCount - 1);
+
+    let bestStep = niceSteps[0];
+    for (const step of niceSteps) {
+        if (step >= roughStep) {
+            bestStep = step;
+            break;
+        }
+        bestStep = step;
+    }
+
+    if (roughStep > niceSteps[niceSteps.length - 1]) {
+        const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
+        const fraction = roughStep / magnitude;
+        if (fraction <= 1) bestStep = magnitude;
+        else if (fraction <= 2) bestStep = 2 * magnitude;
+        else if (fraction <= 5) bestStep = 5 * magnitude;
+        else bestStep = 10 * magnitude;
+    }
+
+    const niceMax = Math.ceil(dataMax / bestStep) * bestStep;
+
+    const ticks: number[] = [];
+    for (let val = 0; val <= niceMax; val += bestStep) {
+        ticks.push(val);
+    }
+
+    return { domain: [0, niceMax], ticks };
+}
 
 interface SpeedDistributionChartProps {
     points?: GPXPoint[];
@@ -119,7 +154,10 @@ const SpeedDistributionChart = ({ points, speedLimit, buckets }: SpeedDistributi
     // and set the domain of BOTH axes to [0, maxVal]
     const maxTime = Math.max(...data.map(d => d.time));
     const maxDist = Math.max(...data.map(d => d.distance));
-    const maxVal = Math.ceil(Math.max(maxTime, maxDist) * 1.1); // Add 10% headroom
+    const rawMax = Math.max(maxTime, maxDist);
+
+    // Use nice tick calculation
+    const yAxisConfig = useMemo(() => calculateNiceYTicks(rawMax * 1.1, 6), [rawMax]);
 
     return (
         <ResponsiveContainer width="100%" height="100%">
@@ -137,7 +175,7 @@ const SpeedDistributionChart = ({ points, speedLimit, buckets }: SpeedDistributi
                         <stop offset="95%" stopColor="hsl(var(--foreground))" stopOpacity={0.1} />
                     </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} opacity={0.3} />
+                <CartesianGrid stroke="hsl(var(--border))" strokeWidth={0.5} vertical={false} opacity={0.3} horizontal={true} />
                 <XAxis
                     dataKey="range"
                     stroke="hsl(var(--foreground))"
@@ -155,7 +193,8 @@ const SpeedDistributionChart = ({ points, speedLimit, buckets }: SpeedDistributi
                     tickLine={false}
                     axisLine={false}
                     tickFormatter={(val) => `${val}m`}
-                    domain={[0, maxVal]}
+                    domain={yAxisConfig.domain}
+                    ticks={yAxisConfig.ticks}
                 />
                 <YAxis
                     yAxisId="right"
@@ -165,7 +204,8 @@ const SpeedDistributionChart = ({ points, speedLimit, buckets }: SpeedDistributi
                     tickLine={false}
                     axisLine={false}
                     tickFormatter={(val) => `${val}km`}
-                    domain={[0, maxVal]}
+                    domain={yAxisConfig.domain}
+                    ticks={yAxisConfig.ticks}
                 />
                 <Tooltip
                     contentStyle={{
