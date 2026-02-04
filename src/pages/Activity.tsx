@@ -374,7 +374,7 @@ const ActivityPage = () => {
       {/* Fixed Bottom Banner for Anonymous Users */}
       {!user && (
         <div className="fixed bottom-0 left-0 right-0 z-[1002] border-t border-primary/20 bg-background/95 backdrop-blur-md shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.2)] animate-in slide-in-from-bottom-full duration-700 delay-500">
-          <div className="container mx-auto px-4 py-4 md:py-6 flex flex-col md:flex-row items-center justify-between gap-4 max-w-5xl">
+          <div className="container mx-auto px-3 py-3 md:py-4 flex flex-col md:flex-row items-center justify-between gap-2 max-w-5xl">
             <div className="text-center md:text-left space-y-1">
               <h3 className="font-bold text-base md:text-lg flex items-center justify-center md:justify-start gap-2">
                 <Globe className="w-4 h-4 text-primary" />
