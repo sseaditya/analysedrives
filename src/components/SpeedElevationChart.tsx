@@ -16,7 +16,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 interface SpeedElevationChartProps {
   points: GPXPoint[];
-  onHover?: (point: GPXPoint | null) => void;
+  onHover?: (point: GPXPoint | null, speed?: number) => void;
   onZoomChange: (range: [number, number] | null) => void;
   zoomRange: [number, number] | null;
   speedLimit?: number | null;
@@ -494,7 +494,7 @@ const SpeedElevationChart = ({
     const pointIndex = activeData.pointIndex;
 
     if (pointIndex !== undefined && pointIndex < points.length) {
-      onHover(points[pointIndex]);
+      onHover(points[pointIndex], activeData.speed);
     }
   };
 

@@ -49,6 +49,7 @@ interface GPSStatsProps {
 
 const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedCap, isOwner = true, isPublic = false, description, hideRadius = 0, ownerProfile, onEdit }: GPSStatsProps) => {
   const [hoveredPoint, setHoveredPoint] = useState<GPXPoint | null>(null);
+  const [hoveredSpeed, setHoveredSpeed] = useState<number | null>(null);
   const [zoomRange, setZoomRange] = useState<[number, number] | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
 
@@ -247,14 +248,16 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
   }, [showLimiter, speedLimit]);
 
   // Handle chart hover with privacy clamping
-  const handleHoverPoint = (point: GPXPoint | null) => {
+  const handleHoverPoint = (point: GPXPoint | null, speed?: number) => {
     if (!point) {
       setHoveredPoint(null);
+      setHoveredSpeed(null);
       return;
     }
 
     if (isOwner) {
       setHoveredPoint(point);
+      setHoveredSpeed(speed ?? null);
       return;
     }
 
@@ -285,6 +288,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
       setHoveredPoint(safeEnd);
     } else {
       setHoveredPoint(point);
+      setHoveredSpeed(speed ?? null);
     }
   };
 
@@ -779,6 +783,9 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                             }
                           }
 
+                          // Use the passed smoothed speed if available, otherwise fallback to calculated
+                          const finalDisplaySpeed = hoveredSpeed ?? pointSpeed;
+
                           // Use accumulated time instead of raw elapsed time (which includes pauses)
                           const h = Math.floor(cumTime / 3600);
                           const m = Math.floor((cumTime % 3600) / 60);
@@ -790,7 +797,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                               <div className="w-px h-3.5 bg-border" />
                               <span className="text-sm font-mono font-semibold">{formatDistance(cumDist)}</span>
                               <div className="w-px h-3.5 bg-border" />
-                              <span className="text-sm font-mono font-semibold">{formatSpeed(pointSpeed)}</span>
+                              <span className="text-sm font-mono font-semibold">{formatSpeed(finalDisplaySpeed)}</span>
                               {hoveredPoint.ele !== undefined && (
                                 <>
                                   <div className="w-px h-3.5 bg-border" />

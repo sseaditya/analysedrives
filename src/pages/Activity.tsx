@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import ActivityEditor from "@/components/ActivityEditor";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface ActivityState {
   stats: GPXStats;
@@ -38,6 +39,7 @@ const ActivityPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, loading: authLoading, signInWithGoogle } = useAuth();
+  const isMobile = useIsMobile();
 
   // Initialize state from location state (if uploaded locally) or null
   const [data, setData] = useState<ActivityState | null>(
@@ -340,6 +342,15 @@ const ActivityPage = () => {
           </div>
         </div>
       </header>
+
+      {/* Mobile Experience Warning */}
+      {isMobile && (
+        <div className="w-full bg-red-500/10 border-b border-red-500/20 px-4 py-2.5 text-center animate-in slide-in-from-top-5">
+          <p className="text-xs font-medium text-red-600 dark:text-red-400">
+            For the best experience and full features, please use DrivenStat on a laptop or desktop.
+          </p>
+        </div>
+      )}
       {/* Main Content */}
       <main className={`container mx-auto px-4 py-6 space-y-8 ${!user ? 'pb-32 md:pb-28' : ''}`}>
         <div className="max-w-[1600px] mx-auto">
