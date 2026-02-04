@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { Fuel } from "lucide-react";
 import {
     Dialog,
     DialogContent,
@@ -14,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
-import { Loader2, Globe, Lock, Gauge, MapPin, Trash2, AlertTriangle } from "lucide-react";
+import { Loader2, Globe, Lock, Gauge, MapPin, Trash2, AlertTriangle, CloudRain, Droplet } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 
@@ -26,6 +27,7 @@ interface ActivityData {
     speed_cap: number | null;
     hide_radius: number | null;
     file_path?: string;
+    fuel: number | null;
 }
 
 interface ActivityEditorProps {
@@ -45,6 +47,7 @@ const ActivityEditor = ({ open, onOpenChange, activity, onUpdate }: ActivityEdit
     const [isPublic, setIsPublic] = useState(activity.public || false);
     const [speedCap, setSpeedCap] = useState(activity.speed_cap || 120);
     const [hideRadius, setHideRadius] = useState(activity.hide_radius || 5);
+    const [fuel, setFuel] = useState<number | string>(activity.fuel || "");
 
     // Reset state when dialog opens or activity changes
     useEffect(() => {
@@ -54,6 +57,7 @@ const ActivityEditor = ({ open, onOpenChange, activity, onUpdate }: ActivityEdit
             setIsPublic(activity.public || false);
             setSpeedCap(activity.speed_cap || 120);
             setHideRadius(activity.hide_radius || 5);
+            setFuel(activity.fuel || "");
         }
     }, [open, activity]);
 
@@ -73,6 +77,7 @@ const ActivityEditor = ({ open, onOpenChange, activity, onUpdate }: ActivityEdit
                     public: isPublic,
                     speed_cap: isPublic ? speedCap : null,
                     hide_radius: isPublic ? hideRadius : null,
+                    fuel: fuel ? Number(fuel) : null,
                 })
                 .eq("id", activity.id);
 
@@ -89,6 +94,7 @@ const ActivityEditor = ({ open, onOpenChange, activity, onUpdate }: ActivityEdit
                     public: isPublic,
                     speed_cap: isPublic ? speedCap : null,
                     hide_radius: isPublic ? hideRadius : null,
+                    fuel: fuel ? Number(fuel) : null,
                 });
             }
         } catch (err) {
@@ -135,7 +141,7 @@ const ActivityEditor = ({ open, onOpenChange, activity, onUpdate }: ActivityEdit
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md z-[2001]">
+            <DialogContent className="sm:max-w-md z-[2001] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Edit Activity</DialogTitle>
                     <DialogDescription>
@@ -165,6 +171,23 @@ const ActivityEditor = ({ open, onOpenChange, activity, onUpdate }: ActivityEdit
                             onChange={(e) => setDescription(e.target.value)}
                             rows={3}
                             className="resize-none"
+                        />
+                    </div>
+
+                    {/* Fuel Input */}
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                            <Fuel className="w-4 h-4 text-muted-foreground" />
+                            <Label htmlFor="fuel">Fuel Consumed (L)</Label>
+                        </div>
+                        <Input
+                            id="fuel"
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            value={fuel}
+                            onChange={(e) => setFuel(e.target.value)}
+                            placeholder="e.g. 5.5"
                         />
                     </div>
 

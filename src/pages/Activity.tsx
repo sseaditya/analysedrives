@@ -24,7 +24,8 @@ interface ActivityMetadata {
   public: boolean;
   speed_cap: number | null;
   hide_radius: number | null;
-  file_path?: string;
+  file_path: string;
+  fuel: number | null;
 }
 
 interface OwnerProfile {
@@ -115,7 +116,8 @@ const ActivityPage = () => {
             public: record.public,
             speed_cap: record.speed_cap,
             hide_radius: record.hide_radius,
-            file_path: record.file_path
+            file_path: record.file_path,
+            fuel: record.fuel
           });
 
           // 1.5 Fetch owner profile
@@ -319,7 +321,8 @@ const ActivityPage = () => {
                     public: metadata.public,
                     speed_cap: metadata.speed_cap,
                     hide_radius: metadata.hide_radius,
-                    file_path: metadata.file_path
+                    file_path: metadata.file_path,
+                    fuel: metadata.fuel
                   }}
                   onUpdate={(updated) => setMetadata({ ...metadata, ...updated })}
                 />
@@ -363,6 +366,7 @@ const ActivityPage = () => {
             isPublic={metadata?.public || false}
             description={metadata?.description || null}
             hideRadius={metadata?.hide_radius ?? 5}
+            fuel={metadata?.fuel ?? null}
             ownerProfile={ownerProfile}
             onEdit={() => setIsEditorOpen(true)}
           />

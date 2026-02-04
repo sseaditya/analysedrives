@@ -1,5 +1,33 @@
 import { useState, useMemo } from "react";
-import { MapPin, Activity, TrendingUp, Compass, RotateCcw, MoveRight, GitCommit, Spline, Gauge, Clock, AlertTriangle, Globe, Lock, Pencil, Info } from "lucide-react";
+import {
+  Activity,
+  Clock,
+  ArrowUpRight,
+  Map as MapIcon,
+  Download,
+  Share2,
+  Calendar,
+  MoreVertical,
+  ChevronDown,
+  ChevronUp,
+  Maximize2,
+  Minimize2,
+  Info,
+  Fuel,
+  Leaf,
+  MapPin,
+  TrendingUp,
+  Compass,
+  RotateCcw,
+  MoveRight,
+  GitCommit,
+  Spline,
+  Gauge,
+  AlertTriangle,
+  Globe,
+  Lock,
+  Pencil
+} from "lucide-react";
 import { ResponsiveContainer } from "recharts";
 import { useIsMobile } from "@/hooks/use-mobile";
 import TrackMap from "./TrackMap";
@@ -29,6 +57,13 @@ import {
   calculateStats
 } from "@/utils/gpxParser";
 
+interface OwnerProfile {
+  display_name: string | null;
+  full_name: string | null;
+  avatar_url: string | null;
+  car: string | null;
+}
+
 interface GPSStatsProps {
   stats: GPXStats;
   fileName: string;
@@ -37,17 +72,13 @@ interface GPSStatsProps {
   isOwner?: boolean;
   isPublic?: boolean;
   description?: string | null;
-  hideRadius?: number; // km
-  ownerProfile?: {
-    display_name: string | null;
-    full_name: string | null;
-    avatar_url: string | null;
-    car: string | null;
-  } | null;
+  hideRadius?: number;
+  ownerProfile?: OwnerProfile | null;
   onEdit?: () => void;
+  fuel?: number | null;
 }
 
-const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedCap, isOwner = true, isPublic = false, description, hideRadius = 0, ownerProfile, onEdit }: GPSStatsProps) => {
+const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedCap, isOwner = true, isPublic = false, description, hideRadius = 0, ownerProfile, onEdit, fuel }: GPSStatsProps) => {
   const [hoveredPoint, setHoveredPoint] = useState<GPXPoint | null>(null);
   const [hoveredSpeed, setHoveredSpeed] = useState<number | null>(null);
   const [zoomRange, setZoomRange] = useState<[number, number] | null>(null);
@@ -292,6 +323,12 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
     }
   };
 
+  const totalDistance = stats.totalDistance;
+  const movingTime = stats.movingTime;
+
+  // Calculate Fuel Efficiency
+  const fuelEfficiency = fuel && fuel > 0 ? totalDistance / fuel : 0;
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col lg:flex-row gap-8">
@@ -453,12 +490,25 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                         </div>
                         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Stopped Time</span>
                       </div>
-                      <div>
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-2xl font-normal tabular-nums">{stats.stopCount}</span>
-                        </div>
-                        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Stops</span>
-                      </div>
+
+                      {fuel && fuel > 0 ? (
+                        <>
+                          <div>
+                            <div className="flex items-baseline gap-1">
+                              <span className="text-2xl font-normal tabular-nums">{fuel.toFixed(1)}</span>
+                              <span className="text-xl text-muted-foreground ml-1">L</span>
+                            </div>
+                            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Fuel Used</span>
+                          </div>
+                          <div>
+                            <div className="flex items-baseline gap-1">
+                              <span className="text-2xl font-normal tabular-nums">{fuelEfficiency.toFixed(1)}</span>
+                              <span className="text-xl text-muted-foreground ml-1">km/L</span>
+                            </div>
+                            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Efficiency</span>
+                          </div>
+                        </>
+                      ) : null}
                     </div>
                   </div>
                 </div>
