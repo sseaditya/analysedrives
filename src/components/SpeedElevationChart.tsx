@@ -11,7 +11,7 @@ import {
 } from "recharts";
 import { GPXPoint, haversineDistance, PAUSE_THRESHOLD } from "@/utils/gpxParser";
 import { calculateNiceTicks, calculateNiceYTicks } from "@/utils/chartUtils";
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface SpeedElevationChartProps {
@@ -73,6 +73,7 @@ const SpeedElevationChart = ({
   const [dragStartDist, setDragStartDist] = useState<number | null>(null);
   const [hoverDistance, setHoverDistance] = useState<number | null>(null);
   const [hoveredPart, setHoveredPart] = useState<'left' | 'right' | 'center' | null>(null);
+  const chartRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
 
   // Calculate combined data for chart - Keep MORE points for better zoom detail
@@ -339,8 +340,8 @@ const SpeedElevationChart = ({
     );
   }, [speedXDomain, xAxisMode]);
 
-  // Edge detection threshold - 3% for better UX
-  const EDGE_THRESHOLD = (fullMaxVal - fullMinVal) * 0.03;
+  // Edge detection threshold - 1% for better UX (Reduced from 3%)
+  const EDGE_THRESHOLD = (fullMaxVal - fullMinVal) * 0.01;
 
   const getInteractionMode = (val: number): InteractionMode => {
     // Safety check for empty data
@@ -553,13 +554,57 @@ const SpeedElevationChart = ({
   useEffect(() => {
     if (!activeChart) return;
 
+    // Separate logic for snapping when mouse is strictly OUT of bounds
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      if (!chartRef.current) return;
+      const rect = chartRef.current.getBoundingClientRect();
+      // AreaChart has margin right 30. We approximate the chart area width.
+      const effectiveWidth = rect.width - 30;
+
+      // Relative X from left edge of chart area
+      const x = e.clientX - rect.left;
+
+      // Snapping Logic
+      if (x < 0) {
+        // SNAP LEFT
+        if (interactionMode === 'move-window' && zoomStartVal !== null && zoomEndVal !== null) {
+          const windowSize = zoomEndVal - zoomStartVal;
+          setRefAreaLeft(fullMinVal.toString());
+          setRefAreaRight((fullMinVal + windowSize).toString());
+        } else if (interactionMode === 'resize-left') {
+          setRefAreaLeft(fullMinVal.toString());
+        } else if (interactionMode === 'resize-right') {
+          setRefAreaRight(fullMinVal.toString());
+        } else if (interactionMode === 'new-selection') {
+          setRefAreaRight(fullMinVal.toString());
+        }
+      } else if (x > effectiveWidth) {
+        // SNAP RIGHT
+        if (interactionMode === 'move-window' && zoomStartVal !== null && zoomEndVal !== null) {
+          const windowSize = zoomEndVal - zoomStartVal;
+          setRefAreaRight(fullMaxVal.toString());
+          setRefAreaLeft((fullMaxVal - windowSize).toString());
+        } else if (interactionMode === 'resize-left') {
+          setRefAreaLeft(fullMaxVal.toString());
+        } else if (interactionMode === 'resize-right') {
+          setRefAreaRight(fullMaxVal.toString());
+        } else if (interactionMode === 'new-selection') {
+          setRefAreaRight(fullMaxVal.toString());
+        }
+      }
+    };
+
     const handleGlobalMouseUp = () => {
       handleMouseUp();
     };
 
     window.addEventListener('mouseup', handleGlobalMouseUp);
-    return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
-  }, [activeChart, handleMouseUp]);
+    window.addEventListener('mousemove', handleGlobalMouseMove);
+    return () => {
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+      window.removeEventListener('mousemove', handleGlobalMouseMove);
+    };
+  }, [activeChart, handleMouseUp, interactionMode, zoomStartVal, zoomEndVal, fullMinVal, fullMaxVal]);
 
   // Shared margin configuration
   const chartMargin = { top: 10, right: 30, left: 0, bottom: 0 };
@@ -581,7 +626,7 @@ const SpeedElevationChart = ({
   }
 
   return (
-    <div className="h-full w-full rounded-2xl border border-border bg-card p-3 select-none flex flex-col cursor-crosshair">
+    <div ref={chartRef} className="h-full w-full rounded-2xl border border-border bg-card p-3 select-none flex flex-col cursor-crosshair">
       {/* Speed Chart (Main - 70% height) */}
       <div className="flex-[7] w-full min-h-0 mb-4">
         <ResponsiveContainer width="100%" height="100%">

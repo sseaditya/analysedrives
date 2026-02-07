@@ -79,7 +79,14 @@ const Feed = () => {
 
             if (error) throw error;
 
-            setActivities(data || []);
+            // Sort by activity date (startTime) if available, otherwise fallback to created_at
+            const sortedData = (data || []).sort((a, b) => {
+                const dateA = a.stats?.startTime ? new Date(a.stats.startTime).getTime() : new Date(a.created_at).getTime();
+                const dateB = b.stats?.startTime ? new Date(b.stats.startTime).getTime() : new Date(b.created_at).getTime();
+                return dateB - dateA;
+            });
+
+            setActivities(sortedData);
         } catch (err) {
             console.error("Error fetching feed:", err);
         } finally {
