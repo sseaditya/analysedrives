@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { MapPin, LogOut, Clock, Activity, Search, LayoutDashboard, Globe, Car, User, BarChart3, ChevronLeft, ChevronRight } from "lucide-react";
@@ -36,6 +36,7 @@ interface ActivityRecord {
 const Feed = () => {
     const { user, signOut } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const [activities, setActivities] = useState<ActivityRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
@@ -237,7 +238,7 @@ const Feed = () => {
                                 {paginatedActivities.map((activity) => (
                                     <div
                                         key={activity.id}
-                                        onClick={() => navigate(`/activity/${activity.slug || activity.id}`)}
+                                        onClick={() => navigate(`/activity/${activity.slug || activity.id}`, { state: { from: location } })}
                                         className="group bg-card border border-border rounded-2xl overflow-hidden hover:shadow-xl hover:shadow-primary/5 transition-all cursor-pointer hover:-translate-y-1 flex flex-col relative"
                                     >
                                         {/* Map Preview with Overlay */}

@@ -149,130 +149,136 @@ const ActivityEditor = ({ open, onOpenChange, activity, onUpdate }: ActivityEdit
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="space-y-6 py-4">
-                    {/* Title */}
-                    <div className="space-y-2">
-                        <Label htmlFor="title">Title</Label>
-                        <Input
-                            id="title"
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            placeholder="Activity Title"
-                            autoFocus={false}
-                        />
-                    </div>
-
-                    {/* Description */}
-                    <div className="space-y-2">
-                        <Label htmlFor="description">Description</Label>
-                        <Textarea
-                            id="description"
-                            placeholder="Add a description..."
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                            rows={3}
-                            className="resize-none"
-                        />
-                    </div>
-
-                    {/* Fuel Input */}
-                    <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                            <Fuel className="w-4 h-4 text-muted-foreground" />
-                            <Label htmlFor="fuel">Fuel Consumed (L)</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 py-4">
+                    {/* Left Column: Details */}
+                    <div className="space-y-6">
+                        {/* Title */}
+                        <div className="space-y-2">
+                            <Label htmlFor="title">Title</Label>
+                            <Input
+                                id="title"
+                                value={title}
+                                onChange={(e) => setTitle(e.target.value)}
+                                placeholder="Activity Title"
+                                autoFocus={false}
+                            />
                         </div>
-                        <Input
-                            id="fuel"
-                            type="number"
-                            step="0.1"
-                            min="0"
-                            value={fuel}
-                            onChange={(e) => setFuel(e.target.value)}
-                            placeholder="e.g. 5.5"
-                            className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        />
+
+                        {/* Description */}
+                        <div className="space-y-2">
+                            <Label htmlFor="description">Description</Label>
+                            <Textarea
+                                id="description"
+                                placeholder="Add a description..."
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                                rows={3}
+                                className="resize-none"
+                            />
+                        </div>
+
+                        {/* Fuel Input */}
+                        <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                                <Fuel className="w-4 h-4 text-muted-foreground" />
+                                <Label htmlFor="fuel">Fuel Consumed (L)</Label>
+                            </div>
+                            <Input
+                                id="fuel"
+                                type="number"
+                                step="0.1"
+                                min="0"
+                                value={fuel}
+                                onChange={(e) => setFuel(e.target.value)}
+                                placeholder="e.g. 5.5"
+                                className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            />
+                        </div>
                     </div>
 
-                    {/* Public Toggle */}
-                    <div className="flex items-center justify-between p-4 rounded-lg border border-border">
-                        <div className="flex items-center gap-3">
-                            {isPublic ? (
-                                <Globe className="w-5 h-5 text-green-500" />
-                            ) : (
-                                <Lock className="w-5 h-5 text-muted-foreground" />
-                            )}
-                            <div>
-                                <p className="font-medium text-sm">
-                                    {isPublic ? "Public" : "Private"}
-                                </p>
+                    {/* Right Column: Settings */}
+                    <div className="space-y-6">
+                        {/* Public Toggle */}
+                        <div className="flex items-center justify-between p-4 rounded-lg border border-border">
+                            <div className="flex items-center gap-3">
+                                {isPublic ? (
+                                    <Globe className="w-5 h-5 text-green-500" />
+                                ) : (
+                                    <Lock className="w-5 h-5 text-muted-foreground" />
+                                )}
+                                <div>
+                                    <p className="font-medium text-sm">
+                                        {isPublic ? "Public" : "Private"}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {isPublic
+                                            ? "Anyone with the link can view"
+                                            : "Only you can see this activity"}
+                                    </p>
+                                </div>
+                            </div>
+                            <Switch
+                                checked={isPublic}
+                                onCheckedChange={setIsPublic}
+                            />
+                        </div>
+
+                        {/* Hide Radius (only when public) */}
+                        {isPublic && (
+                            <div className="space-y-4 p-4 rounded-lg border border-border animate-in fade-in slide-in-from-top-2">
+                                <div className="flex items-center gap-2">
+                                    <MapPin className="w-4 h-4 text-primary" />
+                                    <Label className="font-medium">
+                                        Hide Start/End Location
+                                    </Label>
+                                </div>
                                 <p className="text-xs text-muted-foreground">
-                                    {isPublic
-                                        ? "Anyone with the link can view"
-                                        : "Only you can see this activity"}
+                                    Hide the first and last {hideRadius}km of your route.
                                 </p>
+                                <div className="flex items-center gap-4">
+                                    <Slider
+                                        value={[hideRadius]}
+                                        onValueChange={([val]) => setHideRadius(val)}
+                                        min={1}
+                                        max={10}
+                                        step={1}
+                                        className="flex-1"
+                                    />
+                                    <span className="text-sm font-mono font-bold min-w-[60px]">
+                                        {hideRadius} km
+                                    </span>
+                                </div>
                             </div>
-                        </div>
-                        <Switch
-                            checked={isPublic}
-                            onCheckedChange={setIsPublic}
-                        />
+                        )}
+
+                        {/* Speed Cap (only when public) */}
+                        {isPublic && (
+                            <div className="space-y-4 p-4 rounded-lg border border-border animate-in fade-in slide-in-from-top-2">
+                                <div className="flex items-center gap-2">
+                                    <Gauge className="w-4 h-4 text-primary" />
+                                    <Label className="font-medium">
+                                        Speed Cap for Public Viewers
+                                    </Label>
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    Limit the maximum speed shown to public viewers.
+                                </p>
+                                <div className="flex items-center gap-4">
+                                    <Slider
+                                        value={[speedCap]}
+                                        onValueChange={([val]) => setSpeedCap(val)}
+                                        min={40}
+                                        max={200}
+                                        step={10}
+                                        className="flex-1"
+                                    />
+                                    <span className="text-sm font-mono font-bold min-w-[60px]">
+                                        {speedCap} km/h
+                                    </span>
+                                </div>
+                            </div>
+                        )}
                     </div>
-
-                    {/* Hide Radius (only when public) */}
-                    {isPublic && (
-                        <div className="space-y-4 p-4 rounded-lg border border-border animate-in fade-in slide-in-from-top-2">
-                            <div className="flex items-center gap-2">
-                                <MapPin className="w-4 h-4 text-primary" />
-                                <Label className="font-medium">
-                                    Hide Start/End Location
-                                </Label>
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                                Hide the first and last {hideRadius}km of your route.
-                            </p>
-                            <div className="flex items-center gap-4">
-                                <Slider
-                                    value={[hideRadius]}
-                                    onValueChange={([val]) => setHideRadius(val)}
-                                    min={1}
-                                    max={10}
-                                    step={1}
-                                    className="flex-1"
-                                />
-                                <span className="text-sm font-mono font-bold min-w-[60px]">
-                                    {hideRadius} km
-                                </span>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Speed Cap (only when public) */}
-                    {isPublic && (
-                        <div className="space-y-4 p-4 rounded-lg border border-border animate-in fade-in slide-in-from-top-2">
-                            <div className="flex items-center gap-2">
-                                <Gauge className="w-4 h-4 text-primary" />
-                                <Label className="font-medium">
-                                    Speed Cap for Public Viewers
-                                </Label>
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                                Limit the maximum speed shown to public viewers.
-                            </p>
-                            <div className="flex items-center gap-4">
-                                <Slider
-                                    value={[speedCap]}
-                                    onValueChange={([val]) => setSpeedCap(val)}
-                                    min={40}
-                                    max={200}
-                                    step={10}
-                                    className="flex-1"
-                                />
-                                <span className="text-sm font-mono font-bold min-w-[60px]">
-                                    {speedCap} km/h
-                                </span>
-                            </div>
-                        </div>
-                    )}
                 </div>
 
                 <DialogFooter className="flex sm:justify-between items-center gap-4">

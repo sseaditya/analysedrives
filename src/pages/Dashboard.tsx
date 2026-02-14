@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { MapPin, LogOut, Upload, Activity, Calendar, Clock, ArrowRight, TrendingUp, Pencil, Trash2, Check, X, Search, SlidersHorizontal, ChevronDown, ChevronUp, BarChart3, ChevronLeft, ChevronRight } from "lucide-react";
@@ -36,14 +36,23 @@ type TimePeriod = 'week' | 'month' | 'year' | 'all';
 const Dashboard = () => {
     const { user, signOut } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [activities, setActivities] = useState<ActivityRecord[]>([]);
     const [loadingActivities, setLoadingActivities] = useState(true);
     const [showUpload, setShowUpload] = useState(false);
-    const [profile, setProfile] = useState<Profile | null>(null);
-    const [isLoadingProfile, setIsLoadingProfile] = useState(true);
-
+    const [profile, setProfile] = useState<Profile | null>(() => {
+        if (!user) return null;
+        return {
+            id: user.id,
+            display_name: user.user_metadata?.full_name || user.user_metadata?.display_name || null,
+            full_name: user.user_metadata?.full_name || null,
+            car: null,
+            avatar_url: user.user_metadata?.avatar_url || null
+        };
+    });
+    const [isLoadingProfile, setIsLoadingProfile] = useState(false);
     // Search and Filters
     const [searchQuery, setSearchQuery] = useState("");
     const [showFilters, setShowFilters] = useState(false);
@@ -138,8 +147,29 @@ const Dashboard = () => {
     };
 
     useEffect(() => {
-        fetchProfile();
-        fetchActivities();
+        const loadProfile = async () => {
+            if (!user) return;
+            if (!profile) setIsLoadingProfile(true);
+            try {
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('id, display_name, full_name, car, avatar_url')
+                    .eq('id', user.id)
+                    .single();
+
+                if (error && error.code !== 'PGRST116') throw error;
+                if (data) setProfile(data);
+            } catch (err) {
+                console.error("Error fetching profile:", err);
+            } finally {
+                setIsLoadingProfile(false);
+            }
+        };
+
+        if (user) {
+            loadProfile();
+            fetchActivities();
+        }
 
         // Check for strava connection success param to auto-open upload
         const params = new URLSearchParams(window.location.search);
@@ -148,25 +178,6 @@ const Dashboard = () => {
             window.history.replaceState({}, '', '/dashboard'); // Clean URL
         }
     }, [user]);
-
-    const fetchProfile = async () => {
-        try {
-            if (!user) return;
-            setIsLoadingProfile(true);
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('id, display_name, full_name, car, avatar_url')
-                .eq('id', user.id)
-                .single();
-
-            if (error && error.code !== 'PGRST116') throw error;
-            if (data) setProfile(data);
-        } catch (err) {
-            console.error("Error fetching profile:", err);
-        } finally {
-            setIsLoadingProfile(false);
-        }
-    };
 
     const fetchActivities = async () => {
         try {

@@ -428,30 +428,32 @@ const Analytics = () => {
                         </h1>
                     </div>
 
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleRepairData}
-                        disabled={isRepairing}
-                        className="gap-2"
-                    >
-                        {isRepairing ? (
-                            <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                Repairing {repairProgress}%
-                            </>
-                        ) : (
-                            <>
-                                <RefreshCcw className="w-4 h-4" />
-                                <span className="hidden sm:inline">Scan & Repair Data</span>
-                            </>
-                        )}
-                    </Button>
+                    <div className="flex items-center gap-4">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleRepairData}
+                            disabled={isRepairing}
+                            className="gap-2"
+                        >
+                            {isRepairing ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Repairing {repairProgress}%
+                                </>
+                            ) : (
+                                <>
+                                    <RefreshCcw className="w-4 h-4" />
+                                    <span className="hidden sm:inline">Scan & Repair Data</span>
+                                </>
+                            )}
+                        </Button>
 
-                    {/* Header Profile */}
-                    {user && (
-                        <HeaderProfile />
-                    )}
+                        {/* Header Profile */}
+                        {user && (
+                            <HeaderProfile />
+                        )}
+                    </div>
                 </div>
             </header>
 

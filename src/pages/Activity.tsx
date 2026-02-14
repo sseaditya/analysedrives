@@ -1,5 +1,5 @@
-import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, MapPin, Pencil, ChevronDown, ChevronUp, Globe, Lock, LogIn } from "lucide-react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { Pencil, Trash2, Loader2, ArrowLeft, Globe, Lock, Fuel, Check, LogIn, Maximize2, Minimize2 } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import GPSStats from "@/components/GPSStats";
@@ -36,10 +36,10 @@ interface OwnerProfile {
   car: string | null;
 }
 
-const ActivityPage = () => {
+const Activity = () => {
   const { id } = useParams();
-  const location = useLocation();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, loading: authLoading, signInWithGoogle } = useAuth();
   const isMobile = useIsMobile();
 
@@ -283,7 +283,13 @@ const ActivityPage = () => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => navigate(-1)}
+                  onClick={() => {
+                    if (location.state?.from) {
+                      navigate(location.state.from);
+                    } else {
+                      navigate(-1);
+                    }
+                  }}
                   className="gap-2"
                 >
                   <ArrowLeft className="w-4 h-4" />
@@ -420,4 +426,4 @@ const ActivityPage = () => {
   );
 };
 
-export default ActivityPage;
+export default Activity;

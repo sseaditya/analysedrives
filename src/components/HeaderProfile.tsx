@@ -1,8 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
-import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
 import ProfileEditor from "@/components/ProfileEditor";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -13,16 +10,25 @@ interface Profile {
 }
 
 const HeaderProfile = () => {
-    const navigate = useNavigate();
-    const { user, signOut } = useAuth();
-    const [profile, setProfile] = useState<Profile | null>(null);
+    const { user } = useAuth();
+    // Initialize with user_metadata to prevent stutter
+    const [profile, setProfile] = useState<Profile | null>(() => {
+        if (!user) return null;
+        return {
+            display_name: user.user_metadata?.full_name || user.user_metadata?.display_name || null,
+            full_name: user.user_metadata?.full_name || null,
+            avatar_url: user.user_metadata?.avatar_url || null
+        };
+    });
     const [isLoadingProfile, setIsLoadingProfile] = useState(false);
 
     useEffect(() => {
         if (!user) return;
 
         const fetchProfile = async () => {
-            setIsLoadingProfile(true);
+            // Only show loading if we don't have partial data
+            if (!profile) setIsLoadingProfile(true);
+
             try {
                 const { data, error } = await supabase
                     .from('profiles')
@@ -31,6 +37,7 @@ const HeaderProfile = () => {
                     .single();
 
                 if (error) {
+                    // If error, we still have user_metadata fallback
                     console.error('Error fetching profile:', error);
                     return;
                 }
@@ -48,22 +55,13 @@ const HeaderProfile = () => {
         fetchProfile();
     }, [user]);
 
-    const handleSignOut = async () => {
-        try {
-            await signOut();
-            navigate("/");
-        } catch (error) {
-            console.error("Error signing out:", error);
-        }
-    };
-
     if (!user) return null;
 
     return (
         <div className="flex items-center gap-4 flex-shrink-0">
             <ProfileEditor onProfileUpdate={(updatedProfile: any) => setProfile(updatedProfile)}>
                 <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
-                    {isLoadingProfile ? (
+                    {isLoadingProfile && !profile ? (
                         <>
                             <div className="w-8 h-8 rounded-full bg-muted animate-pulse" />
                             <div className="h-4 w-24 bg-muted animate-pulse rounded hidden md:block" />
@@ -83,10 +81,6 @@ const HeaderProfile = () => {
                     )}
                 </div>
             </ProfileEditor>
-            <Button variant="ghost" size="sm" onClick={handleSignOut} className="text-muted-foreground hover:text-destructive">
-                <LogOut className="w-4 h-4 md:mr-2" />
-                <span className="hidden md:inline">Sign Out</span>
-            </Button>
         </div>
     );
 };
