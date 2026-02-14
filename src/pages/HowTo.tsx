@@ -62,7 +62,7 @@ const HowTo = () => {
                             <li className="pl-2">Select the activity type - <span className="font-bold">Ride.</span></li>
                             <li className="pl-2">Tap <span className="font-bold">Start</span> and begin your drive.</li>
                             <li className="pl-2">When done, tap <span className="font-bold">Stop → Finish</span> to save.</li>
-                            <li className="pl-2">You can <span className="font-bold">pause and restart</span> when taking discretionary stops (fuel, food, etc.) — just remember to restart!</li>
+                            <li className="pl-2">You can <span className="font-bold">pause and resume</span> when taking long discretionary stops (food/viewpoints), just remember to resume!</li>
                             <li className="pl-2">Do <span className="font-bold">not</span> use Strava's auto start/stop feature.</li>
                         </ol>
                         <a

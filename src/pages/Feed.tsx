@@ -40,7 +40,20 @@ const Feed = () => {
     const [activities, setActivities] = useState<ActivityRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
-    const [profile, setProfile] = useState<Profile | null>(null);
+    const [profile, setProfile] = useState<Profile | null>(() => {
+        if (!user) return null;
+        const cached = localStorage.getItem(`profile_${user.id}`);
+        if (cached) {
+            try { return JSON.parse(cached); } catch (e) { /* ignore */ }
+        }
+        return {
+            id: user.id,
+            display_name: user.user_metadata?.full_name || user.user_metadata?.display_name || null,
+            full_name: user.user_metadata?.full_name || null,
+            car: null,
+            avatar_url: user.user_metadata?.avatar_url || null
+        };
+    });
     const [isLoadingProfile, setIsLoadingProfile] = useState(false);
     const isMounted = useRef(false);
 

@@ -44,8 +44,14 @@ const Dashboard = () => {
     const [showUpload, setShowUpload] = useState(false);
     const [profile, setProfile] = useState<Profile | null>(() => {
         if (!user) return null;
+        // Try cache first to prevent flicker
+        const cached = localStorage.getItem(`profile_${user.id}`);
+        if (cached) {
+            try { return JSON.parse(cached); } catch (e) { /* ignore */ }
+        }
         return {
             id: user.id,
+            // Fallback to metadata
             display_name: user.user_metadata?.full_name || user.user_metadata?.display_name || null,
             full_name: user.user_metadata?.full_name || null,
             car: null,
