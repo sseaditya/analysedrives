@@ -147,6 +147,12 @@ const Dashboard = () => {
     };
 
     useEffect(() => {
+        // Backup current path to sessionStorage for robust back navigation
+        const currentPath = `${location.pathname}?${searchParams.toString()}`;
+        sessionStorage.setItem('lastListPath', currentPath);
+    }, [location.pathname, searchParams]);
+
+    useEffect(() => {
         const loadProfile = async () => {
             if (!user) return;
             if (!profile) setIsLoadingProfile(true);
@@ -650,7 +656,7 @@ const Dashboard = () => {
                                                 // Pass full path with search params to ensure we can go back to exact state
                                                 navigate(`/activity/${activity.slug || activity.id}`, {
                                                     state: {
-                                                        from: location.pathname + location.search
+                                                        from: `${location.pathname}?${searchParams.toString()}`
                                                     }
                                                 });
                                             }}

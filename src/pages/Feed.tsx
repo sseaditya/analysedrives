@@ -62,6 +62,12 @@ const Feed = () => {
     };
 
     useEffect(() => {
+        // Backup current path to sessionStorage for robust back navigation
+        const currentPath = `${location.pathname}?${searchParams.toString()}`;
+        sessionStorage.setItem('lastListPath', currentPath);
+    }, [location.pathname, searchParams]);
+
+    useEffect(() => {
         fetchPublicActivities();
         fetchProfile();
     }, [user]);
@@ -241,7 +247,7 @@ const Feed = () => {
                                 {paginatedActivities.map((activity) => (
                                     <div
                                         key={activity.id}
-                                        onClick={() => navigate(`/activity/${activity.slug || activity.id}`, { state: { from: location.pathname + location.search } })}
+                                        onClick={() => navigate(`/activity/${activity.slug || activity.id}`, { state: { from: `${location.pathname}?${searchParams.toString()}` } })}
                                         className="group bg-card border border-border rounded-2xl overflow-hidden hover:shadow-xl hover:shadow-primary/5 transition-all cursor-pointer hover:-translate-y-1 flex flex-col relative"
                                     >
                                         {/* Map Preview with Overlay */}

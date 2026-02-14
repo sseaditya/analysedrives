@@ -289,12 +289,22 @@ const Activity = () => {
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    // Check if we have a valid history state path to go back to
-                    if (typeof location.state?.from === 'string') {
-                      navigate(location.state.from);
-                    } else {
-                      navigate(-1);
+                    // 1. Try explicit state from navigation
+                    const stateFrom = location.state?.from;
+                    if (typeof stateFrom === 'string') {
+                      navigate(stateFrom, { replace: true });
+                      return;
                     }
+
+                    // 2. Try session backup (handles refreshes)
+                    const savedPath = sessionStorage.getItem('lastListPath');
+                    if (savedPath) {
+                      navigate(savedPath, { replace: true });
+                      return;
+                    }
+
+                    // 3. Fallback
+                    navigate(-1);
                   }}
                   className="gap-2"
                 >
