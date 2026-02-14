@@ -2,18 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ExternalLink, ChevronDown, ChevronUp, Monitor, Smartphone, Shield, Eye, EyeOff, Gauge } from "lucide-react";
-
-// Official Strava logo (wordmark) as inline SVG
-const StravaLogo = ({ className = "" }: { className?: string }) => (
-    <svg viewBox="0 0 632 132" className={className} fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-        <path d="M131.6 66.2c0-36.5-29.6-66.2-66.1-66.2C29.1 0 0 29.7 0 66.2c0 27.1 16.5 50.5 40 60.5l10.6-22.7c-14.1-6-23.9-20.1-23.9-36.3 0-21.8 17.7-39.5 39.5-39.5s39.5 17.7 39.5 39.5c0 16.2-9.8 30.3-23.9 36.3l10.6 22.7c23.6-10 40.2-33.4 40.2-60.5z" />
-        <path d="M291.6 82.3c0 9.3-4.4 15.4-14.3 15.4-9.4 0-14.4-6.6-14.4-15.4V38.5h-27.3v47.4c0 26.5 16.1 41.7 38.2 41.7 13.5 0 21.4-5.9 26.3-13.6v10.8h22.2V38.5h-30.7v43.8zM455.3 38.5h-30.7v43.8c0 9.3-4.4 15.4-14.3 15.4-9.4 0-14.4-6.6-14.4-15.4V38.5h-27.3v47.4c0 26.5 16.1 41.7 38.2 41.7 13.5 0 21.4-5.9 26.3-13.6v10.8h22.2V38.5z" />
-        <path d="M339.7 38.5c-8.3 0-16.2 3.3-21.3 10.1V38.5h-27.3v86.3h27.3V80.5c0-9.3 5.5-15.4 13.2-15.4 3.7 0 6.5.9 9.1 2.4l7.8-26.6c-3.1-1.6-6.1-2.4-8.8-2.4z" />
-        <path d="M499.7 38.5l-22.4 53.4-22.3-53.4h-29.4l39.8 86.3h23l40.7-86.3z" />
-        <path d="M539.3 49.8c5.9-8 14.7-14.1 28-14.1 22.5 0 42.2 18.2 42.2 45.8s-19.7 46.1-42.2 46.1c-13.3 0-22.1-6-28-14.1v11.3h-27.3V0h27.3v49.8zm20.3 51.9c11.6 0 22.1-8.6 22.1-20.2 0-11.6-10.5-20-22.1-20s-21.7 8.4-21.7 20c0 11.6 10.1 20.2 21.7 20.2z" />
-        <path d="M218.8 97.7c-11.6 0-22.1-8.6-22.1-20.2 0-11.6 10.5-20 22.1-20s21.7 8.4 21.7 20c0 11.6-10.1 20.2-21.7 20.2zm28-47.9c-5.9-8-14.7-14.1-28-14.1-22.5 0-42.2 18.2-42.2 45.8s19.7 46.1 42.2 46.1c13.3 0 22.1-6 28-14.1v11.3h27.3V38.5h-27.3v11.3z" />
-    </svg>
-);
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const HowTo = () => {
     const navigate = useNavigate();
@@ -35,24 +24,19 @@ const HowTo = () => {
                 {/* Intro */}
                 <div className="bg-primary/5 border border-primary/20 rounded-xl p-5">
                     <p className="text-sm text-foreground">
-                        DrivenStat works with <span className="font-bold">GPX files</span> — a standard GPS format supported by many apps.
+                        DrivenStat works with <span className="font-bold">GPX files</span>, a standard GPS format supported by many apps.
                         The easiest way to get started is with <span className="font-bold">Strava</span> (free).
                     </p>
                 </div>
 
                 {/* Step 1: Record with Strava */}
                 <section className="space-y-4">
-                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                        <span className="bg-primary text-primary-foreground w-6 h-6 rounded-full flex items-center justify-center text-xs">1</span>
-                        Record Your Drive
-                    </div>
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-[#FC4C02] text-white flex items-center justify-center p-1.5">
-                            <StravaLogo className="w-full h-full" />
-                        </div>
-                        <h2 className="text-2xl font-bold">Record with Strava</h2>
+                        <span className="bg-primary text-primary-foreground w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold">1</span>
+                        <h2 className="text-2xl font-bold">Record Your Drive</h2>
                     </div>
-                    <p className="text-muted-foreground">
+                    <h3 className="text-base font-semibold text-muted-foreground">Record with Strava</h3>
+                    <p className="text-sm text-muted-foreground">
                         Use the free Strava app on your phone to record your drive. Start recording before you begin driving, and stop when you're done.
                     </p>
                     <div className="bg-card border border-border rounded-xl p-6 space-y-4">
@@ -80,16 +64,11 @@ const HowTo = () => {
 
                 {/* Step 2: Export GPX */}
                 <section className="space-y-4">
-                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                        <span className="bg-primary text-primary-foreground w-6 h-6 rounded-full flex items-center justify-center text-xs">2</span>
-                        Export Your GPX File
-                    </div>
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-[#FC4C02] text-white flex items-center justify-center p-1.5">
-                            <StravaLogo className="w-full h-full" />
-                        </div>
-                        <h2 className="text-2xl font-bold">Export from Strava</h2>
+                        <span className="bg-primary text-primary-foreground w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold">2</span>
+                        <h2 className="text-2xl font-bold">Export Your GPX File</h2>
                     </div>
+                    <h3 className="text-base font-semibold text-muted-foreground">Export from Strava</h3>
 
                     <div className="bg-muted/50 border border-border rounded-lg p-3 flex items-start gap-2">
                         <Monitor className="w-4 h-4 text-primary mt-0.5 shrink-0" />
@@ -110,9 +89,9 @@ const HowTo = () => {
 
                 {/* Step 3: Upload */}
                 <section className="space-y-4">
-                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                        <span className="bg-primary text-primary-foreground w-6 h-6 rounded-full flex items-center justify-center text-xs">3</span>
-                        Upload to DrivenStat
+                    <div className="flex items-center gap-3">
+                        <span className="bg-primary text-primary-foreground w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold">3</span>
+                        <h2 className="text-2xl font-bold">Upload to DrivenStat</h2>
                     </div>
                     <div className="flex justify-center">
                         <Button size="lg" onClick={() => navigate('/dashboard')}>
@@ -198,6 +177,11 @@ const HowTo = () => {
                 </section>
 
             </main>
+
+            {/* Floating Theme Toggle */}
+            <div className="fixed bottom-6 left-6 z-[1050]">
+                <ThemeToggle />
+            </div>
         </div>
     );
 };
