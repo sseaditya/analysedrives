@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,7 @@ const Feed = () => {
     const [searchQuery, setSearchQuery] = useState("");
     const [profile, setProfile] = useState<Profile | null>(null);
     const [isLoadingProfile, setIsLoadingProfile] = useState(false);
+    const isMounted = useRef(false);
 
     // Pagination via URL search params
     const [searchParams, setSearchParams] = useSearchParams();
@@ -134,9 +135,13 @@ const Feed = () => {
         a.profiles?.car?.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    // Reset to page 1 when search changes
+    // Reset to page 1 when search changes (skip initial mount)
     useEffect(() => {
-        setCurrentPage(1);
+        if (isMounted.current) {
+            setCurrentPage(1);
+        } else {
+            isMounted.current = true;
+        }
     }, [searchQuery]);
 
     // Pagination computed values

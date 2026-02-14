@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -64,6 +64,7 @@ const Dashboard = () => {
     // Edit State
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editTitle, setEditTitle] = useState("");
+    const isMounted = useRef(false);
 
     // Pagination via URL search params
     const [searchParams, setSearchParams] = useSearchParams();
@@ -251,9 +252,13 @@ const Dashboard = () => {
         });
     }, [activities, searchQuery, timeFilter, distFilter, speedFilter]);
 
-    // Reset to page 1 when filters change
+    // Reset to page 1 when filters change (skip initial mount)
     useEffect(() => {
-        setCurrentPage(1);
+        if (isMounted.current) {
+            setCurrentPage(1);
+        } else {
+            isMounted.current = true;
+        }
     }, [searchQuery, timeFilter, distFilter, speedFilter]);
 
     // Pagination computed values
