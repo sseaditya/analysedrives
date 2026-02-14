@@ -22,10 +22,10 @@ const HowTo = () => {
             <main className="container mx-auto px-4 py-8 max-w-3xl space-y-10">
 
                 {/* Intro */}
-                <div className="bg-primary/5 border border-primary/20 rounded-xl p-5">
-                    <p className="text-sm text-foreground">
-                        DrivenStat works with <span className="font-bold">GPX files</span>, a standard GPS format supported by many apps.
-                        The easiest way to get started is with <span className="font-bold">Strava</span> (free).
+                <div className="bg-muted/50 border border-border rounded-lg p-3 flex items-start gap-2">
+                    <p className="text-sm text-muted-foreground">
+                        DrivenStat works with <span className="font-bold text-foreground">GPX files</span>, a standard GPS format supported by many apps.
+                        The easiest way to get started is with <span className="font-bold text-foreground">Strava</span> (free).
                     </p>
                 </div>
 
@@ -127,8 +127,8 @@ const HowTo = () => {
                         <div className="flex items-start gap-3">
                             <Gauge className="w-5 h-5 text-primary mt-0.5 shrink-0" />
                             <div>
-                                <p className="text-sm font-bold text-foreground">Speed cap for viewers</p>
-                                <p className="text-sm text-muted-foreground">Speeds above your chosen speed cap will not be shown to others, they'll see the capped value instead.</p>
+                                <p className="text-sm font-bold text-foreground">Speed cap</p>
+                                <p className="text-sm text-muted-foreground">You can set a speed cap on your drive. Viewers will only see the capped speed value for any section that exceeds it.</p>
                             </div>
                         </div>
                     </div>
@@ -166,9 +166,9 @@ const HowTo = () => {
                                 </ol>
                             </div>
 
-                            <div className="bg-muted/50 border border-border rounded-xl p-5 mt-4">
+                            <div className="bg-muted/50 border border-border rounded-lg p-3 flex items-start gap-2">
                                 <p className="text-sm text-muted-foreground">
-                                    <span className="font-medium text-foreground">Any app that exports GPX files will work.</span>{" "}
+                                    <span className="font-bold text-foreground">Any app that exports GPX files will work.</span>{" "}
                                     If your GPS device or app can save to the .gpx format, you can upload it to DrivenStat.
                                 </p>
                             </div>

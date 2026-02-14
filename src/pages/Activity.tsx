@@ -293,9 +293,15 @@ const ActivityPage = () => {
                 <span className="font-bold text-lg text-foreground truncate max-w-[150px] md:max-w-xs lg:max-w-none" title={data.fileName}>{data.fileName}</span>
                 {metadata && (
                   metadata.public ? (
-                    <Globe className="w-4 h-4 text-green-500 shrink-0" />
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-500/15 text-green-700 dark:text-green-400 border border-green-500/30 shrink-0">
+                      <Globe className="w-3 h-3" />
+                      Public
+                    </span>
                   ) : (
-                    <Lock className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-muted text-muted-foreground border border-border shrink-0">
+                      <Lock className="w-3 h-3" />
+                      Private
+                    </span>
                   )
                 )}
               </div>
