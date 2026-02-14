@@ -22,10 +22,10 @@ const HowTo = () => {
             <main className="container mx-auto px-4 py-8 max-w-3xl space-y-10">
 
                 {/* Intro */}
-                <div className="bg-muted/50 border border-border rounded-lg p-3 flex items-start gap-2">
-                    <p className="text-sm text-muted-foreground">
-                        DrivenStat works with <span className="font-bold text-foreground">GPX files</span>, a standard GPS format supported by many apps.
-                        The easiest way to get started is with <span className="font-bold text-foreground">Strava</span> (free).
+                <div className="bg-card border border-border rounded-xl p-6">
+                    <p className="text-sm text-foreground">
+                        DrivenStat works with <span className="font-bold">GPX files</span>, a standard GPS format supported by many apps.
+                        The easiest way to get started is with <span className="font-bold">Strava</span> (free).
                     </p>
                 </div>
 
@@ -70,8 +70,8 @@ const HowTo = () => {
                     </div>
                     <h3 className="text-base font-semibold text-muted-foreground">Export from Strava</h3>
 
-                    <div className="bg-muted/50 border border-border rounded-lg p-3 flex items-start gap-2">
-                        <Monitor className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                    <div className="bg-card border border-border rounded-xl p-6 flex items-start gap-3">
+                        <Monitor className="w-5 h-5 text-primary mt-0.5 shrink-0" />
                         <p className="text-sm text-muted-foreground">
                             <span className="font-bold text-foreground">Desktop only</span> — GPX export is only available on the Strava website, not the mobile app.
                         </p>
@@ -152,8 +152,8 @@ const HowTo = () => {
                                 </div>
                                 <h3 className="text-xl font-bold">Garmin Connect</h3>
                             </div>
-                            <div className="bg-muted/50 border border-border rounded-lg p-3 flex items-start gap-2">
-                                <Monitor className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                            <div className="bg-card border border-border rounded-xl p-6 flex items-start gap-3">
+                                <Monitor className="w-5 h-5 text-primary mt-0.5 shrink-0" />
                                 <p className="text-sm text-muted-foreground">
                                     <span className="font-bold text-foreground">Desktop only</span> — GPX export is only available on the Garmin Connect website.
                                 </p>
@@ -166,7 +166,7 @@ const HowTo = () => {
                                 </ol>
                             </div>
 
-                            <div className="bg-muted/50 border border-border rounded-lg p-3 flex items-start gap-2">
+                            <div className="bg-card border border-border rounded-xl p-6">
                                 <p className="text-sm text-muted-foreground">
                                     <span className="font-bold text-foreground">Any app that exports GPX files will work.</span>{" "}
                                     If your GPS device or app can save to the .gpx format, you can upload it to DrivenStat.

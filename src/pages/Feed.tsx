@@ -142,7 +142,7 @@ const Feed = () => {
             <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
                 <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3 flex-shrink-0 cursor-pointer" onClick={() => navigate('/dashboard')}>
-                        <span className="font-bold text-xl text-foreground hidden md:block tracking-tight">DrivenStat</span>
+                        <span className="font-bold text-xl text-foreground hidden md:block">DrivenStat</span>
                     </div>
 
                     {/* Search Bar */}

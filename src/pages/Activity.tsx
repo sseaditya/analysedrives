@@ -273,6 +273,10 @@ const ActivityPage = () => {
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-[1001]">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 flex-shrink-0 cursor-pointer" onClick={() => navigate('/dashboard')}>
+              <span className="font-bold text-xl text-foreground hidden md:block">DrivenStat</span>
+            </div>
+            <div className="h-6 w-px bg-border hidden md:block" />
             <Button
               variant="ghost"
               size="sm"
@@ -282,6 +286,10 @@ const ActivityPage = () => {
               <ArrowLeft className="w-4 h-4" />
               Back
             </Button>
+            <div className="h-6 w-px bg-border" />
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-xl text-foreground">DrivenStat</span>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <div className="flex flex-col items-end max-w-[50%] md:max-w-none">
