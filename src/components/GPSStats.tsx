@@ -415,17 +415,24 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                     )}
 
                     {/* Visibility Status */}
-                    <div className="mt-4 flex items-center gap-2 text-xs">
-                      {isPublic ? (
-                        <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-500/10 text-green-500 border border-green-500/30">
-                          <Globe className="w-3 h-3" />
-                          Public
-                          {speedCap && <span className="text-green-400">• Capped at {speedCap} km/h</span>}
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-muted text-muted-foreground border border-border">
-                          <Lock className="w-3 h-3" />
-                          Private
+                    <div className="mt-4 flex flex-col gap-1.5 text-xs">
+                      <div className="flex items-center gap-2">
+                        {isPublic ? (
+                          <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-500/10 text-green-700 dark:text-green-400 border border-green-500/30">
+                            <Globe className="w-3 h-3" />
+                            Public
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-muted text-muted-foreground border border-border">
+                            <Lock className="w-3 h-3" />
+                            Private
+                          </span>
+                        )}
+                      </div>
+                      {isOwner && speedCap && (
+                        <span className="text-muted-foreground">
+                          <Gauge className="w-3 h-3 inline mr-1" />
+                          Speed cap set at {speedCap} km/h
                         </span>
                       )}
                     </div>

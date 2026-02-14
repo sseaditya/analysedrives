@@ -276,16 +276,12 @@ const ActivityPage = () => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate(id ? "/dashboard" : "/")}
+              onClick={() => navigate(-1)}
               className="gap-2"
             >
               <ArrowLeft className="w-4 h-4" />
-              {id ? "Dashboard" : "Back"}
+              Back
             </Button>
-            <div className="h-6 w-px bg-border" />
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-xl text-foreground">DrivenStat</span>
-            </div>
           </div>
           <div className="flex items-center gap-3">
             <div className="flex flex-col items-end max-w-[50%] md:max-w-none">
