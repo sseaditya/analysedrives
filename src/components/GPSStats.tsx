@@ -69,6 +69,7 @@ interface GPSStatsProps {
   fileName: string;
   points: GPXPoint[];
   speedCap?: number | null;
+  displaySpeedCap?: number | null;
   isOwner?: boolean;
   isPublic?: boolean;
   description?: string | null;
@@ -78,7 +79,7 @@ interface GPSStatsProps {
   fuel?: number | null;
 }
 
-const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedCap, isOwner = true, isPublic = false, description, hideRadius = 0, ownerProfile, onEdit, fuel }: GPSStatsProps) => {
+const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedCap, displaySpeedCap, isOwner = true, isPublic = false, description, hideRadius = 0, ownerProfile, onEdit, fuel }: GPSStatsProps) => {
   const [hoveredPoint, setHoveredPoint] = useState<GPXPoint | null>(null);
   const [hoveredSpeed, setHoveredSpeed] = useState<number | null>(null);
   const [zoomRange, setZoomRange] = useState<[number, number] | null>(null);
@@ -415,10 +416,10 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                     )}
 
                     {/* Speed cap info (owner only) */}
-                    {isOwner && speedCap && (
+                    {isOwner && displaySpeedCap && (
                       <div className="mt-4 text-xs text-muted-foreground">
                         <Gauge className="w-3 h-3 inline mr-1" />
-                        Speed cap set at {speedCap} km/h
+                        Speed cap set at {displaySpeedCap} km/h
                       </div>
                     )}
 

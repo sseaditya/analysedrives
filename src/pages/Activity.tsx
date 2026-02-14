@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import ActivityEditor from "@/components/ActivityEditor";
 import { useIsMobile } from "@/hooks/use-mobile";
+import HeaderProfile from "@/components/HeaderProfile";
 
 interface ActivityState {
   stats: GPXStats;
@@ -338,7 +339,8 @@ const ActivityPage = () => {
               </>
             )}
 
-            {/* Header Login Button for Anonymous Users */}
+            {user && <HeaderProfile />}
+
             {/* Header Login Button for Anonymous Users */}
             {!user && (
               <Button
@@ -371,6 +373,7 @@ const ActivityPage = () => {
             fileName={data.fileName}
             points={data.points}
             speedCap={effectiveSpeedCap}
+            displaySpeedCap={metadata?.speed_cap}
             isOwner={isOwner}
             isPublic={metadata?.public || false}
             description={metadata?.description || null}

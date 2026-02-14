@@ -141,7 +141,7 @@ const ActivityEditor = ({ open, onOpenChange, activity, onUpdate }: ActivityEdit
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md z-[2001] max-h-[90vh] overflow-y-auto">
+            <DialogContent className="sm:max-w-xl z-[2001] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Edit Activity</DialogTitle>
                     <DialogDescription>
@@ -158,6 +158,7 @@ const ActivityEditor = ({ open, onOpenChange, activity, onUpdate }: ActivityEdit
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
                             placeholder="Activity Title"
+                            autoFocus={false}
                         />
                     </div>
 
@@ -188,11 +189,12 @@ const ActivityEditor = ({ open, onOpenChange, activity, onUpdate }: ActivityEdit
                             value={fuel}
                             onChange={(e) => setFuel(e.target.value)}
                             placeholder="e.g. 5.5"
+                            className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                     </div>
 
                     {/* Public Toggle */}
-                    <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50 border border-border">
+                    <div className="flex items-center justify-between p-4 rounded-lg border border-border">
                         <div className="flex items-center gap-3">
                             {isPublic ? (
                                 <Globe className="w-5 h-5 text-green-500" />
@@ -218,10 +220,10 @@ const ActivityEditor = ({ open, onOpenChange, activity, onUpdate }: ActivityEdit
 
                     {/* Hide Radius (only when public) */}
                     {isPublic && (
-                        <div className="space-y-4 p-4 rounded-lg bg-red-500/10 border border-red-500/30 animate-in fade-in slide-in-from-top-2">
+                        <div className="space-y-4 p-4 rounded-lg border border-border animate-in fade-in slide-in-from-top-2">
                             <div className="flex items-center gap-2">
-                                <MapPin className="w-4 h-4 text-red-500" />
-                                <Label className="text-red-500 font-medium">
+                                <MapPin className="w-4 h-4 text-primary" />
+                                <Label className="font-medium">
                                     Hide Start/End Location
                                 </Label>
                             </div>
@@ -237,7 +239,7 @@ const ActivityEditor = ({ open, onOpenChange, activity, onUpdate }: ActivityEdit
                                     step={1}
                                     className="flex-1"
                                 />
-                                <span className="text-sm font-mono font-bold text-red-500 min-w-[60px]">
+                                <span className="text-sm font-mono font-bold min-w-[60px]">
                                     {hideRadius} km
                                 </span>
                             </div>
@@ -246,10 +248,10 @@ const ActivityEditor = ({ open, onOpenChange, activity, onUpdate }: ActivityEdit
 
                     {/* Speed Cap (only when public) */}
                     {isPublic && (
-                        <div className="space-y-4 p-4 rounded-lg bg-amber-500/10 border border-amber-500/30 animate-in fade-in slide-in-from-top-2">
+                        <div className="space-y-4 p-4 rounded-lg border border-border animate-in fade-in slide-in-from-top-2">
                             <div className="flex items-center gap-2">
-                                <Gauge className="w-4 h-4 text-amber-500" />
-                                <Label className="text-amber-500 font-medium">
+                                <Gauge className="w-4 h-4 text-primary" />
+                                <Label className="font-medium">
                                     Speed Cap for Public Viewers
                                 </Label>
                             </div>
@@ -265,7 +267,7 @@ const ActivityEditor = ({ open, onOpenChange, activity, onUpdate }: ActivityEdit
                                     step={10}
                                     className="flex-1"
                                 />
-                                <span className="text-sm font-mono font-bold text-amber-500 min-w-[60px]">
+                                <span className="text-sm font-mono font-bold min-w-[60px]">
                                     {speedCap} km/h
                                 </span>
                             </div>

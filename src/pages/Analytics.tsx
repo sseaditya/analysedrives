@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, BarChart3, Map as MapIcon, RefreshCcw, Loader2, TrendingUp, User, Globe } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import HeaderProfile from "@/components/HeaderProfile";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import SpeedDistributionChart from "@/components/SpeedDistributionChart";
 import L from "leaflet";
@@ -446,6 +447,11 @@ const Analytics = () => {
                             </>
                         )}
                     </Button>
+
+                    {/* Header Profile */}
+                    {user && (
+                        <HeaderProfile />
+                    )}
                 </div>
             </header>
 

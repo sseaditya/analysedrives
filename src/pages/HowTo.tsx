@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, ExternalLink, ChevronDown, ChevronUp, Monitor, Smartphone, Shield, Eye, EyeOff, Gauge } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/contexts/AuthContext";
+import HeaderProfile from "@/components/HeaderProfile";
 
 const HowTo = () => {
     const navigate = useNavigate();
@@ -27,6 +28,10 @@ const HowTo = () => {
                         </>
                     )}
                     <h1 className="text-lg font-bold">How to Get Your Drive Data</h1>
+
+                    <div className="ml-auto flex items-center gap-4">
+                        {user && <HeaderProfile />}
+                    </div>
                 </div>
             </header>
 
