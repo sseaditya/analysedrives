@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { MapPin, LogOut, Clock, Activity, Search, LayoutDashboard, Globe, Car, User, BarChart3, ChevronLeft, ChevronRight } from "lucide-react";
@@ -42,9 +42,23 @@ const Feed = () => {
     const [profile, setProfile] = useState<Profile | null>(null);
     const [isLoadingProfile, setIsLoadingProfile] = useState(false);
 
-    // Pagination
-    const [currentPage, setCurrentPage] = useState(1);
+    // Pagination via URL search params
+    const [searchParams, setSearchParams] = useSearchParams();
+    const currentPage = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
     const itemsPerPage = 12;
+
+    const setCurrentPage = (pageOrUpdater: number | ((prev: number) => number)) => {
+        const newPage = typeof pageOrUpdater === 'function' ? pageOrUpdater(currentPage) : pageOrUpdater;
+        setSearchParams(prev => {
+            const next = new URLSearchParams(prev);
+            if (newPage <= 1) {
+                next.delete('page');
+            } else {
+                next.set('page', String(newPage));
+            }
+            return next;
+        }, { replace: true });
+    };
 
     useEffect(() => {
         fetchPublicActivities();

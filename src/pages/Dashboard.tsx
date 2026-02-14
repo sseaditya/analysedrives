@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { MapPin, LogOut, Upload, Activity, Calendar, Clock, ArrowRight, TrendingUp, Pencil, Trash2, Check, X, Search, SlidersHorizontal, ChevronDown, ChevronUp, BarChart3, ChevronLeft, ChevronRight } from "lucide-react";
@@ -56,9 +56,23 @@ const Dashboard = () => {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editTitle, setEditTitle] = useState("");
 
-    // Pagination
-    const [currentPage, setCurrentPage] = useState(1);
+    // Pagination via URL search params
+    const [searchParams, setSearchParams] = useSearchParams();
+    const currentPage = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
     const itemsPerPage = 12;
+
+    const setCurrentPage = (pageOrUpdater: number | ((prev: number) => number)) => {
+        const newPage = typeof pageOrUpdater === 'function' ? pageOrUpdater(currentPage) : pageOrUpdater;
+        setSearchParams(prev => {
+            const next = new URLSearchParams(prev);
+            if (newPage <= 1) {
+                next.delete('page');
+            } else {
+                next.set('page', String(newPage));
+            }
+            return next;
+        }, { replace: true });
+    };
 
     const handleStartEdit = (e: React.MouseEvent, activity: ActivityRecord) => {
         e.stopPropagation();
