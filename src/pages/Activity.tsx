@@ -44,9 +44,14 @@ const Activity = () => {
   const isMobile = useIsMobile();
 
   // Initialize state from location state (if uploaded locally) or null
-  const [data, setData] = useState<ActivityState | null>(
-    (location.state as ActivityState) || null
-  );
+  // strictly check for 'points' to avoid confusing navigation state { from: ... } with activity data
+  const [data, setData] = useState<ActivityState | null>(() => {
+    const state = location.state as any;
+    if (state && state.points && state.stats) {
+      return state as ActivityState;
+    }
+    return null;
+  });
   const [metadata, setMetadata] = useState<ActivityMetadata | null>(null);
   const [ownerProfile, setOwnerProfile] = useState<OwnerProfile | null>(null);
   const [loading, setLoading] = useState(!!id);
