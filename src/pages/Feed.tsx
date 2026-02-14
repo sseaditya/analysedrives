@@ -58,7 +58,7 @@ const Feed = () => {
                 next.set('page', String(newPage));
             }
             return next;
-        }, { replace: true });
+        }, { replace: false });
     };
 
     useEffect(() => {
@@ -76,7 +76,10 @@ const Feed = () => {
                 .eq('id', user.id)
                 .single();
 
-            if (data) setProfile(data);
+            if (data) {
+                setProfile(data);
+                localStorage.setItem(`profile_${user.id}`, JSON.stringify(data));
+            }
         } catch (err) {
             console.error("Error fetching profile:", err);
         } finally {
@@ -238,7 +241,7 @@ const Feed = () => {
                                 {paginatedActivities.map((activity) => (
                                     <div
                                         key={activity.id}
-                                        onClick={() => navigate(`/activity/${activity.slug || activity.id}`, { state: { from: location } })}
+                                        onClick={() => navigate(`/activity/${activity.slug || activity.id}`, { state: { from: location.pathname + location.search } })}
                                         className="group bg-card border border-border rounded-2xl overflow-hidden hover:shadow-xl hover:shadow-primary/5 transition-all cursor-pointer hover:-translate-y-1 flex flex-col relative"
                                     >
                                         {/* Map Preview with Overlay */}

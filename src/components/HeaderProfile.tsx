@@ -11,9 +11,20 @@ interface Profile {
 
 const HeaderProfile = () => {
     const { user } = useAuth();
-    // Initialize with user_metadata to prevent stutter
+    // Initialize with cached data or user_metadata to prevent stutter
     const [profile, setProfile] = useState<Profile | null>(() => {
         if (!user) return null;
+
+        // Try to get cached profile first
+        const cached = localStorage.getItem(`profile_${user.id}`);
+        if (cached) {
+            try {
+                return JSON.parse(cached);
+            } catch (e) {
+                console.error("Error parsing cached profile", e);
+            }
+        }
+
         return {
             display_name: user.user_metadata?.full_name || user.user_metadata?.display_name || null,
             full_name: user.user_metadata?.full_name || null,
@@ -44,6 +55,7 @@ const HeaderProfile = () => {
 
                 if (data) {
                     setProfile(data);
+                    localStorage.setItem(`profile_${user.id}`, JSON.stringify(data));
                 }
             } catch (err) {
                 console.error('Error:', err);

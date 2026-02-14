@@ -80,7 +80,7 @@ const Dashboard = () => {
                 next.set('page', String(newPage));
             }
             return next;
-        }, { replace: true });
+        }, { replace: false });
     };
 
     const handleStartEdit = (e: React.MouseEvent, activity: ActivityRecord) => {
@@ -158,7 +158,11 @@ const Dashboard = () => {
                     .single();
 
                 if (error && error.code !== 'PGRST116') throw error;
-                if (data) setProfile(data);
+                if (data) {
+                    setProfile(data);
+                    // Cache profile for other pages (e.g. Activity header) to avoid flicker
+                    localStorage.setItem(`profile_${user.id}`, JSON.stringify(data));
+                }
             } catch (err) {
                 console.error("Error fetching profile:", err);
             } finally {
@@ -641,7 +645,15 @@ const Dashboard = () => {
                                     {paginatedActivities.map((activity) => (
                                         <div
                                             key={activity.id}
-                                            onClick={() => navigate(`/activity/${activity.slug || activity.id}`)}
+                                            onClick={(e) => {
+                                                if (editingId === activity.id) return;
+                                                // Pass full path with search params to ensure we can go back to exact state
+                                                navigate(`/activity/${activity.slug || activity.id}`, {
+                                                    state: {
+                                                        from: location.pathname + location.search
+                                                    }
+                                                });
+                                            }}
                                             className="group bg-card border border-border rounded-2xl overflow-hidden hover:shadow-xl hover:shadow-primary/5 transition-all cursor-pointer hover:-translate-y-1 flex flex-col relative"
                                         >
                                             {/* Mini Map */}

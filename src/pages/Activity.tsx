@@ -284,7 +284,8 @@ const Activity = () => {
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    if (location.state?.from) {
+                    // Check if we have a valid history state path to go back to
+                    if (typeof location.state?.from === 'string') {
                       navigate(location.state.from);
                     } else {
                       navigate(-1);
