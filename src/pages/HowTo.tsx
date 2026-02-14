@@ -3,19 +3,30 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ExternalLink, ChevronDown, ChevronUp, Monitor, Smartphone, Shield, Eye, EyeOff, Gauge } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { useAuth } from "@/contexts/AuthContext";
 
 const HowTo = () => {
     const navigate = useNavigate();
+    const { user } = useAuth();
     const [showAdvanced, setShowAdvanced] = useState(false);
 
     return (
         <div className="min-h-screen bg-background flex flex-col font-sans">
             <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
                 <div className="container mx-auto px-4 py-4 flex items-center gap-4">
-                    <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-                        <ArrowLeft className="w-5 h-5" />
-                    </Button>
-                    <h1 className="text-xl font-bold">How to Get Your Drive Data</h1>
+                    {user && (
+                        <>
+                            <div className="flex items-center gap-3 flex-shrink-0 cursor-pointer" onClick={() => navigate('/dashboard')}>
+                                <span className="font-bold text-xl text-foreground hidden md:block">DrivenStat</span>
+                            </div>
+                            <div className="h-6 w-px bg-border hidden md:block" />
+                            <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="gap-2">
+                                <ArrowLeft className="w-4 h-4" />
+                            </Button>
+                            <div className="h-6 w-px bg-border hidden md:block" />
+                        </>
+                    )}
+                    <h1 className="text-lg font-bold">How to Get Your Drive Data</h1>
                 </div>
             </header>
 
