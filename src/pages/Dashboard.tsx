@@ -57,8 +57,8 @@ const Dashboard = () => {
     const [searchQuery, setSearchQuery] = useState("");
     const [showFilters, setShowFilters] = useState(false);
     const [timeFilter, setTimeFilter] = useState<[number, number]>([0, 24]); // Hours
-    const [distFilter, setDistFilter] = useState<[number, number]>([0, 1000]); // km
-    const [speedFilter, setSpeedFilter] = useState<[number, number]>([0, 200]); // km/h
+    const [distFilter, setDistFilter] = useState<[number, number]>([0, 10000]); // km
+    const [speedFilter, setSpeedFilter] = useState<[number, number]>([0, 300]); // km/h
     const [timePeriod, setTimePeriod] = useState<TimePeriod>('all');
 
     // Edit State
@@ -208,16 +208,7 @@ const Dashboard = () => {
 
             setActivities(sortedData);
 
-            // Initialize filter bounds based on data
-            if (sortedData.length > 0) {
-                const maxTime = Math.ceil(Math.max(...sortedData.map(a => (a.stats?.totalTime || 0) / 3600)) + 1);
-                const maxDist = Math.ceil(Math.max(...sortedData.map(a => (a.stats?.totalDistance || 0))) + 10);
-                const maxSpeed = Math.ceil(Math.max(...sortedData.map(a => (a.stats?.maxSpeed || 0))) + 10);
-
-                setTimeFilter([0, maxTime]);
-                setDistFilter([0, maxDist]);
-                setSpeedFilter([0, maxSpeed]);
-            }
+            setActivities(sortedData);
         } catch (err) {
             console.error("Error fetching activities:", err);
         } finally {
@@ -226,6 +217,15 @@ const Dashboard = () => {
     };
 
     // --- Computed Data ---
+
+    const maxStats = useMemo(() => {
+        if (activities.length === 0) return { time: 24, dist: 1000, speed: 200 };
+        return {
+            time: Math.ceil(Math.max(...activities.map(a => (a.stats?.totalTime || 0) / 3600)) + 1),
+            dist: Math.ceil(Math.max(...activities.map(a => (a.stats?.totalDistance || 0))) + 10),
+            speed: Math.ceil(Math.max(...activities.map(a => (a.stats?.maxSpeed || 0))) + 10)
+        };
+    }, [activities]);
 
     const filteredActivities = useMemo(() => {
         return activities.filter(activity => {
@@ -543,7 +543,7 @@ const Dashboard = () => {
                                     <Slider
                                         value={timeFilter}
                                         min={0}
-                                        max={24} // Should be dynamic max but 24 is reasonable base
+                                        max={maxStats.time}
                                         step={0.5}
                                         onValueChange={(val: [number, number]) => setTimeFilter(val)}
                                     />
@@ -557,7 +557,7 @@ const Dashboard = () => {
                                     <Slider
                                         value={distFilter}
                                         min={0}
-                                        max={1000} // Dynamic or fixed large?
+                                        max={maxStats.dist}
                                         step={10}
                                         onValueChange={(val: [number, number]) => setDistFilter(val)}
                                     />
@@ -571,7 +571,7 @@ const Dashboard = () => {
                                     <Slider
                                         value={speedFilter}
                                         min={0}
-                                        max={200}
+                                        max={maxStats.speed}
                                         step={5}
                                         onValueChange={(val: [number, number]) => setSpeedFilter(val)}
                                     />
@@ -580,8 +580,8 @@ const Dashboard = () => {
                             <div className="mt-6 flex justify-end">
                                 <Button variant="ghost" size="sm" onClick={() => {
                                     setTimeFilter([0, 24]);
-                                    setDistFilter([0, 1000]);
-                                    setSpeedFilter([0, 200]);
+                                    setDistFilter([0, 10000]);
+                                    setSpeedFilter([0, 300]);
                                 }} className="text-xs text-muted-foreground hover:text-foreground">
                                     Reset Filters
                                 </Button>
