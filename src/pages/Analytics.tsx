@@ -410,11 +410,11 @@ const Analytics = () => {
             <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
                 <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-3 flex-shrink-0 cursor-pointer" onClick={() => navigate('/dashboard')}>
+                            <span className="font-bold text-xl text-foreground hidden md:block">DrivenStat</span>
+                        </div>
                         {user && (
                             <>
-                                <div className="flex items-center gap-3 flex-shrink-0 cursor-pointer" onClick={() => navigate('/dashboard')}>
-                                    <span className="font-bold text-xl text-foreground hidden md:block">DrivenStat</span>
-                                </div>
                                 <div className="h-6 w-px bg-border hidden md:block" />
                                 <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="gap-2">
                                     <ArrowLeft className="w-4 h-4" />
@@ -443,7 +443,6 @@ const Analytics = () => {
                             <>
                                 <RefreshCcw className="w-4 h-4" />
                                 <span className="hidden sm:inline">Scan & Repair Data</span>
-                                <span className="sm:hidden">Repair</span>
                             </>
                         )}
                     </Button>

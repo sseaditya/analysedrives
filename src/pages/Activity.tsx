@@ -272,12 +272,12 @@ const ActivityPage = () => {
       {/* Header */}
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-[1001]">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 md:gap-4">
+            <div className="flex items-center gap-3 flex-shrink-0 cursor-pointer" onClick={() => navigate('/dashboard')}>
+              <span className="font-bold text-xl text-foreground hidden md:block">DrivenStat</span>
+            </div>
             {user && (
               <>
-                <div className="flex items-center gap-3 flex-shrink-0 cursor-pointer" onClick={() => navigate('/dashboard')}>
-                  <span className="font-bold text-xl text-foreground hidden md:block">DrivenStat</span>
-                </div>
                 <div className="h-6 w-px bg-border hidden md:block" />
                 <Button
                   variant="ghost"
@@ -292,19 +292,19 @@ const ActivityPage = () => {
             {/* Removed second DrivenStat */}
           </div>
           <div className="flex items-center gap-3">
-            <div className="flex flex-col items-end max-w-[50%] md:max-w-none">
+            <div className="flex flex-col items-end">
               <div className="flex items-center gap-2 max-w-full">
-                <span className="font-bold text-lg text-foreground truncate max-w-[150px] md:max-w-xs lg:max-w-none" title={data.fileName}>{data.fileName}</span>
+                <span className="font-bold text-lg text-foreground truncate max-w-[200px] md:max-w-xs lg:max-w-none" title={data.fileName}>{data.fileName}</span>
                 {metadata && (
                   metadata.public ? (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-500/15 text-green-700 dark:text-green-400 border border-green-500/30 shrink-0">
                       <Globe className="w-3 h-3" />
-                      Public
+                      <span className="hidden sm:inline">Public</span>
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-muted text-muted-foreground border border-border shrink-0">
                       <Lock className="w-3 h-3" />
-                      Private
+                      <span className="hidden sm:inline">Private</span>
                     </span>
                   )
                 )}
