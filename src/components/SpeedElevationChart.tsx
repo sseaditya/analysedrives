@@ -75,7 +75,6 @@ const SpeedElevationChart = ({
   const [hoveredPart, setHoveredPart] = useState<'left' | 'right' | 'center' | null>(null);
   const chartRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
-  const lastHoverCallRef = useRef<number>(0); // Throttle onHover to ~30fps
   const isMobile = useIsMobile();
 
   // Cleanup rAF on unmount
@@ -267,34 +266,11 @@ const SpeedElevationChart = ({
     return max;
   }, [fullData]);
 
-  // Speed chart data: filter by zoom, then sample to EXACTLY 300 points
+  // Speed chart data: filter by zoom range (same ~1000 points as elevation)
   const speedChartData = useMemo(() => {
     if (fullData.length === 0) return [];
-
-    const filtered = zoomRange
-      ? fullData.filter(d => d.pointIndex >= zoomRange[0] && d.pointIndex <= zoomRange[1])
-      : fullData;
-
-    // Always sample to exactly 300 points for consistent density
-    const targetPoints = 300;
-    if (filtered.length <= targetPoints) return filtered;
-
-    const sampleRate = filtered.length / targetPoints;
-    const sampled: ChartDataPoint[] = [];
-
-    for (let i = 0; i < targetPoints; i++) {
-      const idx = Math.floor(i * sampleRate);
-      if (idx < filtered.length) {
-        sampled.push(filtered[idx]);
-      }
-    }
-
-    // Always include the last point
-    if (sampled[sampled.length - 1] !== filtered[filtered.length - 1]) {
-      sampled.push(filtered[filtered.length - 1]);
-    }
-
-    return sampled;
+    if (!zoomRange) return fullData;
+    return fullData.filter(d => d.pointIndex >= zoomRange[0] && d.pointIndex <= zoomRange[1]);
   }, [fullData, zoomRange]);
 
   // Calculate elevation range for better scaling (memoized)
@@ -538,11 +514,6 @@ const SpeedElevationChart = ({
     if (!e || !e.activePayload || !e.activePayload[0] || !onHover) {
       return;
     }
-
-    // Throttle onHover to ~15fps (66ms) to reduce parent re-renders
-    const now = performance.now();
-    if (now - lastHoverCallRef.current < 66) return;
-    lastHoverCallRef.current = now;
 
     const activeData = e.activePayload[0].payload as ChartDataPoint;
     const pointIndex = activeData.pointIndex;
