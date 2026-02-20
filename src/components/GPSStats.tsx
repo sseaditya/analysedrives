@@ -876,6 +876,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                     speedCap={!isOwner ? speedCap : null}
                     visualLimit={showLimiter ? speedLimit : undefined}
                     xAxisMode={xAxisMode}
+                    maxSpeed={stats.maxSpeed}
                   />
                 </div>
               </div>

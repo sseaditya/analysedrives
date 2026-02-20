@@ -23,6 +23,7 @@ interface SpeedElevationChartProps {
   speedCap?: number | null;
   visualLimit?: number;
   xAxisMode?: 'distance' | 'time';
+  maxSpeed?: number;
 }
 
 interface ChartDataPoint {
@@ -63,7 +64,8 @@ const SpeedElevationChart = ({
   speedLimit,
   speedCap,
   visualLimit,
-  xAxisMode = 'distance'
+  xAxisMode = 'distance',
+  maxSpeed: maxSpeedProp = 0,
 }: SpeedElevationChartProps) => {
   const [refAreaLeft, setRefAreaLeft] = useState<string | null>(null);
   const [refAreaRight, setRefAreaRight] = useState<string | null>(null);
@@ -229,15 +231,16 @@ const SpeedElevationChart = ({
 
   const hasElevation = useMemo(() => fullData.length > 0 && fullData.some((d) => d.elevation !== null), [fullData]);
 
-  // Calculate True Max Speed from ORIGINAL data (unaffected by clamping)
+  // Use maxSpeed from parent stats (authoritative), fallback to processedRawData max
   const trueMaxSpeed = useMemo(() => {
-    if (fullData.length === 0) return 0;
+    if (maxSpeedProp > 0) return maxSpeedProp;
+    if (processedRawData.length === 0) return 0;
     let max = 0;
-    for (let i = 0; i < fullData.length; i++) {
-      if (fullData[i].originalSpeed > max) max = fullData[i].originalSpeed;
+    for (let i = 0; i < processedRawData.length; i++) {
+      if (processedRawData[i].speed > max) max = processedRawData[i].speed;
     }
     return max;
-  }, [fullData]);
+  }, [maxSpeedProp, processedRawData]);
 
   // Calculate elevation range for better scaling (memoized)
   const { minElevation, maxElevation, elevationRange } = useMemo(() => {
@@ -698,7 +701,7 @@ const SpeedElevationChart = ({
               type="monotone"
               dataKey="speed"
               stroke="hsl(15, 52%, 58%)"
-              strokeWidth={isMobile ? 1.5 : 3}
+              strokeWidth={isMobile ? 1 : 1.5}
               fill="url(#speedGradient)"
               isAnimationActive={false}
             />
