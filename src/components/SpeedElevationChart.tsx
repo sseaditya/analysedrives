@@ -74,7 +74,17 @@ const SpeedElevationChart = ({
   const [hoverDistance, setHoverDistance] = useState<number | null>(null);
   const [hoveredPart, setHoveredPart] = useState<'left' | 'right' | 'center' | null>(null);
   const chartRef = useRef<HTMLDivElement>(null);
+  const rafRef = useRef<number | null>(null);
   const isMobile = useIsMobile();
+
+  // Cleanup rAF on unmount
+  useEffect(() => {
+    return () => {
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+      }
+    };
+  }, []);
 
   // Calculate combined data for chart - Keep MORE points for better zoom detail
   const fullData: ChartDataPoint[] = useMemo(() => {
@@ -244,10 +254,17 @@ const SpeedElevationChart = ({
   }
   */
 
-  const hasElevation = fullData.length > 0 && fullData.some((d) => d.elevation !== null);
+  const hasElevation = useMemo(() => fullData.length > 0 && fullData.some((d) => d.elevation !== null), [fullData]);
 
   // Calculate True Max Speed from ORIGINAL data (unaffected by clamping)
-  const trueMaxSpeed = fullData.length > 0 ? Math.max(...fullData.map(d => d.originalSpeed), 0) : 0;
+  const trueMaxSpeed = useMemo(() => {
+    if (fullData.length === 0) return 0;
+    let max = 0;
+    for (let i = 0; i < fullData.length; i++) {
+      if (fullData[i].originalSpeed > max) max = fullData[i].originalSpeed;
+    }
+    return max;
+  }, [fullData]);
 
   // Speed chart data: filter by zoom, then sample to EXACTLY 300 points
   const speedChartData = useMemo(() => {
@@ -279,11 +296,20 @@ const SpeedElevationChart = ({
     return sampled;
   }, [fullData, zoomRange]);
 
-  // Calculate elevation range for better scaling
-  const elevations = fullData.map((d) => d.elevation).filter((e): e is number => e !== null);
-  const minElevation = elevations.length > 0 ? Math.min(...elevations) : 0;
-  const maxElevation = elevations.length > 0 ? Math.max(...elevations) : 1000;
-  const elevationRange = maxElevation - minElevation || 100;
+  // Calculate elevation range for better scaling (memoized)
+  const { minElevation, maxElevation, elevationRange } = useMemo(() => {
+    let min = Infinity;
+    let max = -Infinity;
+    for (let i = 0; i < fullData.length; i++) {
+      const e = fullData[i].elevation;
+      if (e !== null) {
+        if (e < min) min = e;
+        if (e > max) max = e;
+      }
+    }
+    if (min === Infinity) { min = 0; max = 1000; }
+    return { minElevation: min, maxElevation: max, elevationRange: (max - min) || 100 };
+  }, [fullData]);
 
   // Calculate nice elevation Y-axis ticks
   const elevationYAxisConfig = useMemo(() => {
@@ -317,18 +343,33 @@ const SpeedElevationChart = ({
     return isInteger ? `${Math.round(value)} km` : `${parseFloat(value.toFixed(1))} km`;
   }, [xAxisMode]);
 
-  // Get current zoom range boundaries for brush interaction
-  const zoomStartDist = zoomRange ? fullData.find(d => d.pointIndex >= zoomRange[0])?.distance || fullMinDistance : null;
-  const zoomEndDist = zoomRange ? fullData.find(d => d.pointIndex >= zoomRange[1])?.distance || fullMaxDistance : null;
+  // Get current zoom range boundaries for brush interaction (memoized to avoid linear scans per render)
+  const { zoomStartVal, zoomEndVal, fullMinVal, fullMaxVal } = useMemo(() => {
+    const fMinVal = xAxisMode === 'time' ? fullMinTime : fullMinDistance;
+    const fMaxVal = xAxisMode === 'time' ? fullMaxTime : fullMaxDistance;
 
-  const zoomStartTime = zoomRange ? fullData.find(d => d.pointIndex >= zoomRange[0])?.elapsedTime || fullMinTime : null;
-  const zoomEndTime = zoomRange ? fullData.find(d => d.pointIndex >= zoomRange[1])?.elapsedTime || fullMaxTime : null;
+    if (!zoomRange) return { zoomStartVal: null, zoomEndVal: null, fullMinVal: fMinVal, fullMaxVal: fMaxVal };
 
-  // Generic values for interaction logic
-  const zoomStartVal = xAxisMode === 'time' ? zoomStartTime : zoomStartDist;
-  const zoomEndVal = xAxisMode === 'time' ? zoomEndTime : zoomEndDist;
-  const fullMinVal = xAxisMode === 'time' ? fullMinTime : fullMinDistance;
-  const fullMaxVal = xAxisMode === 'time' ? fullMaxTime : fullMaxDistance;
+    let startVal: number | null = null;
+    let endVal: number | null = null;
+
+    for (let i = 0; i < fullData.length; i++) {
+      if (startVal === null && fullData[i].pointIndex >= zoomRange[0]) {
+        startVal = xAxisMode === 'time' ? fullData[i].elapsedTime : fullData[i].distance;
+      }
+      if (endVal === null && fullData[i].pointIndex >= zoomRange[1]) {
+        endVal = xAxisMode === 'time' ? fullData[i].elapsedTime : fullData[i].distance;
+        break;
+      }
+    }
+
+    return {
+      zoomStartVal: startVal ?? fMinVal,
+      zoomEndVal: endVal ?? fMaxVal,
+      fullMinVal: fMinVal,
+      fullMaxVal: fMaxVal
+    };
+  }, [zoomRange, fullData, xAxisMode, fullMinTime, fullMaxTime, fullMinDistance, fullMaxDistance]);
 
   // Calculate strict ticks for synchro
   const xAxisTicks = useMemo(() => {
@@ -340,10 +381,15 @@ const SpeedElevationChart = ({
     );
   }, [speedXDomain, xAxisMode]);
 
+  // Memoize elevation chart X-axis ticks (previously calculated inline in JSX)
+  const elevationXTicks = useMemo(() => {
+    return calculateNiceTicks(fullXDomain[0], fullXDomain[1], xAxisMode, 8);
+  }, [fullXDomain, xAxisMode]);
+
   // Edge detection threshold - 1% for better UX (Reduced from 3%)
   const EDGE_THRESHOLD = (fullMaxVal - fullMinVal) * 0.01;
 
-  const getInteractionMode = (val: number): InteractionMode => {
+  const getInteractionMode = useCallback((val: number): InteractionMode => {
     // Safety check for empty data
     if (zoomStartVal === null || zoomEndVal === null) return 'new-selection';
 
@@ -352,10 +398,10 @@ const SpeedElevationChart = ({
     if (val > zoomStartVal && val < zoomEndVal) return 'move-window';
 
     return 'new-selection';
-  };
+  }, [zoomStartVal, zoomEndVal, EDGE_THRESHOLD]);
 
 
-  const getCursorForMode = (mode: InteractionMode): string => {
+  const getCursorForMode = useCallback((mode: InteractionMode): string => {
     switch (mode) {
       case 'resize-left':
       case 'resize-right':
@@ -366,9 +412,9 @@ const SpeedElevationChart = ({
       default:
         return 'crosshair';
     }
-  };
+  }, []);
 
-  const zoom = () => {
+  const zoom = useCallback(() => {
     if (refAreaLeft === refAreaRight || refAreaRight === null || refAreaLeft === null) {
       // Click (Reset zoom)
       if (zoomRange) {
@@ -420,9 +466,9 @@ const SpeedElevationChart = ({
     setActiveChart(null);
     setInteractionMode('none');
     setDragStartDist(null);
-  };
+  }, [refAreaLeft, refAreaRight, zoomRange, onZoomChange, fullData, xAxisMode, points.length]);
 
-  const handleMouseMove = (e: any, chartType: 'speed' | 'elevation') => {
+  const handleMouseMoveInner = useCallback((e: any, chartType: 'speed' | 'elevation') => {
     // Update hover distance for sync lines
     if (e?.activeLabel) {
       setHoverDistance(parseFloat(e.activeLabel));
@@ -497,9 +543,20 @@ const SpeedElevationChart = ({
     if (pointIndex !== undefined && pointIndex < points.length) {
       onHover(points[pointIndex], activeData.speed);
     }
-  };
+  }, [refAreaLeft, activeChart, interactionMode, zoomStartVal, zoomEndVal, dragStartDist, fullMinVal, fullMaxVal, isMobile, onHover, points, getInteractionMode, getCursorForMode]);
 
-  const handleMouseDown = (e: any, chartType: 'speed' | 'elevation') => {
+  // Throttle mouse moves to once per animation frame for smooth 60fps interaction
+  const handleMouseMove = useCallback((e: any, chartType: 'speed' | 'elevation') => {
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+    }
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      handleMouseMoveInner(e, chartType);
+    });
+  }, [handleMouseMoveInner]);
+
+  const handleMouseDown = useCallback((e: any, chartType: 'speed' | 'elevation') => {
     if (isMobile) return; // Disable selection on mobile
     if (e && e.activeLabel) {
       const dist = parseFloat(e.activeLabel);
@@ -527,14 +584,14 @@ const SpeedElevationChart = ({
 
       setActiveChart(chartType);
     }
-  };
+  }, [isMobile, getInteractionMode, zoomStartVal, zoomEndVal]);
 
-  const handleMouseUp = () => {
+  const handleMouseUp = useCallback(() => {
     zoom();
     setCursorStyle(interactionMode === 'move-window' ? 'grab' : getCursorForMode(interactionMode));
-  };
+  }, [zoom, interactionMode, getCursorForMode]);
 
-  const handleMouseLeave = () => {
+  const handleMouseLeave = useCallback(() => {
     // Clear hover visual feedback
     if (onHover) onHover(null);
     setHoverDistance(null);
@@ -548,7 +605,7 @@ const SpeedElevationChart = ({
       setCursorStyle('crosshair');
       setDragStartDist(null);
     }
-  };
+  }, [onHover, activeChart]);
 
   // Handle global mouse up to catch interactions ending outside the chart
   useEffect(() => {
@@ -775,7 +832,7 @@ const SpeedElevationChart = ({
               ))}
               {/* Vertical (X) - using same ticks as speed chart */}
               {/* We need to recalculate or reuse ticks. The XAxis below uses calculateNiceTicks */}
-              {calculateNiceTicks(fullXDomain[0], fullXDomain[1], xAxisMode, 8).map((tickVal) => (
+              {elevationXTicks.map((tickVal) => (
                 <ReferenceLine
                   key={`grid-ele-x-${tickVal}`}
                   x={tickVal}
@@ -788,17 +845,13 @@ const SpeedElevationChart = ({
               <XAxis
                 dataKey={xAxisDataKey}
                 type="number"
-                domain={fullXDomain} // Note: Elevation chart X-axis is usually Full domain, not Zoom domain?
-                // Wait, user wants them "same markings (assuming no selection)".
-                // If selection exists, Elevation chart acts as a brush (full view).
-                // So its ticks should be based on FULL domain.
+                domain={fullXDomain} // Elevation chart acts as a brush (full view)
                 stroke="hsl(var(--foreground))"
                 strokeOpacity={0.6}
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
-                // Calculate ticks for full domain
-                ticks={calculateNiceTicks(fullXDomain[0], fullXDomain[1], xAxisMode, 8)}
+                ticks={elevationXTicks}
                 tickFormatter={xAxisFormatter}
                 allowDataOverflow
               />

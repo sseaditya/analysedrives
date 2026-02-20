@@ -28,7 +28,7 @@ import {
   Lock,
   Pencil
 } from "lucide-react";
-import { ResponsiveContainer } from "recharts";
+
 import { useIsMobile } from "@/hooks/use-mobile";
 import TrackMap from "./TrackMap";
 import SpeedElevationChart from "./SpeedElevationChart";
@@ -856,19 +856,16 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                 </div>
 
                 <div className="relative h-[300px] w-full cursor-crosshair">
-
-                  <ResponsiveContainer width="100%" height="100%">
-                    <SpeedElevationChart
-                      points={points}
-                      onHover={handleHoverPoint}
-                      onZoomChange={setZoomRange}
-                      zoomRange={zoomRange}
-                      speedLimit={effectiveChartSpeedLimit}
-                      speedCap={!isOwner ? speedCap : null}
-                      visualLimit={showLimiter ? speedLimit : undefined}
-                      xAxisMode={xAxisMode}
-                    />
-                  </ResponsiveContainer>
+                  <SpeedElevationChart
+                    points={points}
+                    onHover={handleHoverPoint}
+                    onZoomChange={setZoomRange}
+                    zoomRange={zoomRange}
+                    speedLimit={effectiveChartSpeedLimit}
+                    speedCap={!isOwner ? speedCap : null}
+                    visualLimit={showLimiter ? speedLimit : undefined}
+                    xAxisMode={xAxisMode}
+                  />
                 </div>
               </div>
 
