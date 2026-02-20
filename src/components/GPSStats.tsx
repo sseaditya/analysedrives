@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import {
   Activity,
   Clock,
@@ -83,8 +83,17 @@ interface GPSStatsProps {
 const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedCap, displaySpeedCap, isOwner = true, isPublic = false, description, hideRadius = 0, ownerProfile, onEdit, fuel }: GPSStatsProps) => {
   const [hoveredPoint, setHoveredPoint] = useState<GPXPoint | null>(null);
   const [hoveredSpeed, setHoveredSpeed] = useState<number | null>(null);
+  const [hoveredIndex, setHoveredIndex] = useState<number>(-1);
   const [zoomRange, setZoomRange] = useState<[number, number] | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
+  const hoverRafRef = useRef<number | null>(null);
+
+  // Cleanup hover rAF on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverRafRef.current !== null) cancelAnimationFrame(hoverRafRef.current);
+    };
+  }, []);
 
   // Filter points based on privacy radius
   const { points, stats, privacyMask, mapPoints, mapPointsStartIndex } = useMemo(() => {
@@ -302,48 +311,63 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
     return { cumDist, cumTime };
   }, [points]);
 
-  // Handle chart hover with privacy clamping
-  const handleHoverPoint = useCallback((point: GPXPoint | null, speed?: number) => {
+  // Handle chart hover with privacy clamping (throttled via rAF)
+  const handleHoverPoint = useCallback((point: GPXPoint | null, speed?: number, pointIndex?: number) => {
+    // Cancel any pending hover update
+    if (hoverRafRef.current !== null) cancelAnimationFrame(hoverRafRef.current);
+
     if (!point) {
+      // Clear immediately on leave
       setHoveredPoint(null);
       setHoveredSpeed(null);
+      setHoveredIndex(-1);
       return;
     }
 
-    if (isOwner) {
-      setHoveredPoint(point);
-      setHoveredSpeed(speed ?? null);
-      return;
-    }
+    // Throttle hover updates to rAF
+    hoverRafRef.current = requestAnimationFrame(() => {
+      hoverRafRef.current = null;
+      const idx = pointIndex ?? -1;
 
-    // Privacy Logic for Public Viewers
-    if (!mapPoints || mapPoints.length === 0) {
-      setHoveredPoint(null);
-      return;
-    }
+      if (isOwner) {
+        setHoveredPoint(point);
+        setHoveredSpeed(speed ?? null);
+        setHoveredIndex(idx);
+        return;
+      }
 
-    const safeStart = mapPoints[0];
-    const safeEnd = mapPoints[mapPoints.length - 1];
+      // Privacy Logic for Public Viewers
+      if (!mapPoints || mapPoints.length === 0) {
+        setHoveredPoint(null);
+        setHoveredIndex(-1);
+        return;
+      }
 
-    // Ensure we have valid time objects for comparison
-    if (!point.time || !safeStart.time || !safeEnd.time) {
-      setHoveredPoint(point); // Fallback if times missing
-      return;
-    }
+      const safeStart = mapPoints[0];
+      const safeEnd = mapPoints[mapPoints.length - 1];
 
-    // Clamp to Safe Boundaries based on Time
-    const pTime = point.time.getTime();
-    const startTime = safeStart.time.getTime();
-    const endTime = safeEnd.time.getTime();
+      if (!point.time || !safeStart.time || !safeEnd.time) {
+        setHoveredPoint(point);
+        setHoveredIndex(idx);
+        return;
+      }
 
-    if (pTime < startTime) {
-      setHoveredPoint(safeStart);
-    } else if (pTime > endTime) {
-      setHoveredPoint(safeEnd);
-    } else {
-      setHoveredPoint(point);
-      setHoveredSpeed(speed ?? null);
-    }
+      const pTime = point.time.getTime();
+      const startTime = safeStart.time.getTime();
+      const endTime = safeEnd.time.getTime();
+
+      if (pTime < startTime) {
+        setHoveredPoint(safeStart);
+        setHoveredIndex(-1);
+      } else if (pTime > endTime) {
+        setHoveredPoint(safeEnd);
+        setHoveredIndex(-1);
+      } else {
+        setHoveredPoint(point);
+        setHoveredSpeed(speed ?? null);
+        setHoveredIndex(idx);
+      }
+    });
   }, [isOwner, mapPoints]);
 
   const totalDistance = stats.totalDistance;
@@ -808,7 +832,6 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
 
                     {/* Hover Data Display - Right Side (Desktop only) */}
                     {!isMobile && hoveredPoint && (() => {
-                      const hoveredIndex = points.indexOf(hoveredPoint);
                       const cd = hoveredIndex >= 0 ? cumulativeData.cumDist[hoveredIndex] : 0;
                       const ct = hoveredIndex >= 0 ? cumulativeData.cumTime[hoveredIndex] : 0;
                       const finalDisplaySpeed = hoveredSpeed ?? 0;
