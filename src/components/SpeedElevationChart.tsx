@@ -11,7 +11,7 @@ import {
 } from "recharts";
 import { GPXPoint, haversineDistance, PAUSE_THRESHOLD } from "@/utils/gpxParser";
 import { calculateNiceTicks, calculateNiceYTicks } from "@/utils/chartUtils";
-import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef, memo } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface SpeedElevationChartProps {
@@ -531,7 +531,8 @@ const SpeedElevationChart = ({
     }
 
     // Skip hover callback on mobile to remove floating data display
-    if (isMobile) return;
+    // Also skip during active drag to prevent parent re-renders
+    if (isMobile || activeChart) return;
 
     if (!e || !e.activePayload || !e.activePayload[0] || !onHover) {
       return;
@@ -933,4 +934,4 @@ const SpeedElevationChart = ({
   );
 };
 
-export default SpeedElevationChart;
+export default memo(SpeedElevationChart);

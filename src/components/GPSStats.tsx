@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import {
   Activity,
   Clock,
@@ -54,7 +54,8 @@ import {
   formatSpeed,
   haversineDistance,
   calculateLimitedStats,
-  calculateStats
+  calculateStats,
+  PAUSE_THRESHOLD
 } from "@/utils/gpxParser";
 
 interface OwnerProfile {
@@ -279,8 +280,30 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
     return null;
   }, [showLimiter, speedLimit]);
 
+  // Precompute cumulative distance and time arrays for O(1) hover lookups
+  // This replaces the O(n) haversine loop that ran on every mouse move
+  const cumulativeData = useMemo(() => {
+    const cumDist = new Float64Array(points.length);
+    const cumTime = new Float64Array(points.length);
+    cumDist[0] = 0;
+    cumTime[0] = 0;
+    for (let i = 1; i < points.length; i++) {
+      const prev = points[i - 1];
+      const curr = points[i];
+      const timeDiff = (curr.time && prev.time) ? (curr.time.getTime() - prev.time.getTime()) / 1000 : 0;
+      if (timeDiff <= PAUSE_THRESHOLD) {
+        cumDist[i] = cumDist[i - 1] + haversineDistance(prev.lat, prev.lon, curr.lat, curr.lon);
+        cumTime[i] = cumTime[i - 1] + timeDiff;
+      } else {
+        cumDist[i] = cumDist[i - 1];
+        cumTime[i] = cumTime[i - 1];
+      }
+    }
+    return { cumDist, cumTime };
+  }, [points]);
+
   // Handle chart hover with privacy clamping
-  const handleHoverPoint = (point: GPXPoint | null, speed?: number) => {
+  const handleHoverPoint = useCallback((point: GPXPoint | null, speed?: number) => {
     if (!point) {
       setHoveredPoint(null);
       setHoveredSpeed(null);
@@ -309,7 +332,6 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
     }
 
     // Clamp to Safe Boundaries based on Time
-    // Using getTime() for safe comparison
     const pTime = point.time.getTime();
     const startTime = safeStart.time.getTime();
     const endTime = safeEnd.time.getTime();
@@ -322,7 +344,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
       setHoveredPoint(point);
       setHoveredSpeed(speed ?? null);
     }
-  };
+  }, [isOwner, mapPoints]);
 
   const totalDistance = stats.totalDistance;
   const movingTime = stats.movingTime;
@@ -785,73 +807,31 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                     </div>
 
                     {/* Hover Data Display - Right Side (Desktop only) */}
-                    {!isMobile && hoveredPoint && (
-                      <div className="flex items-center gap-2 bg-primary/10 px-2.5 rounded-md border border-primary/20 animate-in fade-in slide-in-from-right-2 duration-150">
-                        {/* Calculate cumulative distance to this point */}
-                        {(() => {
-                          let cumDist = 0;
-                          let cumTime = 0;
-                          const hoveredIndex = points.findIndex(p => p === hoveredPoint);
+                    {!isMobile && hoveredPoint && (() => {
+                      const hoveredIndex = points.indexOf(hoveredPoint);
+                      const cd = hoveredIndex >= 0 ? cumulativeData.cumDist[hoveredIndex] : 0;
+                      const ct = hoveredIndex >= 0 ? cumulativeData.cumTime[hoveredIndex] : 0;
+                      const finalDisplaySpeed = hoveredSpeed ?? 0;
+                      const h = Math.floor(ct / 3600);
+                      const m = Math.floor((ct % 3600) / 60);
+                      const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
 
-                          // Calculate accurately up to the point, respecting pauses
-                          for (let i = 1; i <= hoveredIndex && i < points.length; i++) {
-                            const prev = points[i - 1];
-                            const curr = points[i];
-                            const timeDiff = (curr.time && prev.time) ? (curr.time.getTime() - prev.time.getTime()) / 1000 : 0;
-
-                            // 60s Pause Threshold check - must match gpxParser.ts logic
-                            // Ideally import PAUSE_THRESHOLD but simpler to hardcode 60 for UI or move logic to parser
-                            if (timeDiff <= 60.0) {
-                              cumDist += haversineDistance(
-                                prev.lat,
-                                prev.lon,
-                                curr.lat,
-                                curr.lon
-                              );
-                              cumTime += timeDiff;
-                            }
-                          }
-
-                          // Calculate speed for this point
-                          let pointSpeed = 0;
-                          if (hoveredIndex > 0 && points[hoveredIndex - 1].time && hoveredPoint.time) {
-                            const prev = points[hoveredIndex - 1];
-                            const dist = haversineDistance(prev.lat, prev.lon, hoveredPoint.lat, hoveredPoint.lon);
-                            const timeDiff = (hoveredPoint.time.getTime() - prev.time.getTime()) / 1000 / 3600;
-                            if (timeDiff > 0) {
-                              pointSpeed = dist / timeDiff;
-                              if (pointSpeed > 200) pointSpeed = 0;
-                              // Clamp for public viewers if speed cap exists
-                              if (!isOwner && speedCap && pointSpeed > speedCap) pointSpeed = speedCap;
-                            }
-                          }
-
-                          // Use the passed smoothed speed if available, otherwise fallback to calculated
-                          const finalDisplaySpeed = hoveredSpeed ?? pointSpeed;
-
-                          // Use accumulated time instead of raw elapsed time (which includes pauses)
-                          const h = Math.floor(cumTime / 3600);
-                          const m = Math.floor((cumTime % 3600) / 60);
-                          const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
-
-                          return (
+                      return (
+                        <div className="flex items-center gap-2 bg-primary/10 px-2.5 rounded-md border border-primary/20 animate-in fade-in slide-in-from-right-2 duration-150">
+                          <span className="text-sm font-mono font-semibold">{timeStr}</span>
+                          <div className="w-px h-3.5 bg-border" />
+                          <span className="text-sm font-mono font-semibold">{formatDistance(cd)}</span>
+                          <div className="w-px h-3.5 bg-border" />
+                          <span className="text-sm font-mono font-semibold">{formatSpeed(finalDisplaySpeed)}</span>
+                          {hoveredPoint.ele !== undefined && (
                             <>
-                              <span className="text-sm font-mono font-semibold">{timeStr}</span>
                               <div className="w-px h-3.5 bg-border" />
-                              <span className="text-sm font-mono font-semibold">{formatDistance(cumDist)}</span>
-                              <div className="w-px h-3.5 bg-border" />
-                              <span className="text-sm font-mono font-semibold">{formatSpeed(finalDisplaySpeed)}</span>
-                              {hoveredPoint.ele !== undefined && (
-                                <>
-                                  <div className="w-px h-3.5 bg-border" />
-                                  <span className="text-sm font-mono font-semibold">{hoveredPoint.ele.toFixed(0)}m</span>
-                                </>
-                              )}
+                              <span className="text-sm font-mono font-semibold">{hoveredPoint.ele.toFixed(0)}m</span>
                             </>
-                          );
-                        })()}
-                      </div>
-                    )}
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
 
