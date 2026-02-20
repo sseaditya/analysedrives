@@ -200,7 +200,7 @@ const SpeedElevationChart = ({
 
     // Sample points - fewer on mobile for better performance
     // Mobile: ~400 points, Desktop: ~1000 points
-    const targetPoints = isMobile ? 400 : 1000;
+    const targetPoints = isMobile ? 200 : 500;
     const sampleRate = Math.max(1, Math.floor(points.length / targetPoints));
 
     for (let i = 0; i < rawData.length; i++) {
