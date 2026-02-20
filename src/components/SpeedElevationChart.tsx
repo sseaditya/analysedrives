@@ -86,71 +86,40 @@ const SpeedElevationChart = ({
     };
   }, []);
 
-  // Calculate combined data for chart - Keep MORE points for better zoom detail
-  const fullData: ChartDataPoint[] = useMemo(() => {
-    const rawData: { dist: number; speed: number; ele: number | null; time: Date | undefined; elapsed: number }[] = [];
+  // Step 1: Process ALL raw points (speed calculations) — cached once when points change
+  const processedRawData = useMemo(() => {
+    const rawData: { dist: number; speed: number; ele: number | null; time: Date | undefined; elapsed: number; pointIndex: number }[] = [];
 
-    // Track cumulative active time (excluding pauses)
     let cumulativeActiveTime = 0;
     let cumulativeDistance = 0;
 
-    // Dynamic Acceleration Limit
     const getMaxAccel = (speedKmh: number) => {
       return Math.max(2.0, 9.0 - (speedKmh / 25.0));
     };
 
     let prevSpeedMps = 0;
 
-    // Use rawData to push processed points.
-    // Initialize first point
     if (points.length > 0) {
       rawData.push({
-        dist: 0,
-        speed: 0,
+        dist: 0, speed: 0,
         ele: points[0].ele !== undefined ? points[0].ele : null,
-        time: points[0].time,
-        elapsed: 0
+        time: points[0].time, elapsed: 0, pointIndex: 0
       });
     }
-
-    // PAUSE_THRESHOLD derived from gpxParser
-    // const PAUSE_THRESHOLD = 60.0; // Already imported
 
     for (let i = 1; i < points.length; i++) {
       const prev = points[i - 1];
       const curr = points[i];
 
       const distance = haversineDistance(prev.lat, prev.lon, curr.lat, curr.lon);
-      // NOTE: We only add distance if it's NOT a pause? 
-      // gpxParser stops adding cumulative distance during pause too.
-      // But here we need to decide if we filter the point entirely or just freeze time/dist.
-      // If we freeze, we get multiple points at same X.
-      // Better to check time diff first.
 
       let timeDiff = 0;
       if (prev.time && curr.time) {
         timeDiff = (curr.time.getTime() - prev.time.getTime()) / 1000;
       }
 
-      // If Pause, SKIP adding this segment to stats/accumulators
-      //effectively stitching the graph
       if (timeDiff > PAUSE_THRESHOLD) {
-        // We still iterate, but we don't increment cumulative Time or Distance?
-        // If we don't increment Time, x-axis stays same.
-        // If we don't increment Distance, distance-axis stays same.
-        // But the point 'curr' exists. If we push it with same X, we get a vertical stack.
-        // The user complained "paused section turns up as a line".
-        // To fix, we should probably SKIP pushing this point to rawData, or push it with same coords (invisible)?
-        // gpxParser's generateProcessedTrack effectively freezes time/dist.
-        // Let's replicate that: timeDiff is effectively ignored for accumulation.
-        continue; // Skip this point entirely? 
-        // If we skip, we lose the point 'curr'.
-        // But 'curr' is the start of the next segment.
-        // If we skip 'curr', the next iteration will be i+1 vs i=curr.
-        // Wait, loop is 1..length.
-        // If we continue, we don't push 'curr'.
-        // The next iteration calculates dist(points[i], points[i+1]). 
-        // So we strictly lose 'curr' from the chart. That seems correct for a "gap".
+        continue;
       }
 
       cumulativeDistance += distance;
@@ -165,11 +134,6 @@ const SpeedElevationChart = ({
 
         const prevSpeedKmh = prevSpeedMps * 3.6;
         const maxAccel = getMaxAccel(prevSpeedKmh);
-        // const accel = (rawSpeedMps - prevSpeedMps) / timeDiff;
-
-        // Simple Accel Limit Check (Replicating gpxParser but locally)
-        // Ideally we used processedPoints but this component takes raw points.
-        // For now, simple check:
         const accel = (rawSpeedMps - prevSpeedMps) / timeDiff;
         if (accel > maxAccel) {
           speedMps = prevSpeedMps + (maxAccel * timeDiff);
@@ -189,28 +153,28 @@ const SpeedElevationChart = ({
         speed: speedKmh,
         ele: curr.ele !== undefined ? curr.ele : null,
         time: curr.time,
-        elapsed: cumulativeActiveTime // Use accumulated active time
+        elapsed: cumulativeActiveTime,
+        pointIndex: i
       });
     }
 
-    // Apply smoothing and create final dataset
+    return rawData;
+  }, [points]);
+
+  // Step 2: Sample + smooth helper — takes raw data and produces chart-ready points
+  const sampleAndSmooth = useCallback((rawData: typeof processedRawData, targetPoints: number): ChartDataPoint[] => {
+    if (rawData.length === 0) return [];
+
     const WINDOW_SIZE = 5;
     const offset = Math.floor(WINDOW_SIZE / 2);
     const result: ChartDataPoint[] = [];
 
-    // Sample points - fewer on mobile for better performance
-    // Mobile: ~400 points, Desktop: ~1000 points
-    const targetPoints = isMobile ? 100 : 250;
-    const sampleRate = Math.max(1, Math.floor(points.length / targetPoints));
+    const sampleRate = Math.max(1, Math.floor(rawData.length / targetPoints));
 
     for (let i = 0; i < rawData.length; i++) {
-      const originalIndex = i + 1;
-
-      // Sample all data points (no zoom filtering here)
-      const shouldSample = (originalIndex % sampleRate === 0) || originalIndex === points.length - 1;
+      const shouldSample = (i % sampleRate === 0) || i === rawData.length - 1;
 
       if (shouldSample) {
-        // Calculate smoothed speed
         let sum = 0;
         let count = 0;
 
@@ -224,7 +188,7 @@ const SpeedElevationChart = ({
         const smoothedSpeed = count > 0 ? sum / count : 0;
 
         let finalSpeed = parseFloat(smoothedSpeed.toFixed(1));
-        const originalSpeed = finalSpeed; // Keep pure smoothed speed for Y-axis scaling
+        const originalSpeed = finalSpeed;
 
         if (speedCap && finalSpeed > speedCap) finalSpeed = speedCap;
         if (visualLimit && finalSpeed > visualLimit) finalSpeed = visualLimit;
@@ -236,23 +200,32 @@ const SpeedElevationChart = ({
           elevation: rawData[i].ele,
           time: rawData[i].time ? rawData[i].time!.toLocaleTimeString() : '',
           elapsedTime: rawData[i].elapsed,
-          pointIndex: originalIndex,
+          pointIndex: rawData[i].pointIndex,
         });
       }
     }
 
     return result;
-  }, [points, speedCap, visualLimit]);
+  }, [speedCap, visualLimit]);
 
-  /* REMOVED EARLY RETURN TO FIX REACT ERROR #300 (HOOKS ORDER) 
-  if (fullData.length === 0) {
-    return (
-      <div className="rounded-2xl border border-border bg-card p-6 text-center text-muted-foreground">
-        No data available to display chart
-      </div>
-    );
-  }
-  */
+  // Step 3: fullData for elevation chart (always full range, sampled to targetPoints)
+  const targetPoints = isMobile ? 100 : 250;
+
+  const fullData: ChartDataPoint[] = useMemo(() => {
+    return sampleAndSmooth(processedRawData, targetPoints);
+  }, [processedRawData, targetPoints, sampleAndSmooth]);
+
+  // Step 4: speedChartData — when zoomed, resample from FULL processed data for maximum detail
+  const speedChartData = useMemo(() => {
+    if (processedRawData.length === 0) return [];
+    if (!zoomRange) return fullData; // Unzoomed: same as elevation
+
+    // Filter raw data to zoom range, then resample to targetPoints
+    const zoomed = processedRawData.filter(d => d.pointIndex >= zoomRange[0] && d.pointIndex <= zoomRange[1]);
+    return sampleAndSmooth(zoomed, targetPoints);
+  }, [processedRawData, zoomRange, fullData, targetPoints, sampleAndSmooth]);
+
+  /* REMOVED EARLY RETURN TO FIX REACT ERROR #300 (HOOKS ORDER) */
 
   const hasElevation = useMemo(() => fullData.length > 0 && fullData.some((d) => d.elevation !== null), [fullData]);
 
@@ -265,13 +238,6 @@ const SpeedElevationChart = ({
     }
     return max;
   }, [fullData]);
-
-  // Speed chart data: filter by zoom range (same ~1000 points as elevation)
-  const speedChartData = useMemo(() => {
-    if (fullData.length === 0) return [];
-    if (!zoomRange) return fullData;
-    return fullData.filter(d => d.pointIndex >= zoomRange[0] && d.pointIndex <= zoomRange[1]);
-  }, [fullData, zoomRange]);
 
   // Calculate elevation range for better scaling (memoized)
   const { minElevation, maxElevation, elevationRange } = useMemo(() => {
