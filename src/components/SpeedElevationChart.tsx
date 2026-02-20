@@ -294,7 +294,6 @@ const SpeedElevationChart = ({
       sampled.push(filtered[filtered.length - 1]);
     }
 
-    console.log('[SpeedChart] filtered:', filtered.length, 'sampled:', sampled.length, 'zoomRange:', zoomRange);
     return sampled;
   }, [fullData, zoomRange]);
 

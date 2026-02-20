@@ -280,6 +280,14 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
     };
   }, [isOwner, speedCap, zoomRange, subsetStats, stats]);
 
+  // Memoize TrackMap zoomRange to prevent new array reference on every render
+  // Without this, every hover re-render creates [x, y] !== [x, y], triggering
+  // TrackMap's heavy track-rendering useEffect (25k+ L.polyline calls)
+  const adjustedMapZoomRange = useMemo(() => {
+    if (!zoomRange) return null;
+    return [zoomRange[0] - mapPointsStartIndex, zoomRange[1] - mapPointsStartIndex] as [number, number];
+  }, [zoomRange, mapPointsStartIndex]);
+
   // Effective speed limit for charts (owner's limiter or public speed cap)
   // Effective speed limit for charts
   // Effective speed limit for charts
@@ -586,7 +594,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                 <TrackMap
                   points={mapPoints}
                   hoveredPoint={hoveredPoint}
-                  zoomRange={zoomRange ? [zoomRange[0] - mapPointsStartIndex, zoomRange[1] - mapPointsStartIndex] : null}
+                  zoomRange={adjustedMapZoomRange}
                   stopPoints={stats.stopPoints}
                   tightTurnPoints={stats.tightTurnPoints}
                   hairpinPoints={stats.hairpinPoints}
