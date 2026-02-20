@@ -95,7 +95,8 @@ const HowTo = () => {
 
                     <div className="bg-card border border-border rounded-xl p-6 space-y-4">
                         <ol className="list-decimal list-inside space-y-3 marker:font-bold marker:text-primary">
-                            <li className="pl-2">Go to your activity page on <a href="https://www.strava.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">strava.com</a> (on desktop).</li>
+                            <li className="pl-2">Go to your profile page (left top) on <a href="https://www.strava.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">strava.com</a> (on desktop).</li>
+                            <li className="pl-2">Select your <span className="font-bold">activity</span> from the list</li>
                             <li className="pl-2">Click the <span className="font-bold">three dots (...)</span> icon on the left sidebar.</li>
                             <li className="pl-2">Select <span className="font-bold">Export GPX</span>.</li>
                             <li className="pl-2">Upload the downloaded file here.</li>
