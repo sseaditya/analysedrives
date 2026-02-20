@@ -71,10 +71,16 @@ const SpeedElevationChart = ({
   const [interactionMode, setInteractionMode] = useState<InteractionMode>('none');
   const [cursorStyle, setCursorStyle] = useState<string>('crosshair');
   const [dragStartDist, setDragStartDist] = useState<number | null>(null);
-  const [hoverDistance, setHoverDistance] = useState<number | null>(null);
-  const [hoveredPart, setHoveredPart] = useState<'left' | 'right' | 'center' | null>(null);
   const chartRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
+  // Refs for hover - using refs instead of state to avoid triggering recharts re-renders
+  const hoverDistanceRef = useRef<number | null>(null);
+  const hoveredPartRef = useRef<'left' | 'right' | 'center' | null>(null);
+  const speedCursorRef = useRef<HTMLDivElement>(null);
+  const elevCursorRef = useRef<HTMLDivElement>(null);
+  const elevSelectionRef = useRef<HTMLDivElement>(null);
+  const elevLeftHandleRef = useRef<HTMLDivElement>(null);
+  const elevRightHandleRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
 
   // Cleanup rAF on unmount
@@ -469,9 +475,19 @@ const SpeedElevationChart = ({
   }, [refAreaLeft, refAreaRight, zoomRange, onZoomChange, fullData, xAxisMode, points.length]);
 
   const handleMouseMoveInner = useCallback((e: any, chartType: 'speed' | 'elevation') => {
-    // Update hover distance for sync lines
-    if (e?.activeLabel) {
-      setHoverDistance(parseFloat(e.activeLabel));
+    // Update hover cursor lines via refs (no React re-render)
+    if (e?.activeLabel && e?.activeCoordinate?.x !== undefined) {
+      hoverDistanceRef.current = parseFloat(e.activeLabel);
+      const px = e.activeCoordinate.x;
+      // Position the cursor overlay lines
+      if (speedCursorRef.current) {
+        speedCursorRef.current.style.transform = `translateX(${px}px)`;
+        speedCursorRef.current.style.display = 'block';
+      }
+      if (elevCursorRef.current) {
+        elevCursorRef.current.style.transform = `translateX(${px}px)`;
+        elevCursorRef.current.style.display = 'block';
+      }
     }
 
     // Update cursor based on hover position (elevation chart only)
@@ -479,15 +495,24 @@ const SpeedElevationChart = ({
       const dist = parseFloat(e.activeLabel);
       const mode = getInteractionMode(dist);
       setCursorStyle(getCursorForMode(mode));
-
-      // Update hover part state
-      if (mode === 'resize-left') setHoveredPart('left');
-      else if (mode === 'resize-right') setHoveredPart('right');
-      else if (mode === 'move-window') setHoveredPart('center');
-      else setHoveredPart(null);
+      hoveredPartRef.current = mode === 'resize-left' ? 'left'
+        : mode === 'resize-right' ? 'right'
+          : mode === 'move-window' ? 'center'
+            : null;
+      // Update selection handle styling via refs (no re-render)
+      if (elevLeftHandleRef.current) {
+        elevLeftHandleRef.current.style.opacity = hoveredPartRef.current === 'left' ? '1' : '0.75';
+        elevLeftHandleRef.current.style.width = hoveredPartRef.current === 'left' ? '8px' : '6px';
+      }
+      if (elevRightHandleRef.current) {
+        elevRightHandleRef.current.style.opacity = hoveredPartRef.current === 'right' ? '1' : '0.75';
+        elevRightHandleRef.current.style.width = hoveredPartRef.current === 'right' ? '8px' : '6px';
+      }
+      if (elevSelectionRef.current) {
+        elevSelectionRef.current.style.opacity = hoveredPartRef.current === 'center' ? '0.35' : '0.15';
+      }
     } else if (chartType === 'speed') {
-      // Reset interaction hovering if on speed chart
-      setHoveredPart(null);
+      hoveredPartRef.current = null;
     }
 
     if (refAreaLeft && activeChart === chartType) {
@@ -595,8 +620,11 @@ const SpeedElevationChart = ({
   const handleMouseLeave = useCallback(() => {
     // Clear hover visual feedback
     if (onHover) onHover(null);
-    setHoverDistance(null);
-    setHoveredPart(null);
+    hoverDistanceRef.current = null;
+    hoveredPartRef.current = null;
+    // Hide cursor lines
+    if (speedCursorRef.current) speedCursorRef.current.style.display = 'none';
+    if (elevCursorRef.current) elevCursorRef.current.style.display = 'none';
 
     // Only reset interaction interaction if NOT currently performing an action
     if (!activeChart) {
@@ -686,7 +714,7 @@ const SpeedElevationChart = ({
   return (
     <div ref={chartRef} className="h-full w-full rounded-2xl border border-border bg-card p-3 select-none flex flex-col cursor-crosshair">
       {/* Speed Chart (Main - 70% height) */}
-      <div className="flex-[7] w-full min-h-0 mb-4">
+      <div className="flex-[7] w-full min-h-0 mb-4 relative">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart
             data={speedChartData}
@@ -770,16 +798,6 @@ const SpeedElevationChart = ({
               />
             )}
 
-            {/* Synchronized Hover Line */}
-            {hoverDistance !== null && (
-              <ReferenceLine
-                x={hoverDistance}
-                stroke="hsl(var(--foreground))"
-                strokeOpacity={1}
-                isFront={true}
-              />
-            )}
-
             {/* Speed Limit Line - Same color as speed chart, moves with slider */}
             {speedLimit && (
               <ReferenceLine
@@ -799,11 +817,26 @@ const SpeedElevationChart = ({
             )}
           </AreaChart>
         </ResponsiveContainer>
+        {/* Hover cursor line overlay (positioned via ref, no React re-render) */}
+        <div
+          ref={speedCursorRef}
+          style={{
+            display: 'none',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '1px',
+            height: '100%',
+            backgroundColor: 'hsl(var(--foreground))',
+            pointerEvents: 'none',
+            zIndex: 10,
+          }}
+        />
       </div>
 
       {/* Elevation Chart (Brush - 25% height) */}
       {hasElevation && (
-        <div className="flex-[2.5] w-full min-h-0" style={{ cursor: cursorStyle }}>
+        <div className="flex-[2.5] w-full min-h-0 relative" style={{ cursor: cursorStyle }}>
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart
               data={fullData}
@@ -876,15 +909,7 @@ const SpeedElevationChart = ({
                 isAnimationActive={false}
               />
 
-              {/* Synchronized Hover Line */}
-              {hoverDistance !== null && (
-                <ReferenceLine
-                  x={hoverDistance}
-                  stroke="hsl(var(--foreground))"
-                  strokeOpacity={1}
-                  isFront={true}
-                />
-              )}
+
 
               {/* Show selection area when dragging */}
               {activeChart === 'elevation' && refAreaLeft && refAreaRight && (
@@ -897,10 +922,9 @@ const SpeedElevationChart = ({
                 />
               )}
 
-              {/* Visual handles for current zoom range */}
+              {/* Visual handles for current zoom range (static — hover styling via refs) */}
               {zoomRange && zoomStartVal !== null && zoomEndVal !== null && (
                 <>
-                  {/* Main selection area */}
                   <ReferenceArea
                     x1={zoomStartVal}
                     x2={zoomEndVal}
@@ -908,26 +932,39 @@ const SpeedElevationChart = ({
                     stroke="hsl(15, 52%, 58%)"
                     strokeWidth={2}
                     fill="hsl(15, 52%, 58%)"
-                    fillOpacity={hoveredPart === 'center' ? 0.35 : 0.15}
+                    fillOpacity={0.15}
                   />
-                  {/* Left edge handle - thicker for better visibility */}
                   <ReferenceLine
                     x={zoomStartVal}
-                    stroke={hoveredPart === 'left' ? "hsl(var(--foreground))" : "hsl(15, 52%, 58%)"}
-                    strokeWidth={hoveredPart === 'left' ? 8 : 6}
-                    strokeOpacity={0.95}
+                    stroke="hsl(15, 52%, 58%)"
+                    strokeWidth={6}
+                    strokeOpacity={0.75}
                   />
-                  {/* Right edge handle - thicker for better visibility */}
                   <ReferenceLine
                     x={zoomEndVal}
-                    stroke={hoveredPart === 'right' ? "hsl(var(--foreground))" : "hsl(15, 52%, 58%)"}
-                    strokeWidth={hoveredPart === 'right' ? 8 : 6}
-                    strokeOpacity={0.95}
+                    stroke="hsl(15, 52%, 58%)"
+                    strokeWidth={6}
+                    strokeOpacity={0.75}
                   />
                 </>
               )}
             </AreaChart>
           </ResponsiveContainer>
+          {/* Hover cursor line overlay (positioned via ref, no React re-render) */}
+          <div
+            ref={elevCursorRef}
+            style={{
+              display: 'none',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '1px',
+              height: '100%',
+              backgroundColor: 'hsl(var(--foreground))',
+              pointerEvents: 'none',
+              zIndex: 10,
+            }}
+          />
         </div>
       )}
     </div>
