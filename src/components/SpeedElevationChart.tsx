@@ -211,7 +211,7 @@ const SpeedElevationChart = ({
   }, [speedCap, visualLimit]);
 
   // Step 3: fullData for elevation chart (always full range, sampled to targetPoints)
-  const targetPoints = isMobile ? 100 : 250;
+  const targetPoints = isMobile ? 200 : 500;
 
   const fullData: ChartDataPoint[] = useMemo(() => {
     return sampleAndSmooth(processedRawData, targetPoints);
