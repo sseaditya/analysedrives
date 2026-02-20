@@ -294,6 +294,7 @@ const SpeedElevationChart = ({
       sampled.push(filtered[filtered.length - 1]);
     }
 
+    console.log('[SpeedChart] filtered:', filtered.length, 'sampled:', sampled.length, 'zoomRange:', zoomRange);
     return sampled;
   }, [fullData, zoomRange]);
 
@@ -539,9 +540,9 @@ const SpeedElevationChart = ({
       return;
     }
 
-    // Throttle onHover to ~30fps (33ms) to reduce parent re-renders
+    // Throttle onHover to ~15fps (66ms) to reduce parent re-renders
     const now = performance.now();
-    if (now - lastHoverCallRef.current < 33) return;
+    if (now - lastHoverCallRef.current < 66) return;
     lastHoverCallRef.current = now;
 
     const activeData = e.activePayload[0].payload as ChartDataPoint;
