@@ -75,6 +75,7 @@ const SpeedElevationChart = ({
   const [hoveredPart, setHoveredPart] = useState<'left' | 'right' | 'center' | null>(null);
   const chartRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
+  const lastHoverCallRef = useRef<number>(0); // Throttle onHover to ~30fps
   const isMobile = useIsMobile();
 
   // Cleanup rAF on unmount
@@ -537,6 +538,11 @@ const SpeedElevationChart = ({
     if (!e || !e.activePayload || !e.activePayload[0] || !onHover) {
       return;
     }
+
+    // Throttle onHover to ~30fps (33ms) to reduce parent re-renders
+    const now = performance.now();
+    if (now - lastHoverCallRef.current < 33) return;
+    lastHoverCallRef.current = now;
 
     const activeData = e.activePayload[0].payload as ChartDataPoint;
     const pointIndex = activeData.pointIndex;
