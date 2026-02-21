@@ -171,12 +171,73 @@ const SpeedElevationChart = ({
     const offset = Math.floor(WINDOW_SIZE / 2);
     const result: ChartDataPoint[] = [];
 
-    const sampleRate = Math.max(1, Math.floor(rawData.length / targetPoints));
+    if (rawData.length <= targetPoints) {
+      for (let i = 0; i < rawData.length; i++) {
+        let sum = 0, count = 0;
+        for (let j = -offset; j <= offset; j++) {
+          const idx = i + j;
+          if (idx >= 0 && idx < rawData.length) { sum += rawData[idx].speed; count++; }
+        }
+        let finalSpeed = count > 0 ? parseFloat((sum / count).toFixed(1)) : rawData[i].speed;
+        const originalSpeed = finalSpeed;
+        if (speedCap && finalSpeed > speedCap) finalSpeed = speedCap;
+        if (visualLimit && finalSpeed > visualLimit) finalSpeed = visualLimit;
+
+        result.push({
+          distance: rawData[i].dist,
+          speed: finalSpeed,
+          originalSpeed: originalSpeed,
+          elevation: rawData[i].ele,
+          time: rawData[i].time ? rawData[i].time!.toLocaleTimeString() : '',
+          elapsedTime: rawData[i].elapsed,
+          pointIndex: rawData[i].pointIndex,
+        });
+      }
+      return result;
+    }
+
+    const minVal = xAxisMode === 'time' ? rawData[0].elapsed : rawData[0].dist;
+    const maxVal = xAxisMode === 'time' ? rawData[rawData.length - 1].elapsed : rawData[rawData.length - 1].dist;
+    const span = maxVal - minVal;
+
+    if (span <= 0) {
+      // Fallback to index-based sampling if tracking data has no domain span (prevent step=0 infinite loops)
+      const sampleRate = Math.max(1, Math.floor(rawData.length / targetPoints));
+      for (let i = 0; i < rawData.length; i++) {
+        if (i % sampleRate === 0 || i === rawData.length - 1) {
+          let sum = 0, count = 0;
+          for (let j = -offset; j <= offset; j++) {
+            const idx = i + j;
+            if (idx >= 0 && idx < rawData.length) { sum += rawData[idx].speed; count++; }
+          }
+          let finalSpeed = count > 0 ? parseFloat((sum / count).toFixed(1)) : rawData[i].speed;
+          const originalSpeed = finalSpeed;
+          if (speedCap && finalSpeed > speedCap) finalSpeed = speedCap;
+          if (visualLimit && finalSpeed > visualLimit) finalSpeed = visualLimit;
+
+          result.push({
+            distance: rawData[i].dist,
+            speed: finalSpeed,
+            originalSpeed: originalSpeed,
+            elevation: rawData[i].ele,
+            time: rawData[i].time ? rawData[i].time!.toLocaleTimeString() : '',
+            elapsedTime: rawData[i].elapsed,
+            pointIndex: rawData[i].pointIndex,
+          });
+        }
+      }
+      return result;
+    }
+
+    // Spatial or temporal target interval
+    const step = span / Math.max(1, targetPoints - 1);
+    let nextThreshold = minVal;
 
     for (let i = 0; i < rawData.length; i++) {
-      const shouldSample = (i % sampleRate === 0) || i === rawData.length - 1;
+      const currentVal = xAxisMode === 'time' ? rawData[i].elapsed : rawData[i].dist;
+      const isLastPoint = i === rawData.length - 1;
 
-      if (shouldSample) {
+      if (currentVal >= nextThreshold || isLastPoint) {
         let sum = 0;
         let count = 0;
 
@@ -204,11 +265,15 @@ const SpeedElevationChart = ({
           elapsedTime: rawData[i].elapsed,
           pointIndex: rawData[i].pointIndex,
         });
+
+        while (nextThreshold <= currentVal && !isLastPoint) {
+          nextThreshold += step;
+        }
       }
     }
 
     return result;
-  }, [speedCap, visualLimit]);
+  }, [speedCap, visualLimit, xAxisMode]);
 
   // Step 3: fullData for elevation chart (always full range, sampled to targetPoints)
   const targetPoints = isMobile ? 200 : 500;

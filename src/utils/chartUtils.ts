@@ -64,8 +64,6 @@ export function calculateNiceTicks(min: number, max: number, mode: 'distance' | 
     let step = range / targetCount;
 
     if (mode === 'time') {
-        // Time specific steps (seconds)
-        // 10s, 30s, 60s (1m), 300s (5m), 600s (10m), 900s (15m), 1800s (30m), 3600s (1h)
         const timeSteps = [10, 30, 60, 120, 300, 600, 900, 1200, 1800, 3600, 7200];
         let bestTimeStep = timeSteps[0];
         for (const s of timeSteps) {
@@ -75,13 +73,11 @@ export function calculateNiceTicks(min: number, max: number, mode: 'distance' | 
             }
             bestTimeStep = s;
         }
-        // If larger than largest, just use simple rounding logic or custom
         if (step > timeSteps[timeSteps.length - 1]) {
             bestTimeStep = Math.ceil(step / 3600) * 3600;
         }
         step = bestTimeStep;
     } else {
-        // Distance steps: 0.1, 0.2, 0.5, 1, 2, 5, 10, 20...
         const distSteps = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500];
         let bestDistStep = distSteps[0];
         for (const s of distSteps) {
@@ -97,21 +93,14 @@ export function calculateNiceTicks(min: number, max: number, mode: 'distance' | 
         step = bestDistStep;
     }
 
-    // Generate ticks relative to min, snapped to step
-    // e.g. min=13, step=5 -> start at 15
     const startTick = Math.ceil(min / step) * step;
 
     for (let t = startTick; t <= max; t += step) {
-        // Fix float errors
         const safeT = Math.round(t * 10000) / 10000;
         if (safeT >= min && safeT <= max) {
             ticks.push(safeT);
         }
     }
-
-    // Ensure reasonably filling the space?
-    // If we ended up with too few ticks because range < step?
-    // Add min and max? No, nice ticks usually shouldn't ensure min/max unless clamped.
 
     return ticks;
 }
