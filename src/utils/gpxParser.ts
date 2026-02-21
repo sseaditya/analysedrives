@@ -32,6 +32,7 @@ export const MICRO_JITTER_THRESHOLD = 1.0; // degrees - ignore bearing changes s
 export const STRAIGHT_SECTION_THRESHOLD = 5; // degrees - bearing change under this is considered straight
 export const STRAIGHT_FLUSH_DISTANCE = 0.025; // km - distance of straight travel to flush pending turn
 export const MIN_STRAIGHT_SECTION = 0.02; // km - minimum distance to count as straight section
+export const BEARING_SAMPLE_INTERVAL = 0.100; // km (100 meters) - fixed interval for distance-based bearing computation
 
 // Speed & Distance Thresholds
 export const MAX_SPEED_CAP = 200; // km/h - sanity cap for max speed
@@ -106,7 +107,7 @@ export interface SpeedBucket {
 }
 
 // Current version for cache invalidation - increment when parsing logic changes
-export const PROCESSED_TRACK_VERSION = 1;
+export const PROCESSED_TRACK_VERSION = 2;
 
 // Pre-computed point data for cached tracks
 export interface ProcessedPoint {
@@ -498,6 +499,11 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
 
   let currentTurnStartBearing: number | null = null;
 
+  // Distance-based bearing resampling state
+  let distSinceLastBearingSample = 0;
+  let lastSampleLat = 0;
+  let lastSampleLon = 0;
+
   // Coordinate Smoothing (5-point SMA)
   // To reduce "stray points" that cause fake turns and flatten wiggles
   const smoothedPoints = points.map((p, i) => {
@@ -520,6 +526,10 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
       lon: count > 0 ? lonSum / count : p.lon
     };
   });
+
+  // Initialize sample position with smoothed coordinates
+  lastSampleLat = smoothedPoints[0].lat;
+  lastSampleLon = smoothedPoints[0].lon;
 
   const robustSegments = calculateRobustSpeeds(points); // Speeds use raw points for safety? Or should use smoothed?
   // Let's keep speeds on raw points to capture acceleration physics, but use smoothed for BEARING.
@@ -585,8 +595,10 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
       rawGradients.push(0);
     }
 
-    // Geometry Calculation (Rotation)
-    // Updated Logic: Check Moving Average Speed > STOP_SPEED_THRESHOLD (Hysteresis)
+    // Geometry Calculation (Rotation) - DISTANCE-BASED RESAMPLED BEARINGS
+    // Instead of computing bearing between every GPS point (which varies with point density),
+    // we accumulate distance and only sample a new bearing every BEARING_SAMPLE_INTERVAL (100m).
+    // This makes rotation, straight %, and twistiness independent of point count.
     let isMoving = false;
     if (speeds.length > 0) {
       const window = SPEED_MOVING_AVG_WINDOW;
@@ -602,119 +614,126 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
       isMoving = avgSpeed > STOP_SPEED_THRESHOLD;
     }
 
-    if (distance > MIN_DISTANCE_FOR_BEARING && isMoving) {
-      const bearing = calculateBearing(prev.lat, prev.lon, curr.lat, curr.lon);
-      if (lastBearing !== null) {
-        let delta = bearing - lastBearing;
-        if (delta > 180) delta -= 360;
-        if (delta < -180) delta += 360;
+    if (isMoving) {
+      distSinceLastBearingSample += distance;
 
-        // Total Heading Change (Absolute)
-        totalHeadingChange += Math.abs(delta);
+      // Only compute bearing when we've traveled enough distance since last sample
+      if (distSinceLastBearingSample >= BEARING_SAMPLE_INTERVAL) {
+        const sampleDist = haversineDistance(lastSampleLat, lastSampleLon, curr.lat, curr.lon);
+        if (sampleDist > MIN_DISTANCE_FOR_BEARING) {
+          const bearing = calculateBearing(lastSampleLat, lastSampleLon, curr.lat, curr.lon);
 
-        // --- ROBUST TURN DETECTION ---
-        const isTurnContinuation = (
-          (currentTurnSum === 0) || // Fresh start
-          (Math.sign(delta) === Math.sign(currentTurnSum)) || // Same direction
-          (Math.abs(delta) < 10 && Math.abs(currentTurnSum) > 30) // Minor jitter during a major turn is allowed
-        );
+          if (lastBearing !== null) {
+            let delta = bearing - lastBearing;
+            if (delta > 180) delta -= 360;
+            if (delta < -180) delta += 360;
 
-        if (Math.abs(delta) > MICRO_JITTER_THRESHOLD) { // Ignore micro-jitters
-          if (isTurnContinuation) {
-            if (currentTurnSum === 0) currentTurnStartBearing = lastBearing; // Capture start bearing
-            currentTurnSum += delta;
-            currentTurnDistance += distance;
-            // Update Peak for Marker Placement (Center of the action)
-            if (Math.abs(delta) > Math.abs(currentTurnPeak.delta)) {
-              currentTurnPeak = { index: i, delta: delta, lat: curr.lat, lon: curr.lon };
+            // Total Heading Change (Absolute)
+            totalHeadingChange += Math.abs(delta);
+
+            // --- ROBUST TURN DETECTION ---
+            const isTurnContinuation = (
+              (currentTurnSum === 0) || // Fresh start
+              (Math.sign(delta) === Math.sign(currentTurnSum)) || // Same direction
+              (Math.abs(delta) < 10 && Math.abs(currentTurnSum) > 30) // Minor jitter during a major turn is allowed
+            );
+
+            if (Math.abs(delta) > MICRO_JITTER_THRESHOLD) { // Ignore micro-jitters
+              if (isTurnContinuation) {
+                if (currentTurnSum === 0) currentTurnStartBearing = lastBearing; // Capture start bearing
+                currentTurnSum += delta;
+                currentTurnDistance += distSinceLastBearingSample;
+                // Update Peak for Marker Placement (Center of the action)
+                if (Math.abs(delta) > Math.abs(currentTurnPeak.delta)) {
+                  currentTurnPeak = { index: i, delta: delta, lat: curr.lat, lon: curr.lon };
+                }
+              } else {
+                // Direction FLIP -> End previous turn, process it, start new one
+
+                if (currentTurnDistance > MIN_TURN_DISTANCE) {
+                  const turnDensity = Math.abs(currentTurnSum) / (currentTurnDistance * 1000 || 1);
+
+                  let netHeadingChange = 360;
+                  if (currentTurnStartBearing !== null) {
+                    let rawChange = bearing - currentTurnStartBearing;
+                    if (rawChange > 180) rawChange -= 360;
+                    if (rawChange < -180) rawChange += 360;
+                    netHeadingChange = Math.abs(rawChange);
+                  }
+
+                  if (Math.abs(currentTurnSum) > TIGHT_TURN_ANGLE && turnDensity > TURN_DENSITY_THRESHOLD && netHeadingChange > NET_HEADING_CHANGE_MIN) {
+                    tightTurnsCount++;
+                    if (Math.abs(currentTurnSum) > HAIRPIN_ANGLE) {
+                      hairpinCount++;
+                      hairpinPoints.push([currentTurnPeak.lat, currentTurnPeak.lon]);
+                    } else {
+                      tightTurnPoints.push([currentTurnPeak.lat, currentTurnPeak.lon]);
+                    }
+                  }
+                }
+
+                currentTurnSum = delta;
+                currentTurnStartBearing = lastBearing; // Start new turn
+                currentTurnDistance = distSinceLastBearingSample;
+                currentTurnPeak = { index: i, delta: delta, lat: curr.lat, lon: curr.lon };
+              }
+            } else {
+              if (Math.abs(currentTurnSum) > 0) {
+                currentTurnDistance += distSinceLastBearingSample;
+              }
             }
+
+            // Straight Section Logic
+            if (Math.abs(delta) < STRAIGHT_SECTION_THRESHOLD) {
+              currentStraightDist += distSinceLastBearingSample;
+
+              // --- FLUSH TURN ON STRAIGHT ---
+              if (currentStraightDist > STRAIGHT_FLUSH_DISTANCE && Math.abs(currentTurnSum) > 0) {
+                if (currentTurnDistance > MIN_TURN_DISTANCE) {
+                  const turnDensity = Math.abs(currentTurnSum) / (currentTurnDistance * 1000 || 1);
+
+                  let netHeadingChange = 360;
+                  if (currentTurnStartBearing !== null) {
+                    let rawChange = bearing - currentTurnStartBearing;
+                    if (rawChange > 180) rawChange -= 360;
+                    if (rawChange < -180) rawChange += 360;
+                    netHeadingChange = Math.abs(rawChange);
+                  }
+
+                  if (Math.abs(currentTurnSum) > TIGHT_TURN_ANGLE && turnDensity > TURN_DENSITY_THRESHOLD && netHeadingChange > NET_HEADING_CHANGE_MIN) {
+                    tightTurnsCount++;
+                    if (Math.abs(currentTurnSum) > HAIRPIN_ANGLE) {
+                      hairpinCount++;
+                      hairpinPoints.push([currentTurnPeak.lat, currentTurnPeak.lon]);
+                    } else {
+                      tightTurnPoints.push([currentTurnPeak.lat, currentTurnPeak.lon]);
+                    }
+                  }
+                }
+                // Reset Turn State
+                currentTurnSum = 0;
+                currentTurnStartBearing = null;
+                currentTurnDistance = 0;
+                currentTurnPeak = { index: -1, delta: 0, lat: 0, lon: 0 };
+              }
+
+            } else {
+              if (currentStraightDist > MIN_STRAIGHT_SECTION) {
+                straightSections.push(currentStraightDist);
+                totalStraightDistance += currentStraightDist;
+              }
+              currentStraightDist = 0;
+            }
+
           } else {
-            // Direction FLIP -> End previous turn, process it, start new one
-
-            if (currentTurnDistance > MIN_TURN_DISTANCE) {
-              // SHARPNESS CHECK:
-              // 1. Angle Threshold: Reverted to TIGHT_TURN_ANGLE degrees (User Request)
-              // 2. Density Threshold: Turn must be sharp (e.g. > TURN_DENSITY_THRESHOLD deg/meter)
-              // 3. Zig-Zag Filter: Net Heading Change must be > NET_HEADING_CHANGE_MIN degrees
-              const turnDensity = Math.abs(currentTurnSum) / (currentTurnDistance * 1000 || 1);
-
-              let netHeadingChange = 360;
-              if (currentTurnStartBearing !== null) {
-                let rawChange = bearing - currentTurnStartBearing;
-                if (rawChange > 180) rawChange -= 360;
-                if (rawChange < -180) rawChange += 360;
-                netHeadingChange = Math.abs(rawChange);
-              }
-
-              if (Math.abs(currentTurnSum) > TIGHT_TURN_ANGLE && turnDensity > TURN_DENSITY_THRESHOLD && netHeadingChange > NET_HEADING_CHANGE_MIN) {
-                tightTurnsCount++;
-                if (Math.abs(currentTurnSum) > HAIRPIN_ANGLE) {
-                  hairpinCount++;
-                  hairpinPoints.push([currentTurnPeak.lat, currentTurnPeak.lon]);
-                } else {
-                  tightTurnPoints.push([currentTurnPeak.lat, currentTurnPeak.lon]);
-                }
-              }
-            }
-
-            currentTurnSum = delta;
-            currentTurnStartBearing = lastBearing; // Start new turn
-            currentTurnDistance = distance;
-            currentTurnPeak = { index: i, delta: delta, lat: curr.lat, lon: curr.lon };
+            currentStraightDist = distSinceLastBearingSample;
           }
-        } else {
-          if (Math.abs(currentTurnSum) > 0) {
-            currentTurnDistance += distance;
-          }
+          lastBearing = bearing;
+          lastSampleLat = curr.lat;
+          lastSampleLon = curr.lon;
+          distSinceLastBearingSample = 0;
         }
-
-        // Straight Section Logic
-        if (Math.abs(delta) < STRAIGHT_SECTION_THRESHOLD) { // < 5 degrees is effectively straight
-          currentStraightDist += distance;
-
-          // --- FLUSH TURN ON STRAIGHT ---
-          if (currentStraightDist > STRAIGHT_FLUSH_DISTANCE && Math.abs(currentTurnSum) > 0) {
-            // Min Dist Check
-            if (currentTurnDistance > MIN_TURN_DISTANCE) {
-              const turnDensity = Math.abs(currentTurnSum) / (currentTurnDistance * 1000 || 1);
-
-              let netHeadingChange = 360;
-              if (currentTurnStartBearing !== null) {
-                let rawChange = bearing - currentTurnStartBearing;
-                if (rawChange > 180) rawChange -= 360;
-                if (rawChange < -180) rawChange += 360;
-                netHeadingChange = Math.abs(rawChange);
-              }
-
-              if (Math.abs(currentTurnSum) > TIGHT_TURN_ANGLE && turnDensity > TURN_DENSITY_THRESHOLD && netHeadingChange > NET_HEADING_CHANGE_MIN) {
-                tightTurnsCount++;
-                if (Math.abs(currentTurnSum) > HAIRPIN_ANGLE) {
-                  hairpinCount++;
-                  hairpinPoints.push([currentTurnPeak.lat, currentTurnPeak.lon]);
-                } else {
-                  tightTurnPoints.push([currentTurnPeak.lat, currentTurnPeak.lon]);
-                }
-              }
-            }
-            // Reset Turn State
-            currentTurnSum = 0;
-            currentTurnStartBearing = null;
-            currentTurnDistance = 0;
-            currentTurnPeak = { index: -1, delta: 0, lat: 0, lon: 0 };
-          }
-
-        } else {
-          if (currentStraightDist > MIN_STRAIGHT_SECTION) {
-            straightSections.push(currentStraightDist);
-            totalStraightDistance += currentStraightDist;
-          }
-          currentStraightDist = 0;
-        }
-
-      } else {
-        currentStraightDist = distance;
       }
-      lastBearing = bearing;
     } else {
       if (currentStraightDist > 0) currentStraightDist += distance;
     }
