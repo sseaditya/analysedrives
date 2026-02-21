@@ -32,7 +32,7 @@ export const MICRO_JITTER_THRESHOLD = 1.0; // degrees - ignore bearing changes s
 export const STRAIGHT_SECTION_THRESHOLD = 5; // degrees - bearing change under this is considered straight
 export const STRAIGHT_FLUSH_DISTANCE = 0.025; // km - distance of straight travel to flush pending turn
 export const MIN_STRAIGHT_SECTION = 0.02; // km - minimum distance to count as straight section
-export const BEARING_SAMPLE_INTERVAL = 0.100; // km (100 meters) - fixed interval for distance-based bearing computation
+export const BEARING_SAMPLE_INTERVAL = 0.010; // km (10 meters) - fixed interval for distance-based bearing computation
 
 // Speed & Distance Thresholds
 export const MAX_SPEED_CAP = 200; // km/h - sanity cap for max speed
@@ -600,18 +600,8 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
     // we accumulate distance and only sample a new bearing every BEARING_SAMPLE_INTERVAL (100m).
     // This makes rotation, straight %, and twistiness independent of point count.
     let isMoving = false;
-    if (speeds.length > 0) {
-      const window = SPEED_MOVING_AVG_WINDOW;
-      let sum = 0;
-      let count = 0;
-      for (let k = 0; k < window; k++) {
-        if (speeds.length - 1 - k >= 0) {
-          sum += speeds[speeds.length - 1 - k];
-          count++;
-        }
-      }
-      const avgSpeed = count > 0 ? sum / count : 0;
-      isMoving = avgSpeed > STOP_SPEED_THRESHOLD;
+    if (speed > STOP_SPEED_THRESHOLD) {
+      isMoving = true;
     }
 
     if (isMoving) {
@@ -620,10 +610,13 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
       // Only compute bearing when we've traveled enough distance since last sample
       if (distSinceLastBearingSample >= BEARING_SAMPLE_INTERVAL) {
         const sampleDist = haversineDistance(lastSampleLat, lastSampleLon, curr.lat, curr.lon);
-        if (sampleDist > MIN_DISTANCE_FOR_BEARING) {
-          const bearing = calculateBearing(lastSampleLat, lastSampleLon, curr.lat, curr.lon);
 
-          if (lastBearing !== null) {
+        // We only care if we've actually physically moved
+        let bearing: number | null = null;
+        if (sampleDist > MIN_DISTANCE_FOR_BEARING) {
+          bearing = calculateBearing(lastSampleLat, lastSampleLon, curr.lat, curr.lon);
+
+          if (lastBearing !== null && bearing !== null) {
             let delta = bearing - lastBearing;
             if (delta > 180) delta -= 360;
             if (delta < -180) delta += 360;
@@ -728,11 +721,13 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
           } else {
             currentStraightDist = distSinceLastBearingSample;
           }
-          lastBearing = bearing;
-          lastSampleLat = curr.lat;
-          lastSampleLon = curr.lon;
-          distSinceLastBearingSample = 0;
+          if (bearing !== null) {
+            lastBearing = bearing;
+          }
         }
+        lastSampleLat = curr.lat;
+        lastSampleLon = curr.lon;
+        distSinceLastBearingSample = 0;
       }
     } else {
       if (currentStraightDist > 0) currentStraightDist += distance;
