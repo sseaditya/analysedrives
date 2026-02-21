@@ -3,7 +3,7 @@ import { Pencil, Trash2, Loader2, ArrowLeft, Globe, Lock, Fuel, Check, LogIn, Ma
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import GPSStats from "@/components/GPSStats";
-import { GPXStats, GPXPoint, parseGPX, calculateStats, ProcessedTrack, generateProcessedTrack } from "@/utils/gpxParser";
+import { GPXStats, GPXPoint, parseGPX, calculateStats, ProcessedTrack, generateProcessedTrack, PROCESSED_TRACK_VERSION } from "@/utils/gpxParser";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -161,22 +161,31 @@ const Activity = () => {
             .from('gpx-files')
             .download(processedPath);
 
+          let useFallback = true;
           if (!processedError && processedData) {
-            // HIT: Use cached data
             const text = await processedData.text();
-            const processedTrack = JSON.parse(text) as ProcessedTrack;
+            try {
+              const processedTrack = JSON.parse(text) as ProcessedTrack;
 
-            // Map back to GPXPoint structure for components that need it
-            points = processedTrack.points.map(p => ({
-              lat: p.lat,
-              lon: p.lon,
-              ele: p.ele,
-              time: p.time ? new Date(p.time) : undefined,
-            }));
+              if (processedTrack.version === PROCESSED_TRACK_VERSION) {
+                // HIT: Use cached data
+                points = processedTrack.points.map(p => ({
+                  lat: p.lat,
+                  lon: p.lon,
+                  ele: p.ele,
+                  time: p.time ? new Date(p.time) : undefined,
+                }));
+                stats = processedTrack.stats;
+                useFallback = false;
+              } else {
+                console.log(`Version mismatch: Cached ${processedTrack.version} vs App ${PROCESSED_TRACK_VERSION}. Falling back.`);
+              }
+            } catch (e) {
+              console.warn("Error parsing processed track JSON", e);
+            }
+          }
 
-            // Use pre-computed stats
-            stats = processedTrack.stats;
-          } else {
+          if (useFallback) {
             // MISS: Fallback to raw GPX
             const { data: fileData, error: storageError } = await supabase.storage
               .from('gpx-files')

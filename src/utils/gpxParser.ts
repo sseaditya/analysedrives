@@ -107,7 +107,7 @@ export interface SpeedBucket {
 }
 
 // Current version for cache invalidation - increment when parsing logic changes
-export const PROCESSED_TRACK_VERSION = 2;
+export const PROCESSED_TRACK_VERSION = 3;
 
 // Pre-computed point data for cached tracks
 export interface ProcessedPoint {
