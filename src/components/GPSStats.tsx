@@ -836,7 +836,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                   </div>
                 </div>
 
-                {/* Hover Data Display - Own row for mobile */}
+                {/* Hover Data Display */}
                 {hoveredPoint && (() => {
                   const cd = hoveredIndex >= 0 ? cumulativeData.cumDist[hoveredIndex] : 0;
                   const ct = hoveredIndex >= 0 ? cumulativeData.cumTime[hoveredIndex] : 0;
@@ -845,7 +845,16 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                   const m = Math.floor((ct % 3600) / 60);
                   const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
 
-                  return (
+                  return isMobile ? (
+                    <div className="flex items-center gap-4 bg-muted/30 rounded-lg px-3 py-2 border border-border/50 animate-in fade-in duration-150">
+                      <span className="text-sm font-mono font-semibold tabular-nums">{timeStr}</span>
+                      <span className="text-sm font-mono font-semibold tabular-nums">{formatDistance(cd)}</span>
+                      <span className="text-sm font-mono font-semibold tabular-nums">{formatSpeed(finalDisplaySpeed)}</span>
+                      {hoveredPoint.ele !== undefined && (
+                        <span className="text-sm font-mono font-semibold tabular-nums">{hoveredPoint.ele.toFixed(0)}m</span>
+                      )}
+                    </div>
+                  ) : (
                     <div className="flex items-center gap-2 bg-primary/10 px-2.5 py-1.5 rounded-md border border-primary/20 animate-in fade-in duration-150">
                       <span className="text-sm font-mono font-semibold">{timeStr}</span>
                       <div className="w-px h-3.5 bg-border" />
