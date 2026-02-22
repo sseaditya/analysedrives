@@ -40,11 +40,10 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   GPXStats,
   GPXPoint,
@@ -565,31 +564,29 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
               <div className="bg-card border border-border rounded-2xl p-3 shadow-sm">
                 <div className="flex items-center gap-2 mb-2">
                   <h3 className="text-lg font-semibold text-foreground">Route Map</h3>
-                  <TooltipProvider delayDuration={300}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button type="button" className="focus:outline-none" aria-label="More Information">
-                          <Info className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs text-xs space-y-2 z-[1100]">
-                        <p>
-                          <strong>Visualization:</strong> The path is colored by speed. Markers indicate stops and sharp turns.
-                        </p>
-                        <div className="border-t border-border/50 pt-2">
-                          {isOwner ? (
-                            <p className="text-muted-foreground">
-                              <strong>Privacy Zone:</strong> A {hideRadius}km radius around the start/end is visible to you, but hidden from public links.
-                            </p>
-                          ) : (
-                            <p className="text-muted-foreground">
-                              <strong>Privacy Zone:</strong> The first/last few kilometers of this drive are hidden to protect the owner's privacy.
-                            </p>
-                          )}
-                        </div>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button type="button" className="focus:outline-none" aria-label="More Information">
+                        <Info className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="max-w-xs text-xs space-y-2 z-[1100]">
+                      <p>
+                        <strong>Visualization:</strong> The path is colored by speed. Markers indicate stops and sharp turns.
+                      </p>
+                      <div className="border-t border-border/50 pt-2">
+                        {isOwner ? (
+                          <p className="text-muted-foreground">
+                            <strong>Privacy Zone:</strong> A {hideRadius}km radius around the start/end is visible to you, but hidden from public links.
+                          </p>
+                        ) : (
+                          <p className="text-muted-foreground">
+                            <strong>Privacy Zone:</strong> The first/last few kilometers of this drive are hidden to protect the owner's privacy.
+                          </p>
+                        )}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <TrackMap
                   points={mapPoints}
@@ -611,18 +608,16 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                     <div className="flex-shrink-0">
                       <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
                         Speed & Elevation Timeline
-                        <TooltipProvider delayDuration={300}>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button type="button" className="focus:outline-none" aria-label="More Information">
-                                <Info className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs text-xs z-[1100]">
-                              <p>Interactive timeline showing speed (upper chart) and elevation (lower chart). Select speed/elevation chart to zoom, drag and interact. Use speed limiter to understand how longer your drive takes if you stick to a speed limit.</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button type="button" className="focus:outline-none" aria-label="More Information">
+                              <Info className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent className="max-w-xs text-xs z-[1100]">
+                            <p>Interactive timeline showing speed (upper chart) and elevation (lower chart). Select speed/elevation chart to zoom, drag and interact. Use speed limiter to understand how longer your drive takes if you stick to a speed limit.</p>
+                          </PopoverContent>
+                        </Popover>
                       </h3>
                     </div>
 
@@ -838,8 +833,8 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                       </div>
                     </div>
 
-                    {/* Hover Data Display - Right Side (Desktop only) */}
-                    {!isMobile && hoveredPoint && (() => {
+                    {/* Hover Data Display - Right Side */}
+                    {hoveredPoint && (() => {
                       const cd = hoveredIndex >= 0 ? cumulativeData.cumDist[hoveredIndex] : 0;
                       const ct = hoveredIndex >= 0 ? cumulativeData.cumTime[hoveredIndex] : 0;
                       const finalDisplaySpeed = hoveredSpeed ?? 0;
@@ -889,18 +884,16 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                     Speed Distribution
                     {zoomRange && <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Filtered to selection</span>}
                     {effectiveChartSpeedLimit && <span className="text-xs font-normal text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full">Capped at {effectiveChartSpeedLimit} km/h</span>}
-                    <TooltipProvider delayDuration={300}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button type="button" className="focus:outline-none" aria-label="More Information">
-                            <Info className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-xs text-xs">
-                          <p>Histogram showing how much time/distance was spent at each speed range.</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button type="button" className="focus:outline-none" aria-label="More Information">
+                          <Info className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="max-w-xs text-xs">
+                        <p>Histogram showing how much time/distance was spent at each speed range.</p>
+                      </PopoverContent>
+                    </Popover>
                   </h3>
                 </div>
                 <div className="h-[250px]">

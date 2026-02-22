@@ -541,9 +541,8 @@ const SpeedElevationChart = ({
       }
     }
 
-    // Skip hover callback on mobile to remove floating data display
-    // Also skip during active drag to prevent parent re-renders
-    if (isMobile || activeChart) return;
+    // Skip during active drag to prevent parent re-renders
+    if (activeChart) return;
 
     if (!e || !e.activePayload || !e.activePayload[0] || !onHover) {
       return;
