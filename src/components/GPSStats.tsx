@@ -843,16 +843,16 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                       const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
 
                       return (
-                        <div className="flex items-center gap-2 bg-primary/10 px-2.5 rounded-md border border-primary/20 animate-in fade-in slide-in-from-right-2 duration-150">
-                          <span className="text-sm font-mono font-semibold">{timeStr}</span>
-                          <div className="w-px h-3.5 bg-border" />
-                          <span className="text-sm font-mono font-semibold">{formatDistance(cd)}</span>
-                          <div className="w-px h-3.5 bg-border" />
-                          <span className="text-sm font-mono font-semibold">{formatSpeed(finalDisplaySpeed)}</span>
+                        <div className="flex items-baseline gap-2 animate-in fade-in duration-150">
+                          <span className="text-lg font-normal tabular-nums">{timeStr}</span>
+                          <span className="text-muted-foreground">|</span>
+                          <span className="text-lg font-normal tabular-nums">{formatDistance(cd)}</span>
+                          <span className="text-muted-foreground">|</span>
+                          <span className="text-lg font-normal tabular-nums">{formatSpeed(finalDisplaySpeed)}</span>
                           {hoveredPoint.ele !== undefined && (
                             <>
-                              <div className="w-px h-3.5 bg-border" />
-                              <span className="text-sm font-mono font-semibold">{hoveredPoint.ele.toFixed(0)}m</span>
+                              <span className="text-muted-foreground">|</span>
+                              <span className="text-lg font-normal tabular-nums">{hoveredPoint.ele.toFixed(0)}m</span>
                             </>
                           )}
                         </div>
