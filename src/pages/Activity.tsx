@@ -61,7 +61,6 @@ const Activity = () => {
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isVideoOpen, setIsVideoOpen] = useState(false);
-  const canGenerateVideo = user?.email === 'sseaditya@gmail.com';
 
   // Determine ownership
   const isOwner = user && metadata ? user.id === metadata.user_id : false;
@@ -373,7 +372,7 @@ const Activity = () => {
               </>
             )}
 
-            {canGenerateVideo && data && (
+            {data && (
               <>
                 <Button
                   variant="ghost"
