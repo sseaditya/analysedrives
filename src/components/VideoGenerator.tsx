@@ -188,20 +188,32 @@ function renderFrame(
     const zoom = settings.zoom;
     const isLight = style.isLight;
 
-    // Clear
+    // Layout: square map (W×W) at top, stats panel below
+    const mapH = W; // square map
+    const statsH = H - mapH; // remaining space for stats
+    const mapCenterX = W / 2;
+    const mapCenterY = mapH / 2;
+
+    // Clear entire canvas
     ctx.fillStyle = style.bg;
     ctx.fillRect(0, 0, W, H);
+
+    // ── Map region (clipped to square) ──
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, W, mapH);
+    ctx.clip();
 
     // Map tiles (skip for route-only)
     if (style.url) {
         const cxf = lonToTileX(current.lon, zoom), cyf = latToTileY(current.lat, zoom);
         const ctX = Math.floor(cxf), ctY = Math.floor(cyf);
         const offX = (cxf - ctX) * TILE_SIZE, offY = (cyf - ctY) * TILE_SIZE;
-        const halfX = Math.ceil(W / TILE_SIZE / 2) + 1, halfY = Math.ceil(H / TILE_SIZE / 2) + 1;
+        const halfX = Math.ceil(W / TILE_SIZE / 2) + 1, halfY = Math.ceil(mapH / TILE_SIZE / 2) + 1;
         for (let dx = -halfX; dx <= halfX; dx++) {
             for (let dy = -halfY; dy <= halfY; dy++) {
                 const img = tileCache.get(tileCacheKey(style.styleKey, zoom, ctX + dx, ctY + dy));
-                if (img) ctx.drawImage(img, W / 2 + dx * TILE_SIZE - offX, H / 2 + dy * TILE_SIZE - offY, TILE_SIZE, TILE_SIZE);
+                if (img) ctx.drawImage(img, mapCenterX + dx * TILE_SIZE - offX, mapCenterY + dy * TILE_SIZE - offY, TILE_SIZE, TILE_SIZE);
             }
         }
     }
@@ -218,8 +230,8 @@ function renderFrame(
     ctx.beginPath();
     let s = false;
     for (let i = csi; i < sampled.length; i++) {
-        const { x, y } = geoToPixel(sampled[i].lat, sampled[i].lon, current.lat, current.lon, W, H, zoom);
-        if (x < -margin || x > W + margin || y < -margin || y > H + margin) { s = false; continue; }
+        const { x, y } = geoToPixel(sampled[i].lat, sampled[i].lon, current.lat, current.lon, W, mapH, zoom);
+        if (x < -margin || x > W + margin || y < -margin || y > mapH + margin) { s = false; continue; }
         if (!s) { ctx.moveTo(x, y); s = true; } else ctx.lineTo(x, y);
     }
     ctx.strokeStyle = `rgba(204, 120, 92, ${upcomingAlpha})`;
@@ -229,8 +241,8 @@ function renderFrame(
     // Traveled (glow)
     ctx.beginPath(); s = false;
     for (let i = 0; i <= csi && i < sampled.length; i++) {
-        const { x, y } = geoToPixel(sampled[i].lat, sampled[i].lon, current.lat, current.lon, W, H, zoom);
-        if (x < -margin || x > W + margin || y < -margin || y > H + margin) { s = false; continue; }
+        const { x, y } = geoToPixel(sampled[i].lat, sampled[i].lon, current.lat, current.lon, W, mapH, zoom);
+        if (x < -margin || x > W + margin || y < -margin || y > mapH + margin) { s = false; continue; }
         if (!s) { ctx.moveTo(x, y); s = true; } else ctx.lineTo(x, y);
     }
     const glowWidth = settings.mapType === "route" ? 20 : 14;
@@ -238,40 +250,42 @@ function renderFrame(
     ctx.strokeStyle = `rgba(204, 120, 92, 0.4)`; ctx.lineWidth = glowWidth * 0.57; ctx.stroke();
     ctx.strokeStyle = routeColor; ctx.lineWidth = settings.mapType === "route" ? 4 : 3; ctx.stroke();
 
-    // Position marker
-    const px = W / 2, py = H / 2;
+    // Position marker (centered in map square)
     const pulse = Math.sin(frameNum * 0.15) * 0.3 + 1.0;
-    const grad = ctx.createRadialGradient(px, py, 0, px, py, 25 * pulse);
+    const grad = ctx.createRadialGradient(mapCenterX, mapCenterY, 0, mapCenterX, mapCenterY, 25 * pulse);
     grad.addColorStop(0, "rgba(204, 120, 92, 0.6)");
     grad.addColorStop(0.5, "rgba(204, 120, 92, 0.2)");
     grad.addColorStop(1, "rgba(204, 120, 92, 0)");
-    ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(px, py, 25 * pulse, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(px, py, 7, 0, Math.PI * 2);
+    ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(mapCenterX, mapCenterY, 25 * pulse, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(mapCenterX, mapCenterY, 7, 0, Math.PI * 2);
     ctx.fillStyle = isLight ? "#191919" : "#FAFAF7"; ctx.fill();
     ctx.strokeStyle = ACCENT; ctx.lineWidth = 2.5; ctx.stroke();
 
-    // Stats HUD
+    ctx.restore(); // end map clip
+
+    // ── Stats panel below map ──
     const avgSpeed = rollingAvg(points, current.elapsedTime, "speed");
     const avgEle = rollingAvg(points, current.elapsedTime, "ele");
 
-    const hudH = Math.round(H * 0.105), hudY = H - hudH - Math.round(H * 0.022);
-    const hudX = Math.round(W * 0.028), hudW = W - hudX * 2;
-    const r = Math.round(W * 0.022);
-    ctx.beginPath();
-    ctx.moveTo(hudX + r, hudY); ctx.lineTo(hudX + hudW - r, hudY);
-    ctx.quadraticCurveTo(hudX + hudW, hudY, hudX + hudW, hudY + r);
-    ctx.lineTo(hudX + hudW, hudY + hudH - r);
-    ctx.quadraticCurveTo(hudX + hudW, hudY + hudH, hudX + hudW - r, hudY + hudH);
-    ctx.lineTo(hudX + r, hudY + hudH);
-    ctx.quadraticCurveTo(hudX, hudY + hudH, hudX, hudY + hudH - r);
-    ctx.lineTo(hudX, hudY + r);
-    ctx.quadraticCurveTo(hudX, hudY, hudX + r, hudY);
-    ctx.closePath();
-    ctx.fillStyle = style.hudBg; ctx.fill();
-    ctx.strokeStyle = `rgba(204, 120, 92, 0.3)`; ctx.lineWidth = 1; ctx.stroke();
+    const panelY = mapH;
+    const panelPad = Math.round(W * 0.05);
 
-    const colW = hudW / 2, rowH = hudH / 2, pad = Math.round(W * 0.028);
-    const labelSize = Math.round(W * 0.012), valueSize = Math.round(W * 0.037), unitSize = Math.round(W * 0.017);
+    // Subtle separator line at top of stats panel
+    ctx.fillStyle = isLight ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.08)";
+    ctx.fillRect(0, panelY, W, 1);
+
+    // Stats layout: 2×2 grid in the stats panel
+    const gridX = panelPad;
+    const gridW = W - panelPad * 2;
+    const gridY = panelY + Math.round(statsH * 0.08);
+    const gridH = statsH - Math.round(statsH * 0.16);
+    const colW = gridW / 2;
+    const rowH = gridH / 2;
+
+    const labelSize = Math.round(W * 0.022);
+    const valueSize = Math.round(W * 0.065);
+    const unitSize = Math.round(W * 0.028);
+
     const cells = [
         { label: "SPEED", value: `${Math.round(avgSpeed)}`, unit: "km/h", col: 0, row: 0 },
         { label: "DISTANCE", value: formatDist(current.distance), unit: "", col: 1, row: 0 },
@@ -279,23 +293,25 @@ function renderFrame(
         { label: "TIME", value: formatDur(current.elapsedTime), unit: "", col: 1, row: 1 },
     ];
     for (const c of cells) {
-        const cx = hudX + c.col * colW + pad, cy = hudY + c.row * rowH + Math.round(hudH * 0.08);
+        const cx = gridX + c.col * colW;
+        const cy = gridY + c.row * rowH;
         ctx.fillStyle = style.labelColor; ctx.font = `600 ${labelSize}px sans-serif`; ctx.textAlign = "left";
         ctx.fillText(c.label, cx, cy + labelSize + 2);
         ctx.fillStyle = style.textColor; ctx.font = `bold ${valueSize}px sans-serif`;
-        ctx.fillText(c.value, cx, cy + labelSize + valueSize + 6);
+        ctx.fillText(c.value, cx, cy + labelSize + valueSize + 8);
         if (c.unit) {
             const vw = ctx.measureText(c.value).width;
             ctx.fillStyle = style.labelColor; ctx.font = `600 ${unitSize}px sans-serif`;
-            ctx.fillText(` ${c.unit}`, cx + vw, cy + labelSize + valueSize + 6);
+            ctx.fillText(` ${c.unit}`, cx + vw, cy + labelSize + valueSize + 8);
         }
     }
 
-    // Progress bar
-    const barY = H - Math.round(H * 0.01), barH = Math.round(H * 0.002);
+    // Progress bar at very bottom
+    const barH = Math.round(H * 0.003);
+    const barY = H - barH;
     ctx.fillStyle = isLight ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.1)";
-    ctx.fillRect(hudX, barY, hudW, barH);
-    ctx.fillStyle = ACCENT; ctx.fillRect(hudX, barY, hudW * (current.elapsedTime / totalRealTime), barH);
+    ctx.fillRect(0, barY, W, barH);
+    ctx.fillStyle = ACCENT; ctx.fillRect(0, barY, W * (current.elapsedTime / totalRealTime), barH);
 }
 
 // ─── COMPONENT ──────────────────────────────────────────────────────────────
