@@ -263,47 +263,39 @@ function renderFrame(
 
     ctx.restore(); // end map clip
 
-    // ── Stats panel below map ──
+    // ── Stats strip below map (single inline row) ──
     const avgSpeed = rollingAvg(points, current.elapsedTime, "speed");
     const avgEle = rollingAvg(points, current.elapsedTime, "ele");
 
     const panelY = mapH;
-    const panelPad = Math.round(W * 0.05);
 
-    // Subtle separator line at top of stats panel
+    // Subtle separator line
     ctx.fillStyle = isLight ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.08)";
     ctx.fillRect(0, panelY, W, 1);
 
-    // Stats layout: 2×2 grid in the stats panel
-    const gridX = panelPad;
-    const gridW = W - panelPad * 2;
-    const gridY = panelY + Math.round(statsH * 0.08);
-    const gridH = statsH - Math.round(statsH * 0.16);
-    const colW = gridW / 2;
-    const rowH = gridH / 2;
-
-    const labelSize = Math.round(W * 0.022);
-    const valueSize = Math.round(W * 0.065);
-    const unitSize = Math.round(W * 0.028);
+    // 4 stats in a single row, evenly spaced
+    const labelSize = Math.round(W * 0.018);
+    const valueSize = Math.round(W * 0.042);
+    const unitSize = Math.round(W * 0.022);
+    const colW = W / 4;
+    const centerY = panelY + statsH / 2;
 
     const cells = [
-        { label: "SPEED", value: `${Math.round(avgSpeed)}`, unit: "km/h", col: 0, row: 0 },
-        { label: "DISTANCE", value: formatDist(current.distance), unit: "", col: 1, row: 0 },
-        { label: "ELEVATION", value: `${Math.round(avgEle)} m`, unit: "", col: 0, row: 1 },
-        { label: "TIME", value: formatDur(current.elapsedTime), unit: "", col: 1, row: 1 },
+        { label: "SPEED", value: `${Math.round(avgSpeed)}`, unit: "km/h" },
+        { label: "DISTANCE", value: formatDist(current.distance), unit: "" },
+        { label: "ELEVATION", value: `${Math.round(avgEle)}`, unit: "m" },
+        { label: "TIME", value: formatDur(current.elapsedTime), unit: "" },
     ];
-    for (const c of cells) {
-        const cx = gridX + c.col * colW;
-        const cy = gridY + c.row * rowH;
-        ctx.fillStyle = style.labelColor; ctx.font = `600 ${labelSize}px sans-serif`; ctx.textAlign = "left";
-        ctx.fillText(c.label, cx, cy + labelSize + 2);
-        ctx.fillStyle = style.textColor; ctx.font = `bold ${valueSize}px sans-serif`;
-        ctx.fillText(c.value, cx, cy + labelSize + valueSize + 8);
-        if (c.unit) {
-            const vw = ctx.measureText(c.value).width;
-            ctx.fillStyle = style.labelColor; ctx.font = `600 ${unitSize}px sans-serif`;
-            ctx.fillText(` ${c.unit}`, cx + vw, cy + labelSize + valueSize + 8);
-        }
+    for (let i = 0; i < cells.length; i++) {
+        const c = cells[i];
+        const cx = colW * i + colW / 2; // center of each column
+        // Label
+        ctx.fillStyle = style.labelColor; ctx.font = `600 ${labelSize}px sans-serif`; ctx.textAlign = "center";
+        ctx.fillText(c.label, cx, centerY - valueSize * 0.3);
+        // Value + unit
+        ctx.fillStyle = style.textColor; ctx.font = `bold ${valueSize}px sans-serif`; ctx.textAlign = "center";
+        const valText = c.unit ? `${c.value} ${c.unit}` : c.value;
+        ctx.fillText(valText, cx, centerY + valueSize * 0.55);
     }
 
     // Progress bar at very bottom
