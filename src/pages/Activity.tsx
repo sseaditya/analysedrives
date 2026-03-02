@@ -1,5 +1,5 @@
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { Pencil, Trash2, Loader2, ArrowLeft, Globe, Lock, Fuel, Check, LogIn, Maximize2, Minimize2 } from "lucide-react";
+import { Pencil, Trash2, Loader2, ArrowLeft, Globe, Lock, Fuel, Check, LogIn, Maximize2, Minimize2, Film } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import GPSStats from "@/components/GPSStats";
@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import ActivityEditor from "@/components/ActivityEditor";
 import { useIsMobile } from "@/hooks/use-mobile";
 import HeaderProfile from "@/components/HeaderProfile";
+import VideoGenerator from "@/components/VideoGenerator";
 
 interface ActivityState {
   stats: GPXStats;
@@ -59,6 +60,8 @@ const Activity = () => {
   const [accessDenied, setAccessDenied] = useState(false);
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [isVideoOpen, setIsVideoOpen] = useState(false);
+  const canGenerateVideo = user?.email === 'sseaditya@gmail.com';
 
   // Determine ownership
   const isOwner = user && metadata ? user.id === metadata.user_id : false;
@@ -366,6 +369,26 @@ const Activity = () => {
                     fuel: metadata.fuel
                   }}
                   onUpdate={(updated) => setMetadata({ ...metadata, ...updated })}
+                />
+              </>
+            )}
+
+            {canGenerateVideo && data && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setIsVideoOpen(true)}
+                  title="Generate Video"
+                >
+                  <Film className="w-4 h-4" />
+                </Button>
+                <VideoGenerator
+                  open={isVideoOpen}
+                  onOpenChange={setIsVideoOpen}
+                  points={data.points}
+                  title={data.fileName}
                 />
               </>
             )}
