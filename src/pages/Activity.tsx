@@ -372,7 +372,7 @@ const Activity = () => {
               </>
             )}
 
-            {data && (
+            {isOwner && data && (
               <>
                 <Button
                   variant="ghost"
