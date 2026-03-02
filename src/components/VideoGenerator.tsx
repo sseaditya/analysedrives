@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Film, Download, Loader2, X, Play, ZoomIn, ZoomOut } from "lucide-react";
+import { Film, Download, Loader2, X, Play, ZoomIn, ZoomOut, Sun, Moon } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { GPXPoint, haversineDistance } from "@/utils/gpxParser";
@@ -11,15 +11,32 @@ const TILE_SIZE = 256;
 const ROLLING_WINDOW_SECONDS = 30;
 const SPEED_OPTIONS = [15, 30, 60, 120] as const;
 
-// Map styles
-const MAP_STYLES = [
-    { id: "dark", label: "Dark", url: "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png", bg: "#191919", textColor: "#FAFAF7", labelColor: "rgba(250,250,247,0.45)", hudBg: "rgba(25,25,25,0.88)" },
-    { id: "light", label: "Light", url: "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png", bg: "#E5E4DF", textColor: "#191919", labelColor: "rgba(25,25,25,0.45)", hudBg: "rgba(250,250,247,0.88)" },
-    { id: "terrain", label: "Terrain", url: "https://tile.opentopomap.org/{z}/{x}/{y}.png", bg: "#F2EFE9", textColor: "#191919", labelColor: "rgba(25,25,25,0.45)", hudBg: "rgba(250,250,247,0.88)" },
-    { id: "route", label: "Route Only", url: "", bg: "#191919", textColor: "#FAFAF7", labelColor: "rgba(250,250,247,0.45)", hudBg: "rgba(25,25,25,0.88)" },
+// Map type tiles
+const MAP_TYPES = [
+    { id: "standard", label: "Standard" },
+    { id: "terrain", label: "Terrain" },
+    { id: "route", label: "Route Only" },
 ] as const;
+type MapTypeId = typeof MAP_TYPES[number]["id"];
 
-type MapStyleId = typeof MAP_STYLES[number]["id"];
+function getMapConfig(isDark: boolean, mapType: MapTypeId) {
+    const darkColors = { bg: "#191919", textColor: "#FAFAF7", labelColor: "rgba(250,250,247,0.45)", hudBg: "rgba(25,25,25,0.88)" };
+    const lightColors = { bg: "#E5E4DF", textColor: "#191919", labelColor: "rgba(25,25,25,0.45)", hudBg: "rgba(250,250,247,0.88)" };
+    const colors = isDark ? darkColors : lightColors;
+    let url = "";
+    let styleKey = isDark ? "dark" : "light";
+    if (mapType === "standard") {
+        url = isDark
+            ? "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png"
+            : "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png";
+    } else if (mapType === "terrain") {
+        url = "https://tile.opentopomap.org/{z}/{x}/{y}.png";
+        styleKey = "terrain";
+        if (!isDark) Object.assign(colors, { bg: "#F2EFE9" });
+    }
+    // route: url stays empty
+    return { ...colors, url, styleKey: `${styleKey}_${mapType}`, isLight: !isDark };
+}
 
 const ACCENT = "#CC785C";
 
@@ -44,7 +61,8 @@ interface VideoGeneratorProps {
 
 interface RenderSettings {
     zoom: number;
-    mapStyle: MapStyleId;
+    isDark: boolean;
+    mapType: MapTypeId;
 }
 
 // ─── HELPERS ────────────────────────────────────────────────────────────────
@@ -166,9 +184,9 @@ function renderFrame(
     frameNum: number, totalRealTime: number,
     settings: RenderSettings,
 ) {
-    const style = MAP_STYLES.find(s => s.id === settings.mapStyle) || MAP_STYLES[0];
+    const style = getMapConfig(settings.isDark, settings.mapType);
     const zoom = settings.zoom;
-    const isLight = style.id === "light" || style.id === "terrain";
+    const isLight = style.isLight;
 
     // Clear
     ctx.fillStyle = style.bg;
@@ -182,7 +200,7 @@ function renderFrame(
         const halfX = Math.ceil(W / TILE_SIZE / 2) + 1, halfY = Math.ceil(H / TILE_SIZE / 2) + 1;
         for (let dx = -halfX; dx <= halfX; dx++) {
             for (let dy = -halfY; dy <= halfY; dy++) {
-                const img = tileCache.get(tileCacheKey(style.id, zoom, ctX + dx, ctY + dy));
+                const img = tileCache.get(tileCacheKey(style.styleKey, zoom, ctX + dx, ctY + dy));
                 if (img) ctx.drawImage(img, W / 2 + dx * TILE_SIZE - offX, H / 2 + dy * TILE_SIZE - offY, TILE_SIZE, TILE_SIZE);
             }
         }
@@ -205,7 +223,7 @@ function renderFrame(
         if (!s) { ctx.moveTo(x, y); s = true; } else ctx.lineTo(x, y);
     }
     ctx.strokeStyle = `rgba(204, 120, 92, ${upcomingAlpha})`;
-    ctx.lineWidth = style.id === "route" ? 4 : 3;
+    ctx.lineWidth = settings.mapType === "route" ? 4 : 3;
     ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.stroke();
 
     // Traveled (glow)
@@ -215,10 +233,10 @@ function renderFrame(
         if (x < -margin || x > W + margin || y < -margin || y > H + margin) { s = false; continue; }
         if (!s) { ctx.moveTo(x, y); s = true; } else ctx.lineTo(x, y);
     }
-    const glowWidth = style.id === "route" ? 20 : 14;
+    const glowWidth = settings.mapType === "route" ? 20 : 14;
     ctx.strokeStyle = `rgba(204, 120, 92, 0.15)`; ctx.lineWidth = glowWidth; ctx.stroke();
     ctx.strokeStyle = `rgba(204, 120, 92, 0.4)`; ctx.lineWidth = glowWidth * 0.57; ctx.stroke();
-    ctx.strokeStyle = routeColor; ctx.lineWidth = style.id === "route" ? 4 : 3; ctx.stroke();
+    ctx.strokeStyle = routeColor; ctx.lineWidth = settings.mapType === "route" ? 4 : 3; ctx.stroke();
 
     // Position marker
     const px = W / 2, py = H / 2;
@@ -282,9 +300,10 @@ function renderFrame(
 
 // ─── COMPONENT ──────────────────────────────────────────────────────────────
 const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorProps) => {
-    const [resolution, setResolution] = useState(0); // 720p default (faster)
+    const [resolution, setResolution] = useState(0);
     const [zoom, setZoom] = useState(14);
-    const [mapStyleId, setMapStyleId] = useState<MapStyleId>("dark");
+    const [isDark, setIsDark] = useState(true);
+    const [mapType, setMapType] = useState<MapTypeId>("standard");
     const [speedMultiplier, setSpeedMultiplier] = useState(30);
     const [phase, setPhase] = useState<"idle" | "prefetch" | "preview" | "generating" | "done">("idle");
     const [progress, setProgress] = useState(0);
@@ -295,8 +314,8 @@ const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorPro
     const abortRef = useRef(false);
     const computed = useRef<ComputedPoint[]>([]);
 
-    const settings: RenderSettings = { zoom, mapStyle: mapStyleId };
-    const currentStyle = MAP_STYLES.find(s => s.id === mapStyleId)!;
+    const settings: RenderSettings = { zoom, isDark, mapType };
+    const mapConfig = getMapConfig(isDark, mapType);
 
     // Compute points once when dialog opens
     useEffect(() => {
@@ -325,8 +344,8 @@ const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorPro
 
         const doPreview = async () => {
             abortRef.current = false;
-            if (currentStyle.url) {
-                await prefetchTiles(pts, currentStyle.id, currentStyle.url, zoom);
+            if (mapConfig.url) {
+                await prefetchTiles(pts, mapConfig.styleKey, mapConfig.url, zoom);
             }
 
             const totalRealTime = pts[pts.length - 1].elapsedTime;
@@ -352,16 +371,16 @@ const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorPro
         doPreview();
 
         return () => { abortRef.current = true; cancelAnimationFrame(animFrameRef.current); };
-    }, [phase, zoom, mapStyleId]);
+    }, [phase, zoom, isDark, mapType, speedMultiplier]);
 
     const startPreview = useCallback(async () => {
         const pts = computed.current;
         if (pts.length === 0) return;
         setPhase("prefetch");
-        await prefetchTiles(pts, currentStyle.id, currentStyle.url, zoom, (p) => setProgress(p));
+        await prefetchTiles(pts, mapConfig.styleKey, mapConfig.url, zoom, (p) => setProgress(p));
         setProgress(0);
         setPhase("preview");
-    }, [zoom, mapStyleId]);
+    }, [zoom, isDark, mapType]);
 
     const generateVideo = useCallback(async () => {
         const pts = computed.current;
@@ -413,7 +432,7 @@ const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorPro
         encoder.configure(config);
 
         // Ensure tiles are loaded for the generation zoom/style
-        await prefetchTiles(pts, currentStyle.id, currentStyle.url, zoom);
+        await prefetchTiles(pts, mapConfig.styleKey, mapConfig.url, zoom);
 
         for (let frame = 0; frame < totalFrames; frame++) {
             if (abortRef.current) { encoder.close(); return; }
@@ -458,7 +477,7 @@ const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorPro
         setBlobUrl(URL.createObjectURL(blob));
         setPhase("done");
         setProgress(1);
-    }, [resolution, zoom, mapStyleId]);
+    }, [resolution, zoom, isDark, mapType, speedMultiplier]);
 
     const handleClose = () => {
         abortRef.current = true;
@@ -526,20 +545,30 @@ const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorPro
                         </div>
                     </div>
 
-                    {/* Row 2: Map Style */}
-                    <div>
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Map Style</span>
-                        <div className="flex gap-1 mt-1">
-                            {MAP_STYLES.map((ms) => (
-                                <button key={ms.id} onClick={() => canEdit && setMapStyleId(ms.id)}
-                                    className={`flex-1 py-1 rounded text-[11px] font-bold transition-all border ${ms.id === mapStyleId
-                                        ? "bg-primary text-primary-foreground border-primary"
-                                        : "bg-muted/30 text-muted-foreground border-transparent hover:bg-muted/50"}`}
-                                    disabled={!canEdit}>
-                                    {ms.label}
-                                </button>
-                            ))}
+                    {/* Row 2: Map Type + Dark/Light */}
+                    <div className="grid grid-cols-[1fr_auto] gap-3 items-end">
+                        <div>
+                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Map</span>
+                            <div className="flex gap-1 mt-1">
+                                {MAP_TYPES.map((mt) => (
+                                    <button key={mt.id} onClick={() => canEdit && setMapType(mt.id)}
+                                        className={`flex-1 py-1 rounded text-[11px] font-bold transition-all border ${mt.id === mapType
+                                            ? "bg-primary text-primary-foreground border-primary"
+                                            : "bg-muted/30 text-muted-foreground border-transparent hover:bg-muted/50"}`}
+                                        disabled={!canEdit}>
+                                        {mt.label}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
+                        <button
+                            onClick={() => canEdit && setIsDark(d => !d)}
+                            disabled={!canEdit}
+                            className="p-1.5 rounded-md border bg-muted/30 hover:bg-muted/50 text-muted-foreground transition-all mb-[1px]"
+                            title={isDark ? "Switch to Light" : "Switch to Dark"}
+                        >
+                            {isDark ? <Moon className="w-3.5 h-3.5" /> : <Sun className="w-3.5 h-3.5" />}
+                        </button>
                     </div>
 
                     {/* Row 3: Zoom slider */}
