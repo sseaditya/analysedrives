@@ -188,9 +188,9 @@ function renderFrame(
     const zoom = settings.zoom;
     const isLight = style.isLight;
 
-    // Layout: square map (W×W) at top, stats panel below
-    const mapH = W; // square map
-    const statsH = H - mapH; // remaining space for stats
+    // Layout: compact stats strip at bottom, map fills the rest
+    const statsH = Math.round(W * 0.16); // compact strip for stats + branding
+    const mapH = H - statsH; // map gets all remaining height
     const mapCenterX = W / 2;
     const mapCenterY = mapH / 2;
 
@@ -276,9 +276,8 @@ function renderFrame(
     // 4 stats in a single row, evenly spaced
     const labelSize = Math.round(W * 0.018);
     const valueSize = Math.round(W * 0.042);
-    const unitSize = Math.round(W * 0.022);
     const colW = W / 4;
-    const centerY = panelY + statsH / 2;
+    const statsCenterY = panelY + statsH * 0.38; // upper portion for stats
 
     const cells = [
         { label: "SPEED", value: `${Math.round(avgSpeed)}`, unit: "km/h" },
@@ -288,15 +287,20 @@ function renderFrame(
     ];
     for (let i = 0; i < cells.length; i++) {
         const c = cells[i];
-        const cx = colW * i + colW / 2; // center of each column
+        const cx = colW * i + colW / 2;
         // Label
         ctx.fillStyle = style.labelColor; ctx.font = `600 ${labelSize}px sans-serif`; ctx.textAlign = "center";
-        ctx.fillText(c.label, cx, centerY - valueSize * 0.3);
+        ctx.fillText(c.label, cx, statsCenterY - valueSize * 0.3);
         // Value + unit
         ctx.fillStyle = style.textColor; ctx.font = `bold ${valueSize}px sans-serif`; ctx.textAlign = "center";
         const valText = c.unit ? `${c.value} ${c.unit}` : c.value;
-        ctx.fillText(valText, cx, centerY + valueSize * 0.55);
+        ctx.fillText(valText, cx, statsCenterY + valueSize * 0.55);
     }
+
+    // "driven" branding
+    const brandSize = Math.round(W * 0.022);
+    ctx.fillStyle = style.labelColor; ctx.font = `700 ${brandSize}px sans-serif`; ctx.textAlign = "center";
+    ctx.fillText("driven", W / 2, panelY + statsH - Math.round(statsH * 0.15));
 
     // Progress bar at very bottom
     const barH = Math.round(H * 0.003);
