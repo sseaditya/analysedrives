@@ -370,13 +370,29 @@ const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorPro
             error: (e) => console.error("VideoEncoder error:", e),
         });
 
-        encoder.configure({
-            codec: "avc1.42001E",
+        // Pick codec level based on resolution
+        // H.264 High Profile: Level 4.0 (640028) for ≤1080p, Level 5.1 (640033) for 4K
+        const codecString = W > 1500 ? "avc1.640033" : "avc1.640028";
+
+        const config: VideoEncoderConfig = {
+            codec: codecString,
             width: W,
             height: H,
-            bitrate: W > 1500 ? 8_000_000 : 4_000_000,
+            bitrate: W > 1500 ? 12_000_000 : W > 800 ? 6_000_000 : 3_000_000,
             framerate: FPS,
-        });
+        };
+
+        // Verify support before starting
+        const support = await VideoEncoder.isConfigSupported(config);
+        if (!support.supported) {
+            console.error("❌ VideoEncoder config not supported:", config);
+            alert(`Your browser doesn't support encoding at ${RESOLUTIONS[resolution].label}. Try a lower resolution.`);
+            setPhase("preview");
+            return;
+        }
+        console.log("✅ Codec supported:", codecString);
+
+        encoder.configure(config);
 
         // Render & encode frames
         for (let frame = 0; frame < totalFrames; frame++) {
