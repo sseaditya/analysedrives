@@ -478,175 +478,156 @@ const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorPro
 
     return (
         <Dialog open={open} onOpenChange={handleClose}>
-            <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <Film className="w-5 h-5 text-primary" />
-                        Generate Video
-                    </DialogTitle>
-                    <DialogDescription>
-                        Timelapse · on-device processing
-                    </DialogDescription>
-                </DialogHeader>
+            <DialogContent className="max-w-[420px] p-0 gap-0 overflow-hidden">
+                {/* Header */}
+                <div className="px-5 pt-5 pb-3">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-base">
+                            <Film className="w-4 h-4 text-primary" />
+                            Generate Video
+                        </DialogTitle>
+                        <DialogDescription className="text-xs">
+                            Timelapse · processed on your device
+                        </DialogDescription>
+                    </DialogHeader>
+                </div>
 
-                {/* Settings Grid */}
-                <div className="space-y-3">
-                    {/* Resolution */}
-                    <div>
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Resolution</span>
-                        <div className="flex gap-1.5 mt-1">
-                            {RESOLUTIONS.map((r, i) => (
-                                <button
-                                    key={r.label}
-                                    onClick={() => canEdit && setResolution(i)}
-                                    className={`flex-1 py-1.5 px-2 rounded-md text-xs font-bold transition-all border ${i === resolution
-                                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                                        : "bg-muted/40 text-muted-foreground border-transparent hover:bg-muted/60"
-                                        }`}
-                                    disabled={!canEdit}
-                                >
-                                    {r.label}
-                                </button>
-                            ))}
+                {/* Scrollable body */}
+                <div className="px-5 pb-4 space-y-3 max-h-[calc(90vh-140px)] overflow-y-auto">
+                    {/* Row 1: Resolution + Speed side by side */}
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Resolution</span>
+                            <div className="flex gap-1 mt-1">
+                                {RESOLUTIONS.map((r, i) => (
+                                    <button key={r.label} onClick={() => canEdit && setResolution(i)}
+                                        className={`flex-1 py-1 rounded text-[11px] font-bold transition-all border ${i === resolution
+                                            ? "bg-primary text-primary-foreground border-primary"
+                                            : "bg-muted/30 text-muted-foreground border-transparent hover:bg-muted/50"}`}
+                                        disabled={!canEdit}>
+                                        {r.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div>
+                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Speed</span>
+                            <div className="flex gap-1 mt-1">
+                                {SPEED_OPTIONS.map((sp) => (
+                                    <button key={sp} onClick={() => canEdit && setSpeedMultiplier(sp)}
+                                        className={`flex-1 py-1 rounded text-[11px] font-bold transition-all border ${sp === speedMultiplier
+                                            ? "bg-primary text-primary-foreground border-primary"
+                                            : "bg-muted/30 text-muted-foreground border-transparent hover:bg-muted/50"}`}
+                                        disabled={!canEdit}>
+                                        {sp}×
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     </div>
 
-                    {/* Speed */}
-                    <div>
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Speed</span>
-                        <div className="flex gap-1.5 mt-1">
-                            {SPEED_OPTIONS.map((sp) => (
-                                <button
-                                    key={sp}
-                                    onClick={() => canEdit && setSpeedMultiplier(sp)}
-                                    className={`flex-1 py-1.5 px-2 rounded-md text-xs font-bold transition-all border ${sp === speedMultiplier
-                                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                                        : "bg-muted/40 text-muted-foreground border-transparent hover:bg-muted/60"
-                                        }`}
-                                    disabled={!canEdit}
-                                >
-                                    {sp}×
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Map Style */}
+                    {/* Row 2: Map Style */}
                     <div>
                         <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Map Style</span>
-                        <div className="flex gap-1.5 mt-1">
+                        <div className="flex gap-1 mt-1">
                             {MAP_STYLES.map((ms) => (
-                                <button
-                                    key={ms.id}
-                                    onClick={() => { if (canEdit) setMapStyleId(ms.id); }}
-                                    className={`flex-1 py-1.5 px-2 rounded-md text-xs font-bold transition-all border ${ms.id === mapStyleId
-                                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                                        : "bg-muted/40 text-muted-foreground border-transparent hover:bg-muted/60"
-                                        }`}
-                                    disabled={!canEdit}
-                                >
+                                <button key={ms.id} onClick={() => canEdit && setMapStyleId(ms.id)}
+                                    className={`flex-1 py-1 rounded text-[11px] font-bold transition-all border ${ms.id === mapStyleId
+                                        ? "bg-primary text-primary-foreground border-primary"
+                                        : "bg-muted/30 text-muted-foreground border-transparent hover:bg-muted/50"}`}
+                                    disabled={!canEdit}>
                                     {ms.label}
                                 </button>
                             ))}
                         </div>
                     </div>
 
-                    {/* Zoom */}
+                    {/* Row 3: Zoom slider */}
                     <div>
                         <div className="flex items-center justify-between">
                             <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Zoom</span>
-                            <span className="text-[11px] text-muted-foreground font-mono">{zoom}</span>
+                            <span className="text-[10px] text-muted-foreground font-mono">{zoom}</span>
                         </div>
                         <div className="flex items-center gap-2 mt-1">
-                            <button
-                                onClick={() => canEdit && setZoom(z => Math.max(10, z - 1))}
+                            <button onClick={() => canEdit && setZoom(z => Math.max(10, z - 1))}
                                 disabled={!canEdit || zoom <= 10}
-                                className="p-1 rounded bg-muted/40 hover:bg-muted/60 text-muted-foreground disabled:opacity-30"
-                            >
-                                <ZoomOut className="w-3.5 h-3.5" />
+                                className="p-0.5 rounded bg-muted/30 hover:bg-muted/50 text-muted-foreground disabled:opacity-30">
+                                <ZoomOut className="w-3 h-3" />
                             </button>
-                            <input
-                                type="range" min={10} max={17} value={zoom}
+                            <input type="range" min={10} max={17} value={zoom}
                                 onChange={(e) => canEdit && setZoom(Number(e.target.value))}
                                 disabled={!canEdit}
-                                className="flex-1 h-1.5 accent-primary"
-                            />
-                            <button
-                                onClick={() => canEdit && setZoom(z => Math.min(17, z + 1))}
+                                className="flex-1 h-1 accent-primary" />
+                            <button onClick={() => canEdit && setZoom(z => Math.min(17, z + 1))}
                                 disabled={!canEdit || zoom >= 17}
-                                className="p-1 rounded bg-muted/40 hover:bg-muted/60 text-muted-foreground disabled:opacity-30"
-                            >
-                                <ZoomIn className="w-3.5 h-3.5" />
+                                className="p-0.5 rounded bg-muted/30 hover:bg-muted/50 text-muted-foreground disabled:opacity-30">
+                                <ZoomIn className="w-3 h-3" />
                             </button>
                         </div>
                     </div>
+
+                    {/* Preview Area */}
+                    <div
+                        className="relative w-full rounded-lg overflow-hidden border border-border bg-black flex items-center justify-center"
+                        style={{ aspectRatio: `${res.w} / ${res.h}`, maxHeight: 300 }}
+                    >
+                        {phase === "idle" && (
+                            <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                <Play className="w-8 h-8 opacity-30" />
+                                <span className="text-[10px]">Tap Preview to start</span>
+                            </div>
+                        )}
+
+                        {phase === "prefetch" && (
+                            <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                <Loader2 className="w-5 h-5 animate-spin" />
+                                <span className="text-[10px]">Loading tiles… {Math.round(progress * 100)}%</span>
+                            </div>
+                        )}
+
+                        {(phase === "preview" || phase === "generating" || phase === "done") && (
+                            <canvas ref={previewCanvasRef} width={previewW} height={previewH}
+                                className="w-full h-full object-contain" />
+                        )}
+
+                        {phase === "generating" && (
+                            <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-1.5 backdrop-blur-[1px]">
+                                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                                <span className="text-white text-sm font-semibold">{Math.round(progress * 100)}%</span>
+                                <span className="text-white/50 text-[9px]">{frameInfo || `Starting ${RESOLUTIONS[resolution].label} encode…`}</span>
+                            </div>
+                        )}
+
+                        {phase === "done" && (
+                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                                <span className="text-white text-sm font-semibold">✅ Ready</span>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
-                {/* Preview / Progress Area */}
-                <div
-                    className="relative w-full rounded-xl overflow-hidden border border-border bg-black flex items-center justify-center"
-                    style={{ aspectRatio: `${res.w} / ${res.h}`, maxHeight: 380 }}
-                >
+                {/* Sticky action bar */}
+                <div className="px-5 py-3 border-t border-border bg-background">
                     {phase === "idle" && (
-                        <div className="flex flex-col items-center gap-3 text-muted-foreground">
-                            <Play className="w-10 h-10 opacity-40" />
-                            <span className="text-xs">Click Preview to see a sample</span>
-                        </div>
-                    )}
-
-                    {phase === "prefetch" && (
-                        <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                            <Loader2 className="w-6 h-6 animate-spin" />
-                            <span className="text-xs">Loading map tiles... {Math.round(progress * 100)}%</span>
-                        </div>
-                    )}
-
-                    {(phase === "preview" || phase === "generating" || phase === "done") && (
-                        <canvas
-                            ref={previewCanvasRef}
-                            width={previewW}
-                            height={previewH}
-                            className="w-full h-full object-contain"
-                        />
-                    )}
-
-                    {phase === "generating" && (
-                        <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-2 backdrop-blur-[1px]">
-                            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                            <span className="text-white text-sm font-semibold">{Math.round(progress * 100)}%</span>
-                            <span className="text-white/50 text-[10px]">{frameInfo || `Starting ${RESOLUTIONS[resolution].label} encode...`}</span>
-                        </div>
-                    )}
-
-                    {phase === "done" && (
-                        <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-3">
-                            <span className="text-white text-sm font-semibold">✅ Video Ready</span>
-                        </div>
-                    )}
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex gap-2">
-                    {phase === "idle" && (
-                        <Button onClick={startPreview} className="flex-1 gap-2">
+                        <Button onClick={startPreview} className="w-full gap-2">
                             <Play className="w-4 h-4" /> Preview
                         </Button>
                     )}
 
                     {phase === "preview" && (
-                        <Button onClick={generateVideo} className="flex-1 gap-2">
-                            <Film className="w-4 h-4" /> Generate {RESOLUTIONS[resolution].label}
+                        <Button onClick={generateVideo} className="w-full gap-2">
+                            <Film className="w-4 h-4" /> Generate {RESOLUTIONS[resolution].label} · {speedMultiplier}×
                         </Button>
                     )}
 
                     {phase === "generating" && (
-                        <Button variant="destructive" onClick={() => { abortRef.current = true; setPhase("preview"); }} className="flex-1 gap-2">
+                        <Button variant="destructive" onClick={() => { abortRef.current = true; setPhase("preview"); }} className="w-full gap-2">
                             <X className="w-4 h-4" /> Cancel
                         </Button>
                     )}
 
                     {phase === "done" && blobUrl && (
-                        <a href={blobUrl} download={`${title}_${speedMultiplier}x.mp4`} className="flex-1">
+                        <a href={blobUrl} download={`${title}_${speedMultiplier}x.mp4`}>
                             <Button className="w-full gap-2">
                                 <Download className="w-4 h-4" /> Download MP4
                             </Button>
