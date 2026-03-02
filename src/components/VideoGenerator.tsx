@@ -268,6 +268,7 @@ const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorPro
     const [resolution, setResolution] = useState(1); // 1080p default
     const [phase, setPhase] = useState<"idle" | "prefetch" | "preview" | "generating" | "done">("idle");
     const [progress, setProgress] = useState(0);
+    const [frameInfo, setFrameInfo] = useState("");
     const [blobUrl, setBlobUrl] = useState<string | null>(null);
     const previewCanvasRef = useRef<HTMLCanvasElement>(null);
     const animFrameRef = useRef<number>(0);
@@ -281,6 +282,7 @@ const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorPro
             computed.current = computePoints(points);
             setPhase("idle");
             setProgress(0);
+            setFrameInfo("");
             setBlobUrl(null);
             abortRef.current = false;
         }
@@ -341,6 +343,8 @@ const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorPro
         const totalRealTime = pts[pts.length - 1].elapsedTime;
         const videoSeconds = totalRealTime / SPEED_MULTIPLIER;
         const totalFrames = Math.ceil(videoSeconds * FPS);
+        const startedAt = performance.now();
+        console.log(`🎬 Starting encode: ${totalFrames} frames, ${RESOLUTIONS[resolution].label}, ${Math.round(videoSeconds)}s video`);
 
         // Canvas for rendering
         const offscreen = new OffscreenCanvas(W, H);
@@ -397,8 +401,14 @@ const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorPro
                 await new Promise<void>(res => { const check = () => { if (encoder.encodeQueueSize <= 2) res(); else setTimeout(check, 5); }; check(); });
             }
 
-            if (frame % 30 === 0) {
+            if (frame % 5 === 0) {
                 setProgress(frame / totalFrames);
+                setFrameInfo(`Frame ${frame}/${totalFrames}`);
+                if (frame % 100 === 0) {
+                    const elapsed = ((performance.now() - startedAt) / 1000).toFixed(1);
+                    const fps = frame > 0 ? (frame / ((performance.now() - startedAt) / 1000)).toFixed(1) : '0';
+                    console.log(`📊 Frame ${frame}/${totalFrames} (${Math.round(frame / totalFrames * 100)}%) — ${elapsed}s elapsed, ${fps} fps`);
+                }
                 await new Promise(r => setTimeout(r, 0)); // yield to UI
             }
         }
@@ -406,6 +416,9 @@ const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorPro
         await encoder.flush();
         encoder.close();
         muxer.finalize();
+
+        const totalTime = ((performance.now() - startedAt) / 1000).toFixed(1);
+        console.log(`✅ Encode complete: ${totalFrames} frames in ${totalTime}s (${(totalFrames / parseFloat(totalTime)).toFixed(1)} fps avg)`);
 
         const blob = new Blob([muxerTarget.buffer], { type: "video/mp4" });
         const url = URL.createObjectURL(blob);
@@ -421,6 +434,7 @@ const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorPro
         setBlobUrl(null);
         setPhase("idle");
         setProgress(0);
+        setFrameInfo("");
         onOpenChange(false);
     };
 
@@ -491,7 +505,7 @@ const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorPro
                         <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-2 backdrop-blur-[1px]">
                             <Loader2 className="w-8 h-8 animate-spin text-primary" />
                             <span className="text-white text-sm font-semibold">{Math.round(progress * 100)}%</span>
-                            <span className="text-white/50 text-[10px]">Encoding {RESOLUTIONS[resolution].label} video...</span>
+                            <span className="text-white/50 text-[10px]">{frameInfo || `Starting ${RESOLUTIONS[resolution].label} encode...`}</span>
                         </div>
                     )}
 
