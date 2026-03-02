@@ -159,9 +159,20 @@ const Activity = () => {
           // 2. Try to download pre-processed JSON first
           // Robust naming convention
           const processedPath = record.file_path.replace(/\.gpx$/i, '') + '.processed.json';
-          const { data: processedData, error: processedError } = await supabase.storage
+
+          // Check if processed file exists before downloading (avoids 400 errors in console)
+          const pathParts = processedPath.split('/');
+          const fileName = pathParts.pop()!;
+          const folder = pathParts.join('/');
+          const { data: fileList } = await supabase.storage
             .from('gpx-files')
-            .download(processedPath);
+            .list(folder, { search: fileName, limit: 1 });
+
+          const processedExists = fileList && fileList.some(f => f.name === fileName);
+
+          const { data: processedData, error: processedError } = processedExists
+            ? await supabase.storage.from('gpx-files').download(processedPath)
+            : { data: null, error: null };
 
           let useFallback = true;
           if (!processedError && processedData) {

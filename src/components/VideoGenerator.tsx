@@ -434,6 +434,11 @@ const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorPro
         // Ensure tiles are loaded for the generation zoom/style
         await prefetchTiles(pts, mapConfig.styleKey, mapConfig.url, zoom);
 
+        // IMPORTANT: Reset abort flag here, after all async setup.
+        // The preview effect cleanup may have set it to true during the awaits above.
+        abortRef.current = false;
+
+        console.log(`🎬 Encoding ${totalFrames} frames...`);
         for (let frame = 0; frame < totalFrames; frame++) {
             if (abortRef.current) { encoder.close(); return; }
 
