@@ -300,7 +300,7 @@ function renderFrame(
     // "driven" branding
     const brandSize = Math.round(W * 0.022);
     ctx.fillStyle = style.labelColor; ctx.font = `700 ${brandSize}px sans-serif`; ctx.textAlign = "center";
-    ctx.fillText("driven", W / 2, panelY + statsH - Math.round(statsH * 0.15));
+    ctx.fillText("DrivenStat", W / 2, panelY + statsH - Math.round(statsH * 0.15));
 
     // Progress bar at very bottom
     const barH = Math.round(H * 0.003);
