@@ -26,14 +26,38 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Check active sessions and sets the user
+        // Detect if we're in the middle of an OAuth callback (PKCE code or hash tokens)
+        const params = new URLSearchParams(window.location.search);
+        const hashParams = new URLSearchParams(window.location.hash.replace('#', '?'));
+        const hasAuthCallback = params.has('code') || hashParams.has('access_token');
+
+        if (hasAuthCallback) {
+            // Don't call getSession — let onAuthStateChange handle the code exchange.
+            // Keep loading=true until the SIGNED_IN event fires.
+            const timeout = setTimeout(() => {
+                // Safety: if exchange doesn't complete in 10s, stop loading
+                setLoading(false);
+            }, 10000);
+
+            const {
+                data: { subscription },
+            } = supabase.auth.onAuthStateChange((_event, session) => {
+                setSession(session);
+                setUser(session?.user ?? null);
+                setLoading(false);
+                clearTimeout(timeout);
+            });
+
+            return () => { subscription.unsubscribe(); clearTimeout(timeout); };
+        }
+
+        // Normal flow (no auth callback in URL)
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
             setUser(session?.user ?? null);
             setLoading(false);
         });
 
-        // Listen for changes on auth state (logged in, signed out, etc.)
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange((_event, session) => {
