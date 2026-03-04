@@ -507,10 +507,10 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                       </div>
                       <div>
                         <div className="flex items-baseline gap-1">
-                          <span className="text-2xl font-normal tabular-nums">{stats.elevationGain.toFixed(0)}</span>
-                          <span className="text-xl text-muted-foreground ml-1">m</span>
+                          <span className="text-2xl font-normal tabular-nums">{formatSpeed(displayStats.maxSpeed).replace(' km/h', '')}</span>
+                          <span className="text-xl text-muted-foreground ml-1">km/h</span>
                         </div>
-                        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Elevation Gained</span>
+                        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Top Speed</span>
                       </div>
                       <div>
                         <div className="text-2xl font-normal tabular-nums">{isMobile ? formatDurationShort(displayStats.movingTime) : formatDuration(displayStats.movingTime)}</div>
@@ -523,20 +523,6 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                         </div>
                         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Average Moving Speed</span>
                       </div>
-                      <div>
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-2xl font-normal tabular-nums">{formatSpeed(displayStats.maxSpeed).replace(' km/h', '')}</span>
-                          <span className="text-xl text-muted-foreground ml-1">km/h</span>
-                        </div>
-                        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Top Speed</span>
-                      </div>
-                      <div>
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-2xl font-normal tabular-nums">{formatDuration(stats.stoppedTime)}</span>
-                        </div>
-                        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-2 block">Stopped Time</span>
-                      </div>
-
                       {fuel && fuel > 0 ? (
                         <>
                           <div>
