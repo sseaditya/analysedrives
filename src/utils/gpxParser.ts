@@ -207,7 +207,6 @@ export function calculateSpeedDistribution(points: GPXPoint[], bucketSize: numbe
 
   activeSegments.forEach((seg, i) => {
     const speed = smoothedSpeeds[i];
-    if (speed < 0.1) return; // Ignore stops
 
     const bucketIndex = Math.floor(speed / bucketSize) * bucketSize;
     if (!buckets[bucketIndex]) {
