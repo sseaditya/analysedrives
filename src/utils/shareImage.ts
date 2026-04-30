@@ -1,0 +1,291 @@
+import {
+  GPXPoint,
+  GPXStats,
+  formatDistance,
+  formatDurationShort,
+  formatSpeed,
+  haversineDistance,
+} from "@/utils/gpxParser";
+
+interface ShareImageOptions {
+  title: string;
+  points: GPXPoint[];
+  stats: GPXStats;
+  hideRadius?: number | null;
+}
+
+const WIDTH = 1080;
+const HEIGHT = 1920;
+
+const sanitizeFileName = (name: string) =>
+  name
+    .trim()
+    .replace(/[^a-z0-9-_]+/gi, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80) || "activity";
+
+export const getPrivacyClippedPoints = (points: GPXPoint[], hideRadius?: number | null): GPXPoint[] => {
+  if (!hideRadius || hideRadius <= 0 || points.length < 2) return points;
+
+  let cumulativeDist = 0;
+  let startIndex = 0;
+  let endIndex = points.length - 1;
+
+  for (let i = 1; i < points.length; i++) {
+    cumulativeDist += haversineDistance(points[i - 1].lat, points[i - 1].lon, points[i].lat, points[i].lon);
+    if (cumulativeDist >= hideRadius) {
+      startIndex = i;
+      break;
+    }
+  }
+
+  cumulativeDist = 0;
+  for (let i = points.length - 2; i >= 0; i--) {
+    cumulativeDist += haversineDistance(points[i].lat, points[i].lon, points[i + 1].lat, points[i + 1].lon);
+    if (cumulativeDist >= hideRadius) {
+      endIndex = i;
+      break;
+    }
+  }
+
+  if (startIndex >= endIndex) return [];
+  return points.slice(startIndex, endIndex + 1);
+};
+
+const roundRect = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) => {
+  const radius = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.arcTo(x + w, y, x + w, y + h, radius);
+  ctx.arcTo(x + w, y + h, x, y + h, radius);
+  ctx.arcTo(x, y + h, x, y, radius);
+  ctx.arcTo(x, y, x + w, y, radius);
+  ctx.closePath();
+};
+
+const drawWrappedText = (
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  lineHeight: number,
+  maxLines: number,
+) => {
+  const words = text.split(/\s+/);
+  const lines: string[] = [];
+  let line = "";
+
+  words.forEach((word) => {
+    const next = line ? `${line} ${word}` : word;
+    if (ctx.measureText(next).width > maxWidth && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = next;
+    }
+  });
+  if (line) lines.push(line);
+
+  lines.slice(0, maxLines).forEach((item, index) => {
+    const suffix = index === maxLines - 1 && lines.length > maxLines ? "..." : "";
+    ctx.fillText(`${item}${suffix}`, x, y + index * lineHeight);
+  });
+};
+
+const projectRoute = (points: GPXPoint[], bounds: { x: number; y: number; width: number; height: number }) => {
+  const lats = points.map((p) => p.lat);
+  const lons = points.map((p) => p.lon);
+  const minLat = Math.min(...lats);
+  const maxLat = Math.max(...lats);
+  const minLon = Math.min(...lons);
+  const maxLon = Math.max(...lons);
+  const lonRange = Math.max(maxLon - minLon, 0.000001);
+  const latRange = Math.max(maxLat - minLat, 0.000001);
+  const routeRatio = lonRange / latRange;
+  const boxRatio = bounds.width / bounds.height;
+
+  let drawWidth = bounds.width;
+  let drawHeight = bounds.height;
+  if (routeRatio > boxRatio) {
+    drawHeight = bounds.width / routeRatio;
+  } else {
+    drawWidth = bounds.height * routeRatio;
+  }
+
+  const offsetX = bounds.x + (bounds.width - drawWidth) / 2;
+  const offsetY = bounds.y + (bounds.height - drawHeight) / 2;
+
+  return points.map((p) => ({
+    x: offsetX + ((p.lon - minLon) / lonRange) * drawWidth,
+    y: offsetY + (1 - (p.lat - minLat) / latRange) * drawHeight,
+  }));
+};
+
+const drawRoute = (ctx: CanvasRenderingContext2D, route: { x: number; y: number }[]) => {
+  if (route.length < 2) return;
+
+  const strokePath = () => {
+    ctx.beginPath();
+    ctx.moveTo(route[0].x, route[0].y);
+    for (let i = 1; i < route.length; i++) ctx.lineTo(route[i].x, route[i].y);
+  };
+
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  ctx.shadowColor = "rgba(255, 126, 64, 0.45)";
+  ctx.shadowBlur = 28;
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.86)";
+  ctx.lineWidth = 18;
+  strokePath();
+  ctx.stroke();
+
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = "#ff7a3d";
+  ctx.lineWidth = 10;
+  strokePath();
+  ctx.stroke();
+
+  ctx.strokeStyle = "#ffd166";
+  ctx.lineWidth = 4;
+  strokePath();
+  ctx.stroke();
+
+  const start = route[0];
+  const end = route[route.length - 1];
+  [
+    { point: start, color: "#34d399" },
+    { point: end, color: "#f87171" },
+  ].forEach(({ point, color }) => {
+    ctx.beginPath();
+    ctx.fillStyle = color;
+    ctx.arc(point.x, point.y, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = "#ffffff";
+    ctx.stroke();
+  });
+
+  ctx.restore();
+};
+
+export const createActivityShareImage = async ({ title, points, stats, hideRadius }: ShareImageOptions): Promise<File> => {
+  const visiblePoints = getPrivacyClippedPoints(points, hideRadius);
+  const canvas = document.createElement("canvas");
+  canvas.width = WIDTH;
+  canvas.height = HEIGHT;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Unable to create image renderer.");
+
+  const bg = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT);
+  bg.addColorStop(0, "#10141f");
+  bg.addColorStop(0.45, "#172032");
+  bg.addColorStop(1, "#090b10");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+  ctx.save();
+  ctx.globalAlpha = 0.16;
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 1;
+  for (let x = -HEIGHT; x < WIDTH; x += 72) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x + HEIGHT, HEIGHT);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  const mapBounds = { x: 90, y: 280, width: 900, height: 820 };
+  const mapGlow = ctx.createRadialGradient(WIDTH / 2, 710, 120, WIDTH / 2, 710, 560);
+  mapGlow.addColorStop(0, "rgba(255, 122, 61, 0.24)");
+  mapGlow.addColorStop(1, "rgba(255, 122, 61, 0)");
+  ctx.fillStyle = mapGlow;
+  ctx.fillRect(0, 180, WIDTH, 1020);
+
+  roundRect(ctx, 58, 182, 964, 1052, 34);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.055)";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.13)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "700 58px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
+  drawWrappedText(ctx, title, 92, 116, 890, 66, 2);
+
+  if (visiblePoints.length >= 2) {
+    drawRoute(ctx, projectRoute(visiblePoints, mapBounds));
+  } else {
+    ctx.fillStyle = "rgba(255,255,255,0.72)";
+    ctx.font = "600 42px Inter, ui-sans-serif, system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText("Route hidden by privacy zone", WIDTH / 2, 710);
+    ctx.textAlign = "left";
+  }
+
+  ctx.fillStyle = "rgba(255, 255, 255, 0.68)";
+  ctx.font = "600 28px Inter, ui-sans-serif, system-ui";
+  ctx.fillText(hideRadius && hideRadius > 0 ? "Privacy zones applied" : "Route map", 92, 1170);
+
+  const statCards = [
+    { label: "Distance", value: formatDistance(stats.totalDistance), accent: "#ffd166" },
+    { label: "Moving time", value: formatDurationShort(stats.movingTime), accent: "#34d399" },
+    { label: "Avg speed", value: formatSpeed(stats.movingAvgSpeed), accent: "#60a5fa" },
+  ];
+
+  statCards.forEach((stat, index) => {
+    const x = 72;
+    const y = 1308 + index * 158;
+    roundRect(ctx, x, y, 936, 122, 22);
+    ctx.fillStyle = "rgba(255, 255, 255, 0.09)";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
+    ctx.stroke();
+
+    ctx.fillStyle = stat.accent;
+    ctx.beginPath();
+    ctx.arc(x + 44, y + 61, 10, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(255,255,255,0.62)";
+    ctx.font = "700 24px Inter, ui-sans-serif, system-ui";
+    ctx.fillText(stat.label.toUpperCase(), x + 76, y + 48);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "700 44px Inter, ui-sans-serif, system-ui";
+    ctx.fillText(stat.value, x + 76, y + 94);
+  });
+
+  ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+  ctx.font = "600 24px Inter, ui-sans-serif, system-ui";
+  ctx.fillText("DrivenStat", 72, 1842);
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((result) => {
+      if (result) resolve(result);
+      else reject(new Error("Unable to export share image."));
+    }, "image/png");
+  });
+
+  return new File([blob], `${sanitizeFileName(title)}-share.png`, { type: "image/png" });
+};
+
+export const shareOrDownloadImage = async (file: File, title: string) => {
+  const shareData = { title, files: [file] };
+  if (navigator.canShare?.(shareData)) {
+    await navigator.share(shareData);
+    return;
+  }
+
+  const url = URL.createObjectURL(file);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = file.name;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+};

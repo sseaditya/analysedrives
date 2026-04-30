@@ -16,7 +16,16 @@ import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 
-type TimePeriod = 'week' | 'month' | 'year' | 'all';
+type TimePeriod = 'week' | 'month' | '3months' | '6months' | 'year' | 'all';
+
+const TIME_PERIOD_OPTIONS: { value: TimePeriod; label: string; days?: number }[] = [
+    { value: 'week', label: 'Week', days: 7 },
+    { value: 'month', label: 'Month', days: 30 },
+    { value: '3months', label: '3 Months', days: 90 },
+    { value: '6months', label: '6 Months', days: 180 },
+    { value: 'year', label: 'Year', days: 365 },
+    { value: 'all', label: 'All' },
+];
 
 interface ActivityRecord {
     id: string;
@@ -39,7 +48,6 @@ interface ActivityRecord {
 const Analytics = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [loading, setLoading] = useState(true);
     const [myActivities, setMyActivities] = useState<ActivityRecord[]>([]);
     const [allActivities, setAllActivities] = useState<ActivityRecord[]>([]);
@@ -174,21 +182,22 @@ const Analytics = () => {
         }
     };
 
-    // Cumulative Stats with Time Period Filtering (User's own activities only)
-    const cumulativeStats = useMemo(() => {
+    const periodActivities = useMemo(() => {
         const now = new Date();
-        const periodActivities = myActivities.filter(a => {
+        const selectedPeriod = TIME_PERIOD_OPTIONS.find(option => option.value === timePeriod);
+
+        return myActivities.filter(a => {
             if (timePeriod === 'all') return true;
             const date = new Date(a.stats?.startTime || a.created_at);
-            const diffTime = Math.abs(now.getTime() - date.getTime());
+            const diffTime = now.getTime() - date.getTime();
             const diffDays = diffTime / (1000 * 60 * 60 * 24);
 
-            if (timePeriod === 'week') return diffDays <= 7;
-            if (timePeriod === 'month') return diffDays <= 30;
-            if (timePeriod === 'year') return diffDays <= 365;
-            return true;
+            return diffDays >= 0 && diffDays <= (selectedPeriod?.days ?? Infinity);
         });
+    }, [myActivities, timePeriod]);
 
+    // Cumulative Stats with Time Period Filtering (User's own activities only)
+    const cumulativeStats = useMemo(() => {
         const count = periodActivities.length;
         const totalDist = periodActivities.reduce((acc, curr) => acc + (curr.stats?.totalDistance || 0), 0);
         const totalTime = periodActivities.reduce((acc, curr) => acc + (curr.stats?.totalTime || 0), 0);
@@ -202,13 +211,13 @@ const Analytics = () => {
             avgSpeed,
             maxSpeed
         };
-    }, [myActivities, timePeriod]);
+    }, [periodActivities]);
 
     // Speed Profile Aggregation (User's own activities only)
     const aggregatedSpeedDistribution = useMemo(() => {
         const bucketMap = new Map<number, { minSpeed: number, time: number, distance: number }>();
 
-        myActivities.forEach(activity => {
+        periodActivities.forEach(activity => {
             const dist: SpeedBucket[] | undefined = activity.stats?.speedDistribution;
             if (Array.isArray(dist)) {
                 dist.forEach((bucket) => {
@@ -226,7 +235,7 @@ const Analytics = () => {
                 ...b,
                 range: `${b.minSpeed}-${b.minSpeed + 10}`
             }));
-    }, [myActivities]);
+    }, [periodActivities]);
 
     // Helper function to clip track coordinates by hide_radius
     const clipTrackByRadius = (coordinates: [number, number][], hideRadius: number): [number, number][] => {
@@ -467,17 +476,17 @@ const Analytics = () => {
                     </h3>
 
                     {/* Time Period Tabs */}
-                    <div className="grid grid-cols-4 bg-muted/50 p-1 rounded-lg mb-6 max-w-md">
-                        {(['week', 'month', 'year', 'all'] as TimePeriod[]).map((p) => (
+                    <div className="grid grid-cols-3 sm:grid-cols-6 bg-muted/50 p-1 rounded-lg mb-6 max-w-2xl">
+                        {TIME_PERIOD_OPTIONS.map((option) => (
                             <button
-                                key={p}
-                                onClick={() => setTimePeriod(p)}
+                                key={option.value}
+                                onClick={() => setTimePeriod(option.value)}
                                 className={cn(
-                                    "text-sm py-2 rounded-md font-medium capitalize transition-all",
-                                    timePeriod === p ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                                    "text-sm py-2 px-2 rounded-md font-medium transition-all",
+                                    timePeriod === option.value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                                 )}
                             >
-                                {p}
+                                {option.label}
                             </button>
                         ))}
                     </div>

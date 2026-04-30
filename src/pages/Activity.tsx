@@ -1,5 +1,5 @@
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { Pencil, Trash2, Loader2, ArrowLeft, Globe, Lock, Fuel, Check, LogIn, Maximize2, Minimize2, Film } from "lucide-react";
+import { Pencil, Trash2, Loader2, ArrowLeft, Globe, Lock, Fuel, Check, LogIn, Maximize2, Minimize2, Film, Share2 } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import GPSStats from "@/components/GPSStats";
@@ -11,6 +11,8 @@ import ActivityEditor from "@/components/ActivityEditor";
 import { useIsMobile } from "@/hooks/use-mobile";
 import HeaderProfile from "@/components/HeaderProfile";
 import VideoGenerator from "@/components/VideoGenerator";
+import { createActivityShareImage, shareOrDownloadImage } from "@/utils/shareImage";
+import { toast } from "sonner";
 
 interface ActivityState {
   stats: GPXStats;
@@ -61,6 +63,7 @@ const Activity = () => {
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isVideoOpen, setIsVideoOpen] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
 
   // Determine ownership
   const isOwner = user && metadata ? user.id === metadata.user_id : false;
@@ -259,6 +262,28 @@ const Activity = () => {
     ? metadata.speed_cap
     : null;
 
+  const handleShareImage = async () => {
+    if (!data || !isOwner || isSharing) return;
+
+    try {
+      setIsSharing(true);
+      const file = await createActivityShareImage({
+        title: data.fileName,
+        points: data.points,
+        stats: data.stats,
+        hideRadius: metadata?.hide_radius,
+      });
+      await shareOrDownloadImage(file, data.fileName);
+    } catch (err) {
+      if ((err as DOMException)?.name !== "AbortError") {
+        console.error("Failed to share activity image:", err);
+        toast.error("Could not create the share image.");
+      }
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
   if (loading || authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -385,6 +410,16 @@ const Activity = () => {
 
             {isOwner && data && (
               <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={handleShareImage}
+                  disabled={isSharing}
+                  title="Share Activity Image"
+                >
+                  {isSharing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />}
+                </Button>
                 <Button
                   variant="ghost"
                   size="icon"
