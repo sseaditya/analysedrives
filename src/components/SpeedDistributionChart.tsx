@@ -108,7 +108,7 @@ const SpeedDistributionChart = ({ points, speedLimit, buckets }: SpeedDistributi
 
         // Sort buckets by speed
         return collapsedData.sort((a, b) => a.minSpeed - b.minSpeed);
-    }, [points, speedLimit]);
+    }, [points, speedLimit, buckets]);
 
     // Calculate max value to synchronize axes 1:1
     // We find the absolute maximum value across both time(min) and distance(km)
