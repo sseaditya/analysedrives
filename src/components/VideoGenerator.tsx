@@ -40,11 +40,13 @@ function getMapConfig(isDark: boolean, mapType: MapTypeId) {
 
 const ACCENT = "#CC785C";
 
-const RESOLUTIONS = [
-    { label: "720p", w: 720, h: 1280 },
-    { label: "1080p", w: 1080, h: 1920 },
-    { label: "4K", w: 2160, h: 3840 },
+const VIDEO_PRESETS = [
+    { id: "square1080", label: "Square 1080", w: 1080, h: 1080, bitrate: 8_000_000 },
+    { id: "reel720", label: "720p Reel", w: 720, h: 1280, bitrate: 4_500_000 },
+    { id: "reel1080", label: "1080p Reel", w: 1080, h: 1920, bitrate: 8_000_000 },
+    { id: "reel4k", label: "4K Reel", w: 2160, h: 3840, bitrate: 16_000_000 },
 ] as const;
+type VideoPresetId = typeof VIDEO_PRESETS[number]["id"];
 
 // ─── TYPES ──────────────────────────────────────────────────────────────────
 interface ComputedPoint {
@@ -132,6 +134,32 @@ function formatDur(s: number) {
 }
 function formatDist(km: number) { return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`; }
 
+function drawRoutePath(
+    ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+    route: ComputedPoint[],
+    current: ComputedPoint,
+    w: number,
+    h: number,
+    zoom: number,
+    margin: number,
+) {
+    ctx.beginPath();
+    let started = false;
+    for (const point of route) {
+        const { x, y } = geoToPixel(point.lat, point.lon, current.lat, current.lon, w, h, zoom);
+        if (x < -margin || x > w + margin || y < -margin || y > h + margin) {
+            started = false;
+            continue;
+        }
+        if (!started) {
+            ctx.moveTo(x, y);
+            started = true;
+        } else {
+            ctx.lineTo(x, y);
+        }
+    }
+}
+
 // ─── TILE CACHE (keyed by style+zoom+coords) ────────────────────────────────
 const tileCache = new Map<string, HTMLImageElement>();
 
@@ -180,7 +208,7 @@ async function prefetchTiles(points: ComputedPoint[], styleId: string, tileUrl: 
 function renderFrame(
     ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
     W: number, H: number,
-    points: ComputedPoint[], currentIdx: number, current: ComputedPoint,
+    points: ComputedPoint[], current: ComputedPoint,
     frameNum: number, totalRealTime: number,
     settings: RenderSettings,
 ) {
@@ -189,7 +217,7 @@ function renderFrame(
     const isLight = style.isLight;
 
     // Layout: compact stats strip at bottom, map fills the rest
-    const statsH = Math.round(W * 0.16); // compact strip for stats + branding
+    const statsH = Math.round(Math.min(H * 0.18, W * 0.18)); // square overlays use a rectangular map plus bottom HUD
     const mapH = H - statsH; // map gets all remaining height
     const mapCenterX = W / 2;
     const mapCenterY = mapH / 2;
@@ -206,6 +234,8 @@ function renderFrame(
 
     // Map tiles (skip for route-only)
     if (style.url) {
+        const previousSmoothing = ctx.imageSmoothingEnabled;
+        ctx.imageSmoothingEnabled = false;
         const cxf = lonToTileX(current.lon, zoom), cyf = latToTileY(current.lat, zoom);
         const ctX = Math.floor(cxf), ctY = Math.floor(cyf);
         const offX = (cxf - ctX) * TILE_SIZE, offY = (cyf - ctY) * TILE_SIZE;
@@ -213,45 +243,46 @@ function renderFrame(
         for (let dx = -halfX; dx <= halfX; dx++) {
             for (let dy = -halfY; dy <= halfY; dy++) {
                 const img = tileCache.get(tileCacheKey(style.styleKey, zoom, ctX + dx, ctY + dy));
-                if (img) ctx.drawImage(img, mapCenterX + dx * TILE_SIZE - offX, mapCenterY + dy * TILE_SIZE - offY, TILE_SIZE, TILE_SIZE);
+                if (img) {
+                    ctx.drawImage(
+                        img,
+                        Math.round(mapCenterX + dx * TILE_SIZE - offX),
+                        Math.round(mapCenterY + dy * TILE_SIZE - offY),
+                        TILE_SIZE,
+                        TILE_SIZE,
+                    );
+                }
             }
         }
+        ctx.imageSmoothingEnabled = previousSmoothing;
     }
 
     // Route
     const step = Math.max(1, Math.floor(points.length / 2000));
     const sampled = points.filter((_, i) => i % step === 0 || i === points.length - 1);
-    const csi = Math.min(Math.floor(currentIdx / step), sampled.length - 1);
+    const traveledRoute = sampled.filter((p) => p.elapsedTime < current.elapsedTime);
+    const upcomingRoute = sampled.filter((p) => p.elapsedTime > current.elapsedTime);
+    traveledRoute.push(current);
+    upcomingRoute.unshift(current);
     const margin = 300;
     const routeColor = ACCENT;
     const upcomingAlpha = isLight ? 0.2 : 0.12;
 
     // Upcoming (faint)
-    ctx.beginPath();
-    let s = false;
-    for (let i = csi; i < sampled.length; i++) {
-        const { x, y } = geoToPixel(sampled[i].lat, sampled[i].lon, current.lat, current.lon, W, mapH, zoom);
-        if (x < -margin || x > W + margin || y < -margin || y > mapH + margin) { s = false; continue; }
-        if (!s) { ctx.moveTo(x, y); s = true; } else ctx.lineTo(x, y);
-    }
+    drawRoutePath(ctx, upcomingRoute, current, W, mapH, zoom, margin);
     ctx.strokeStyle = `rgba(204, 120, 92, ${upcomingAlpha})`;
     ctx.lineWidth = settings.mapType === "route" ? 4 : 3;
     ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.stroke();
 
     // Traveled (glow)
-    ctx.beginPath(); s = false;
-    for (let i = 0; i <= csi && i < sampled.length; i++) {
-        const { x, y } = geoToPixel(sampled[i].lat, sampled[i].lon, current.lat, current.lon, W, mapH, zoom);
-        if (x < -margin || x > W + margin || y < -margin || y > mapH + margin) { s = false; continue; }
-        if (!s) { ctx.moveTo(x, y); s = true; } else ctx.lineTo(x, y);
-    }
+    drawRoutePath(ctx, traveledRoute, current, W, mapH, zoom, margin);
     const glowWidth = settings.mapType === "route" ? 20 : 14;
     ctx.strokeStyle = `rgba(204, 120, 92, 0.15)`; ctx.lineWidth = glowWidth; ctx.stroke();
     ctx.strokeStyle = `rgba(204, 120, 92, 0.4)`; ctx.lineWidth = glowWidth * 0.57; ctx.stroke();
     ctx.strokeStyle = routeColor; ctx.lineWidth = settings.mapType === "route" ? 4 : 3; ctx.stroke();
 
     // Position marker (centered in map square)
-    const pulse = Math.sin(frameNum * 0.15) * 0.3 + 1.0;
+    const pulse = Math.sin(frameNum * 0.12) * 0.14 + 1.0;
     const grad = ctx.createRadialGradient(mapCenterX, mapCenterY, 0, mapCenterX, mapCenterY, 25 * pulse);
     grad.addColorStop(0, "rgba(204, 120, 92, 0.6)");
     grad.addColorStop(0.5, "rgba(204, 120, 92, 0.2)");
@@ -312,7 +343,7 @@ function renderFrame(
 
 // ─── COMPONENT ──────────────────────────────────────────────────────────────
 const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorProps) => {
-    const [resolution, setResolution] = useState(0);
+    const [videoPresetId, setVideoPresetId] = useState<VideoPresetId>("square1080");
     const [zoom, setZoom] = useState(14);
     const [isDark, setIsDark] = useState(true);
     const [mapType, setMapType] = useState<MapTypeId>("standard");
@@ -371,9 +402,7 @@ const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorPro
                 if (realTime > totalRealTime) frame = 0;
                 const current = interpolateAtTime(pts, realTime);
                 if (current) {
-                    let lo = 0, hi = pts.length - 1;
-                    while (lo < hi) { const mid = (lo + hi) >> 1; if (pts[mid].elapsedTime < realTime) lo = mid + 1; else hi = mid; }
-                    renderFrame(ctx, W, H, pts, lo, current, frame, totalRealTime, settings);
+                    renderFrame(ctx, W, H, pts, current, frame, totalRealTime, settings);
                 }
                 frame++;
                 animFrameRef.current = requestAnimationFrame(animate);
@@ -383,7 +412,7 @@ const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorPro
         doPreview();
 
         return () => { abortRef.current = true; cancelAnimationFrame(animFrameRef.current); };
-    }, [phase, zoom, isDark, mapType, speedMultiplier]);
+    }, [phase, zoom, isDark, mapType, speedMultiplier, videoPresetId]);
 
     const startPreview = useCallback(async () => {
         const pts = computed.current;
@@ -400,7 +429,7 @@ const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorPro
         abortRef.current = false;
         cancelAnimationFrame(animFrameRef.current);
 
-        const res = RESOLUTIONS[resolution];
+        const res = VIDEO_PRESETS.find((preset) => preset.id === videoPresetId) ?? VIDEO_PRESETS[0];
         const W = res.w, H = res.h;
         setPhase("generating");
         setProgress(0);
@@ -409,7 +438,7 @@ const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorPro
         const videoSeconds = totalRealTime / speedMultiplier;
         const totalFrames = Math.ceil(videoSeconds * FPS);
         const startedAt = performance.now();
-        console.log(`🎬 Starting encode: ${totalFrames} frames, ${RESOLUTIONS[resolution].label}, ${Math.round(videoSeconds)}s video`);
+        console.log(`🎬 Starting encode: ${totalFrames} frames, ${res.label}, ${Math.round(videoSeconds)}s video`);
 
         const offscreen = new OffscreenCanvas(W, H);
         const ctx = offscreen.getContext("2d")!;
@@ -429,14 +458,14 @@ const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorPro
         const codecString = W > 1500 ? "avc1.640033" : "avc1.640028";
         const config: VideoEncoderConfig = {
             codec: codecString, width: W, height: H,
-            bitrate: W > 1500 ? 12_000_000 : W > 800 ? 6_000_000 : 3_000_000,
+            bitrate: res.bitrate,
             framerate: FPS,
         };
 
         const support = await VideoEncoder.isConfigSupported(config);
         if (!support.supported) {
             console.error("❌ VideoEncoder config not supported:", config);
-            alert(`Your browser doesn't support encoding at ${RESOLUTIONS[resolution].label}. Try a lower resolution.`);
+            alert(`Your browser doesn't support encoding at ${res.label}. Try a lower resolution.`);
             setPhase("preview");
             return;
         }
@@ -458,10 +487,7 @@ const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorPro
             const current = interpolateAtTime(pts, realTime);
             if (!current) continue;
 
-            let lo = 0, hi = pts.length - 1;
-            while (lo < hi) { const mid = (lo + hi) >> 1; if (pts[mid].elapsedTime < realTime) lo = mid + 1; else hi = mid; }
-
-            renderFrame(ctx, W, H, pts, lo, current, frame, totalRealTime, settings);
+            renderFrame(ctx, W, H, pts, current, frame, totalRealTime, settings);
 
             const vf = new VideoFrame(offscreen, { timestamp: (frame / FPS) * 1_000_000, duration: (1 / FPS) * 1_000_000 });
             encoder.encode(vf, { keyFrame: frame % (FPS * 2) === 0 });
@@ -494,7 +520,7 @@ const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorPro
         setBlobUrl(URL.createObjectURL(blob));
         setPhase("done");
         setProgress(1);
-    }, [resolution, zoom, isDark, mapType, speedMultiplier]);
+    }, [videoPresetId, zoom, isDark, mapType, speedMultiplier]);
 
     const handleClose = () => {
         abortRef.current = true;
@@ -507,7 +533,7 @@ const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorPro
         onOpenChange(false);
     };
 
-    const res = RESOLUTIONS[resolution];
+    const res = VIDEO_PRESETS.find((preset) => preset.id === videoPresetId) ?? VIDEO_PRESETS[0];
     const previewW = 270;
     const previewH = Math.round(previewW * (res.h / res.w));
     const canEdit = phase === "idle" || phase === "preview";
@@ -530,18 +556,18 @@ const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorPro
 
                 {/* Scrollable body */}
                 <div className="px-5 pb-4 space-y-3 max-h-[calc(90vh-140px)] overflow-y-auto">
-                    {/* Row 1: Resolution + Speed side by side */}
+                    {/* Row 1: Preset + Speed side by side */}
                     <div className="grid grid-cols-2 gap-3">
                         <div>
-                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Resolution</span>
-                            <div className="flex gap-1 mt-1">
-                                {RESOLUTIONS.map((r, i) => (
-                                    <button key={r.label} onClick={() => canEdit && setResolution(i)}
-                                        className={`flex-1 py-1 rounded text-[11px] font-bold transition-all border ${i === resolution
+                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Preset</span>
+                            <div className="grid grid-cols-2 gap-1 mt-1">
+                                {VIDEO_PRESETS.map((preset) => (
+                                    <button key={preset.id} onClick={() => canEdit && setVideoPresetId(preset.id)}
+                                        className={`py-1 rounded text-[10px] font-bold transition-all border ${preset.id === videoPresetId
                                             ? "bg-primary text-primary-foreground border-primary"
                                             : "bg-muted/30 text-muted-foreground border-transparent hover:bg-muted/50"}`}
                                         disabled={!canEdit}>
-                                        {r.label}
+                                        {preset.label}
                                     </button>
                                 ))}
                             </div>
@@ -640,7 +666,7 @@ const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorPro
                             <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-1.5 backdrop-blur-[1px]">
                                 <Loader2 className="w-6 h-6 animate-spin text-primary" />
                                 <span className="text-white text-sm font-semibold">{Math.round(progress * 100)}%</span>
-                                <span className="text-white/50 text-[9px]">{frameInfo || `Starting ${RESOLUTIONS[resolution].label} encode…`}</span>
+                                <span className="text-white/50 text-[9px]">{frameInfo || `Starting ${res.label} encode…`}</span>
                             </div>
                         )}
 
@@ -662,7 +688,7 @@ const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorPro
 
                     {phase === "preview" && (
                         <Button onClick={generateVideo} className="w-full gap-2">
-                            <Film className="w-4 h-4" /> Generate {RESOLUTIONS[resolution].label} · {speedMultiplier}×
+                            <Film className="w-4 h-4" /> Generate {res.label} · {speedMultiplier}×
                         </Button>
                     )}
 
