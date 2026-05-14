@@ -31,6 +31,8 @@ const HEIGHT = 1920;
 const FPS = 30;
 const SPEED_MULTIPLIER = 30;     // 30× real-time
 const TILE_SIZE = 256;
+const MAP_LABEL_SCALE = 2;       // Raster tile labels are baked in; render lower-z tiles larger for legibility.
+const MAP_TILE_ZOOM_OFFSET = Math.log2(MAP_LABEL_SCALE);
 const ZOOM = 16;                 // Map zoom level
 const TILE_URL = 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png';
 const TILE_CACHE_DIR = path.join(__dirname, '.tile-cache');
@@ -196,6 +198,10 @@ function latToTileY(lat: number, zoom: number): number {
     return (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * (1 << zoom);
 }
 
+function getLabelTileZoom(zoom: number): number {
+    return Math.max(0, Math.round(zoom - MAP_TILE_ZOOM_OFFSET));
+}
+
 // Convert lat/lon to pixel coordinates relative to canvas center
 function geoToPixel(lat: number, lon: number, centerLat: number, centerLon: number): { x: number; y: number } {
     const centerTileX = lonToTileX(centerLon, ZOOM);
@@ -272,18 +278,20 @@ async function getOrLoadTileImage(z: number, x: number, y: number): Promise<Imag
 
 // ─── RENDER MAP TILES ─────────────────────────────────────────────────────────
 function renderMapTiles(ctx: CanvasRenderingContext2D, centerLat: number, centerLon: number): void {
-    const centerTileXf = lonToTileX(centerLon, ZOOM);
-    const centerTileYf = latToTileY(centerLat, ZOOM);
+    const tileZoom = getLabelTileZoom(ZOOM);
+    const drawTileSize = TILE_SIZE * MAP_LABEL_SCALE;
+    const centerTileXf = lonToTileX(centerLon, tileZoom);
+    const centerTileYf = latToTileY(centerLat, tileZoom);
 
     // How many tiles needed to fill the canvas
-    const tilesNeededX = Math.ceil(WIDTH / TILE_SIZE) + 2;
-    const tilesNeededY = Math.ceil(HEIGHT / TILE_SIZE) + 2;
+    const tilesNeededX = Math.ceil(WIDTH / drawTileSize) + 2;
+    const tilesNeededY = Math.ceil(HEIGHT / drawTileSize) + 2;
 
     const centerTileX = Math.floor(centerTileXf);
     const centerTileY = Math.floor(centerTileYf);
 
-    const offsetX = (centerTileXf - centerTileX) * TILE_SIZE;
-    const offsetY = (centerTileYf - centerTileY) * TILE_SIZE;
+    const offsetX = (centerTileXf - centerTileX) * drawTileSize;
+    const offsetY = (centerTileYf - centerTileY) * drawTileSize;
 
     const halfX = Math.ceil(tilesNeededX / 2);
     const halfY = Math.ceil(tilesNeededY / 2);
@@ -292,11 +300,11 @@ function renderMapTiles(ctx: CanvasRenderingContext2D, centerLat: number, center
         for (let dy = -halfY; dy <= halfY; dy++) {
             const tx = centerTileX + dx;
             const ty = centerTileY + dy;
-            const img = tileImageCache.get(`${ZOOM}_${tx}_${ty}`);
+            const img = tileImageCache.get(`${tileZoom}_${tx}_${ty}`);
             if (!img) continue;
-            const drawX = WIDTH / 2 + (dx * TILE_SIZE) - offsetX;
-            const drawY = HEIGHT / 2 + (dy * TILE_SIZE) - offsetY;
-            ctx.drawImage(img, drawX, drawY, TILE_SIZE, TILE_SIZE);
+            const drawX = WIDTH / 2 + (dx * drawTileSize) - offsetX;
+            const drawY = HEIGHT / 2 + (dy * drawTileSize) - offsetY;
+            ctx.drawImage(img, drawX, drawY, drawTileSize, drawTileSize);
         }
     }
 }
@@ -564,13 +572,14 @@ async function main(): Promise<void> {
     // Pre-fetch unique tiles and load into memory
     console.log('🗺  Pre-fetching and loading map tiles into memory...');
     const uniqueTiles = new Set<string>();
+    const tileZoom = getLabelTileZoom(ZOOM);
     for (const p of points) {
-        const tx = Math.floor(lonToTileX(p.lon, ZOOM));
-        const ty = Math.floor(latToTileY(p.lat, ZOOM));
+        const tx = Math.floor(lonToTileX(p.lon, tileZoom));
+        const ty = Math.floor(latToTileY(p.lat, tileZoom));
         // Add surrounding tiles
         for (let dx = -3; dx <= 3; dx++) {
             for (let dy = -5; dy <= 5; dy++) {
-                uniqueTiles.add(`${ZOOM}_${tx + dx}_${ty + dy}`);
+                uniqueTiles.add(`${tileZoom}_${tx + dx}_${ty + dy}`);
             }
         }
     }

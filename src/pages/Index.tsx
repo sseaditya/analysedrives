@@ -1,8 +1,6 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { MapPin, Route, Clock, Zap, LogIn, LayoutDashboard, Gauge as Speedometer, Activity } from "lucide-react";
+import { Zap, Gauge as Speedometer, Activity, Users } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useTheme } from "@/components/ThemeProvider";
@@ -35,7 +33,13 @@ const Index = () => {
         <div className="flex items-center gap-2">
           <span className="font-bold text-2xl tracking-tight text-[#CC785C]">DrivenStat</span>
         </div>
-        <div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate('/about')}
+            className="text-sm font-semibold text-foreground/80 hover:text-[#CC785C] transition-colors"
+          >
+            About Us
+          </button>
           {!user ? (
             <button
               onClick={handleGoogleSignIn}
@@ -80,6 +84,13 @@ const Index = () => {
           </p>
 
           <div className="flex flex-col items-center gap-4 w-full max-w-xs mx-auto">
+            <button
+              onClick={() => navigate('/feed')}
+              className="w-full bg-card text-card-foreground hover:bg-muted border border-border h-14 rounded-md font-bold text-lg shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-3"
+            >
+              <Users className="w-5 h-5" />
+              Community Drives
+            </button>
             {!user && (
               <>
                 <button

@@ -19,6 +19,7 @@ import Feed from "./pages/Feed";
 import HowTo from "./pages/HowTo";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
+import About from "./pages/About";
 
 const App = () => (
   <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
@@ -39,14 +40,7 @@ const App = () => (
                   </ProtectedRoute>
                 }
               />
-              <Route
-                path="/feed"
-                element={
-                  <ProtectedRoute>
-                    <Feed />
-                  </ProtectedRoute>
-                }
-              />
+              <Route path="/feed" element={<Feed />} />
               <Route path="/activity/:id?" element={<Activity />} />
               <Route
                 path="/analytics"
@@ -58,6 +52,7 @@ const App = () => (
               />
               <Route path="/strava-callback" element={<StravaCallback />} />
               <Route path="/how-to" element={<HowTo />} />
+              <Route path="/about" element={<About />} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/privacy" element={<Privacy />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

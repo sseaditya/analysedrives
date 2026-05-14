@@ -2,8 +2,8 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { MapPin, LogOut, Clock, Activity, Search, LayoutDashboard, Globe, Car, User, BarChart3, ChevronLeft, ChevronRight } from "lucide-react";
-import { formatDistance, formatDuration } from "@/utils/gpxParser";
+import { MapPin, LogOut, Clock, Activity, Search, Globe, Car, BarChart3, ChevronLeft, ChevronRight, LogIn } from "lucide-react";
+import { formatDistance } from "@/utils/gpxParser";
 import { supabase } from "@/lib/supabase";
 import ActivityMiniMap from "@/components/ActivityMiniMap";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -17,13 +17,21 @@ interface Profile {
     avatar_url: string | null;
 }
 
+interface ActivityStats {
+    startTime?: string;
+    previewCoordinates?: [number, number][];
+    totalDistance?: number;
+    totalTime?: number;
+    avgSpeed?: number;
+}
+
 interface ActivityRecord {
     id: string;
     slug: number | null;
     title: string;
     file_path: string;
     created_at: string;
-    stats: any;
+    stats: ActivityStats | null;
     user_id: string;
     profiles?: {
         display_name: string | null;
@@ -34,7 +42,7 @@ interface ActivityRecord {
 }
 
 const Feed = () => {
-    const { user, signOut } = useAuth();
+    const { user, signOut, signInWithGoogle } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const [activities, setActivities] = useState<ActivityRecord[]>([]);
@@ -169,7 +177,7 @@ const Feed = () => {
             {/* Header */}
             <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
                 <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3 flex-shrink-0 cursor-pointer" onClick={() => navigate('/dashboard')}>
+                    <div className="flex items-center gap-3 flex-shrink-0 cursor-pointer" onClick={() => navigate(user ? '/dashboard' : '/')}>
                         <span className="font-bold text-xl text-foreground hidden md:block">DrivenStat</span>
                     </div>
 
@@ -186,46 +194,55 @@ const Feed = () => {
                     </div>
 
                     <div className="flex items-center gap-4 flex-shrink-0">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => navigate('/analytics')}
-                            className="text-muted-foreground hover:text-primary gap-2 mr-2"
-                        >
-                            <BarChart3 className="w-4 h-4" />
-                            <span className="hidden md:inline">Analytics</span>
-                        </Button>
-                        <ProfileEditor onProfileUpdate={(updatedProfile) => setProfile(updatedProfile)}>
-                            <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
-                                {isLoadingProfile ? (
-                                    <>
-                                        <div className="w-8 h-8 rounded-full bg-muted animate-pulse" />
-                                        <div className="h-4 w-24 bg-muted animate-pulse rounded hidden md:block" />
-                                    </>
-                                ) : (
-                                    <>
-                                        <img
-                                            src={profile?.avatar_url || user?.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.display_name || profile?.full_name || user?.user_metadata?.full_name || user?.email || "U")}&background=random`}
-                                            alt={profile?.display_name || profile?.full_name || user?.user_metadata?.full_name || user?.email || "User"}
-                                            className="w-8 h-8 rounded-full border border-border object-cover"
-                                            crossOrigin="anonymous"
-                                        />
-                                        <span className="text-sm font-medium hidden md:block">
-                                            {profile?.display_name || profile?.full_name || user?.user_metadata?.full_name || user?.email}
-                                        </span>
-                                    </>
-                                )}
-                            </div>
-                        </ProfileEditor>
-                        <Button variant="ghost" size="sm" onClick={handleSignOut} className="text-muted-foreground hover:text-destructive">
-                            <LogOut className="w-4 h-4 mr-2" />
-                            Sign Out
-                        </Button>
+                        {user ? (
+                            <>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => navigate('/analytics')}
+                                    className="text-muted-foreground hover:text-primary gap-2 mr-2"
+                                >
+                                    <BarChart3 className="w-4 h-4" />
+                                    <span className="hidden md:inline">Analytics</span>
+                                </Button>
+                                <ProfileEditor onProfileUpdate={(updatedProfile) => setProfile(updatedProfile)}>
+                                    <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
+                                        {isLoadingProfile ? (
+                                            <>
+                                                <div className="w-8 h-8 rounded-full bg-muted animate-pulse" />
+                                                <div className="h-4 w-24 bg-muted animate-pulse rounded hidden md:block" />
+                                            </>
+                                        ) : (
+                                            <>
+                                                <img
+                                                    src={profile?.avatar_url || user.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.display_name || profile?.full_name || user.user_metadata?.full_name || user.email || "U")}&background=random`}
+                                                    alt={profile?.display_name || profile?.full_name || user.user_metadata?.full_name || user.email || "User"}
+                                                    className="w-8 h-8 rounded-full border border-border object-cover"
+                                                    crossOrigin="anonymous"
+                                                />
+                                                <span className="text-sm font-medium hidden md:block">
+                                                    {profile?.display_name || profile?.full_name || user.user_metadata?.full_name || user.email}
+                                                </span>
+                                            </>
+                                        )}
+                                    </div>
+                                </ProfileEditor>
+                                <Button variant="ghost" size="sm" onClick={handleSignOut} className="text-muted-foreground hover:text-destructive">
+                                    <LogOut className="w-4 h-4 mr-2" />
+                                    Sign Out
+                                </Button>
+                            </>
+                        ) : (
+                            <Button size="sm" onClick={() => signInWithGoogle()} className="gap-2">
+                                <LogIn className="w-4 h-4" />
+                                Log In
+                            </Button>
+                        )}
                     </div>
                 </div>
             </header>
 
-            <main className="container mx-auto px-4 py-8 flex-1">
+            <main className={`container mx-auto px-4 py-8 flex-1 ${!user ? 'pb-36 md:pb-32' : ''}`}>
                 <div className="max-w-7xl mx-auto space-y-6">
                     {/* Controls Header */}
                     <div className="space-y-2">
@@ -234,10 +251,10 @@ const Feed = () => {
                                 {/* Tab Navigation */}
                                 <div className="flex items-center bg-muted/50 p-1 rounded-lg">
                                     <button
-                                        onClick={() => navigate('/dashboard')}
+                                        onClick={() => user ? navigate('/dashboard') : signInWithGoogle()}
                                         className="px-4 py-1.5 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
                                     >
-                                        My Activities
+                                        {user ? 'My Activities' : 'Upload Drive'}
                                     </button>
                                     <button
                                         className="px-4 py-1.5 rounded-md text-sm font-medium bg-background text-foreground shadow-sm transition-colors"
@@ -373,6 +390,30 @@ const Feed = () => {
                     )}
                 </div>
             </main>
+
+            {!user && (
+                <div className="fixed bottom-0 left-0 right-0 z-[1002] border-t border-primary/20 bg-background/95 backdrop-blur-md shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.2)] animate-in slide-in-from-bottom-full duration-700 delay-500">
+                    <div className="container mx-auto px-3 py-3 md:py-4 flex flex-col md:flex-row items-center justify-between gap-2 max-w-5xl">
+                        <div className="text-center md:text-left space-y-1">
+                            <h3 className="font-bold text-base md:text-lg flex items-center justify-center md:justify-start gap-2">
+                                <Globe className="w-4 h-4 text-primary" />
+                                Explore Public Drives
+                            </h3>
+                            <p className="text-sm text-muted-foreground max-w-xl">
+                                Sign in for free to upload your own drives, save activities, and use advanced analysis tools.
+                            </p>
+                        </div>
+                        <Button
+                            onClick={() => signInWithGoogle()}
+                            size="lg"
+                            className="shrink-0 w-full md:w-auto shadow-lg shadow-primary/20 gap-2 font-semibold"
+                        >
+                            <LogIn className="w-4 h-4" />
+                            Sign in with Google
+                        </Button>
+                    </div>
+                </div>
+            )}
 
             {/* Floating Theme Toggle */}
             <div className="fixed bottom-6 left-6 z-[1050]">

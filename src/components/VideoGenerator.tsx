@@ -8,6 +8,8 @@ import { Muxer, ArrayBufferTarget } from "mp4-muxer";
 // ─── CONFIG ─────────────────────────────────────────────────────────────────
 const FPS = 30;
 const TILE_SIZE = 256;
+const MAP_LABEL_SCALE = 2;
+const MAP_TILE_ZOOM_OFFSET = Math.log2(MAP_LABEL_SCALE);
 const ROLLING_WINDOW_SECONDS = 30;
 const SPEED_OPTIONS = [15, 30, 60, 120] as const;
 
@@ -167,6 +169,10 @@ function tileCacheKey(styleId: string, z: number, x: number, y: number) {
     return `${styleId}_${z}_${x}_${y}`;
 }
 
+function getLabelTileZoom(zoom: number) {
+    return Math.max(0, Math.round(zoom - MAP_TILE_ZOOM_OFFSET));
+}
+
 async function loadTile(styleId: string, tileUrl: string, z: number, x: number, y: number): Promise<HTMLImageElement | null> {
     if (!tileUrl) return null; // route-only mode
     const key = tileCacheKey(styleId, z, x, y);
@@ -183,11 +189,12 @@ async function loadTile(styleId: string, tileUrl: string, z: number, x: number, 
 
 async function prefetchTiles(points: ComputedPoint[], styleId: string, tileUrl: string, zoom: number, onProgress?: (p: number) => void) {
     if (!tileUrl) { onProgress?.(1); return; } // route-only
+    const tileZoom = getLabelTileZoom(zoom);
     const needed = new Set<string>();
     for (const p of points) {
-        const tx = Math.floor(lonToTileX(p.lon, zoom));
-        const ty = Math.floor(latToTileY(p.lat, zoom));
-        for (let dx = -3; dx <= 3; dx++) for (let dy = -4; dy <= 4; dy++) needed.add(`${zoom}_${tx + dx}_${ty + dy}`);
+        const tx = Math.floor(lonToTileX(p.lon, tileZoom));
+        const ty = Math.floor(latToTileY(p.lat, tileZoom));
+        for (let dx = -3; dx <= 3; dx++) for (let dy = -4; dy <= 4; dy++) needed.add(`${tileZoom}_${tx + dx}_${ty + dy}`);
     }
     const keys = Array.from(needed);
     // Skip already cached tiles
@@ -236,20 +243,22 @@ function renderFrame(
     if (style.url) {
         const previousSmoothing = ctx.imageSmoothingEnabled;
         ctx.imageSmoothingEnabled = false;
-        const cxf = lonToTileX(current.lon, zoom), cyf = latToTileY(current.lat, zoom);
+        const tileZoom = getLabelTileZoom(zoom);
+        const drawTileSize = TILE_SIZE * MAP_LABEL_SCALE;
+        const cxf = lonToTileX(current.lon, tileZoom), cyf = latToTileY(current.lat, tileZoom);
         const ctX = Math.floor(cxf), ctY = Math.floor(cyf);
-        const offX = (cxf - ctX) * TILE_SIZE, offY = (cyf - ctY) * TILE_SIZE;
-        const halfX = Math.ceil(W / TILE_SIZE / 2) + 1, halfY = Math.ceil(mapH / TILE_SIZE / 2) + 1;
+        const offX = (cxf - ctX) * drawTileSize, offY = (cyf - ctY) * drawTileSize;
+        const halfX = Math.ceil(W / drawTileSize / 2) + 1, halfY = Math.ceil(mapH / drawTileSize / 2) + 1;
         for (let dx = -halfX; dx <= halfX; dx++) {
             for (let dy = -halfY; dy <= halfY; dy++) {
-                const img = tileCache.get(tileCacheKey(style.styleKey, zoom, ctX + dx, ctY + dy));
+                const img = tileCache.get(tileCacheKey(style.styleKey, tileZoom, ctX + dx, ctY + dy));
                 if (img) {
                     ctx.drawImage(
                         img,
-                        Math.round(mapCenterX + dx * TILE_SIZE - offX),
-                        Math.round(mapCenterY + dy * TILE_SIZE - offY),
-                        TILE_SIZE,
-                        TILE_SIZE,
+                        Math.round(mapCenterX + dx * drawTileSize - offX),
+                        Math.round(mapCenterY + dy * drawTileSize - offY),
+                        drawTileSize,
+                        drawTileSize,
                     );
                 }
             }
