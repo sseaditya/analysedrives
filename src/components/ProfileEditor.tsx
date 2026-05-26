@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import {
@@ -14,7 +15,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Camera, Loader2, User } from "lucide-react";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Camera, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface Profile {
@@ -31,10 +42,13 @@ interface ProfileEditorProps {
 }
 
 const ProfileEditor = ({ children, onProfileUpdate }: ProfileEditorProps) => {
-    const { user } = useAuth();
+    const { user, session } = useAuth();
+    const navigate = useNavigate();
     const [open, setOpen] = useState(false);
+    const [confirmDeactivateOpen, setConfirmDeactivateOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [deactivating, setDeactivating] = useState(false);
 
     const [displayName, setDisplayName] = useState("");
     const [car, setCar] = useState("");
@@ -44,14 +58,7 @@ const ProfileEditor = ({ children, onProfileUpdate }: ProfileEditorProps) => {
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Fetch profile when dialog opens
-    useEffect(() => {
-        if (open && user) {
-            fetchProfile();
-        }
-    }, [open, user]);
-
-    const fetchProfile = async () => {
+    const fetchProfile = useCallback(async () => {
         if (!user) return;
         setLoading(true);
         try {
@@ -77,7 +84,14 @@ const ProfileEditor = ({ children, onProfileUpdate }: ProfileEditorProps) => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [user]);
+
+    // Fetch profile when dialog opens
+    useEffect(() => {
+        if (open && user) {
+            fetchProfile();
+        }
+    }, [fetchProfile, open, user]);
 
     const handleAvatarClick = () => {
         fileInputRef.current?.click();
@@ -170,6 +184,48 @@ const ProfileEditor = ({ children, onProfileUpdate }: ProfileEditorProps) => {
         }
     };
 
+    const handleDeactivateAccount = async () => {
+        if (!user || !session?.access_token) {
+            toast.error("Please sign in again before deactivating your account.");
+            return;
+        }
+
+        setDeactivating(true);
+        try {
+            const response = await fetch("/api/deactivate-account", {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${session.access_token}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({}),
+            });
+
+            if (!response.ok) {
+                const body = await response.json().catch(() => null);
+                throw new Error(body?.error || "Failed to deactivate account");
+            }
+
+            localStorage.removeItem(`profile_${user.id}`);
+            localStorage.removeItem("strava_access_token");
+
+            const { error } = await supabase.auth.signOut({ scope: "local" });
+            if (error) {
+                console.warn("Local sign out after deactivation failed:", error);
+            }
+
+            toast.success("Your account has been deactivated.");
+            setConfirmDeactivateOpen(false);
+            setOpen(false);
+            navigate("/", { replace: true });
+        } catch (err) {
+            console.error("Error deactivating account:", err);
+            toast.error(err instanceof Error ? err.message : "Failed to deactivate account");
+        } finally {
+            setDeactivating(false);
+        }
+    };
+
     const currentAvatar = avatarPreview || avatarUrl || user?.user_metadata?.avatar_url;
     const initials = (displayName || user?.user_metadata?.full_name || user?.email || "U")
         .split(" ")
@@ -179,85 +235,136 @@ const ProfileEditor = ({ children, onProfileUpdate }: ProfileEditorProps) => {
         .slice(0, 2);
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>{children}</DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                    <DialogTitle>Edit Profile</DialogTitle>
-                    <DialogDescription>
-                        Customize your display name, car, and profile picture.
-                    </DialogDescription>
-                </DialogHeader>
+        <>
+            <Dialog open={open} onOpenChange={setOpen}>
+                <DialogTrigger asChild>{children}</DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Edit Profile</DialogTitle>
+                        <DialogDescription>
+                            Customize your display name, car, and profile picture.
+                        </DialogDescription>
+                    </DialogHeader>
 
-                {loading ? (
-                    <div className="flex items-center justify-center py-8">
-                        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                    </div>
-                ) : (
-                    <div className="space-y-6 py-4">
-                        {/* Avatar Upload */}
-                        <div className="flex flex-col items-center gap-3">
-                            <div
-                                className="relative group cursor-pointer"
-                                onClick={handleAvatarClick}
-                            >
-                                <Avatar className="w-24 h-24 border-2 border-border">
-                                    <AvatarImage src={currentAvatar} />
-                                    <AvatarFallback className="text-lg bg-primary/10">
-                                        {initials}
-                                    </AvatarFallback>
-                                </Avatar>
-                                <div className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                    <Camera className="w-6 h-6 text-white" />
+                    {loading ? (
+                        <div className="flex items-center justify-center py-8">
+                            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                        </div>
+                    ) : (
+                        <div className="space-y-6 py-4">
+                            {/* Avatar Upload */}
+                            <div className="flex flex-col items-center gap-3">
+                                <div
+                                    className="relative group cursor-pointer"
+                                    onClick={handleAvatarClick}
+                                >
+                                    <Avatar className="w-24 h-24 border-2 border-border">
+                                        <AvatarImage src={currentAvatar} />
+                                        <AvatarFallback className="text-lg bg-primary/10">
+                                            {initials}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <div className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                        <Camera className="w-6 h-6 text-white" />
+                                    </div>
+                                </div>
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={handleFileChange}
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    Click to upload a new photo
+                                </p>
+                            </div>
+
+                            {/* Display Name */}
+                            <div className="space-y-2">
+                                <Label htmlFor="displayName">Display Name</Label>
+                                <Input
+                                    id="displayName"
+                                    placeholder="your display name"
+                                    value={displayName}
+                                    onChange={(e) => setDisplayName(e.target.value)}
+                                />
+                            </div>
+
+                            {/* Car */}
+                            <div className="space-y-2">
+                                <Label htmlFor="car">Car</Label>
+                                <Input
+                                    id="car"
+                                    placeholder="name your ride"
+                                    value={car}
+                                    onChange={(e) => setCar(e.target.value)}
+                                />
+                            </div>
+
+                            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+                                <div className="flex items-start justify-between gap-4">
+                                    <div>
+                                        <p className="text-sm font-medium text-destructive">
+                                            Deactivate account
+                                        </p>
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            Permanently delete your account, drives, profile, avatars, and public links.
+                                        </p>
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        variant="destructive"
+                                        size="sm"
+                                        className="shrink-0 gap-2"
+                                        onClick={() => setConfirmDeactivateOpen(true)}
+                                        disabled={saving || deactivating}
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                        Deactivate
+                                    </Button>
                                 </div>
                             </div>
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                onChange={handleFileChange}
-                            />
-                            <p className="text-xs text-muted-foreground">
-                                Click to upload a new photo
-                            </p>
                         </div>
+                    )}
 
-                        {/* Display Name */}
-                        <div className="space-y-2">
-                            <Label htmlFor="displayName">Display Name</Label>
-                            <Input
-                                id="displayName"
-                                placeholder="your display name"
-                                value={displayName}
-                                onChange={(e) => setDisplayName(e.target.value)}
-                            />
-                        </div>
+                    <DialogFooter>
+                        <Button variant="ghost" onClick={() => setOpen(false)} disabled={saving || deactivating}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleSave} disabled={loading || saving || deactivating}>
+                            {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                            Save Changes
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
-                        {/* Car */}
-                        <div className="space-y-2">
-                            <Label htmlFor="car">Car</Label>
-                            <Input
-                                id="car"
-                                placeholder="name your ride"
-                                value={car}
-                                onChange={(e) => setCar(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                )}
-
-                <DialogFooter>
-                    <Button variant="ghost" onClick={() => setOpen(false)} disabled={saving}>
-                        Cancel
-                    </Button>
-                    <Button onClick={handleSave} disabled={loading || saving}>
-                        {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                        Save Changes
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+            <AlertDialog open={confirmDeactivateOpen} onOpenChange={setConfirmDeactivateOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Deactivate your account?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This permanently deletes your account, uploaded drives, profile data, avatars, and public activity links. This cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={deactivating}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={(event) => {
+                                event.preventDefault();
+                                handleDeactivateAccount();
+                            }}
+                            disabled={deactivating}
+                        >
+                            {deactivating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                            Deactivate account
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </>
     );
 };
 
