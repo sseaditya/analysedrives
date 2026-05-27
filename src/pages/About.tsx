@@ -27,16 +27,45 @@ const About = () => {
             <main className="container mx-auto px-4 py-10 max-w-4xl flex-1">
                 <section className="space-y-6">
                     <div className="space-y-4">
-                        <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground">About DrivenStat</p>
+                        <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground">About Us</p>
                         <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-foreground">
-                            Better context for every drive.
+                            Our Story
                         </h2>
                         <p className="text-lg text-muted-foreground leading-relaxed max-w-3xl">
-                            DrivenStat is a place to upload, analyze, and share drive data. It turns GPX files into maps, charts, and useful driving metrics so enthusiasts can understand each route with more precision.
+                            DrivenStat was started by me, Aditya Raskar, along with Ritul Sherkar, my younger cousin.
+                        </p>
+                        <p className="text-lg text-muted-foreground leading-relaxed max-w-3xl">
+                            I love driving, and I wanted a better way to store and understand my drives. Most tools could show me a route, distance, or average speed, but I wanted more detail. I wanted to know what actually happened during a drive: how much time I spent at different speeds, how long different sections of the road took, where I slowed down, where I gained pace, how elevation changed, and how one part of a route compared with another.
+                        </p>
+                        <p className="text-lg text-muted-foreground leading-relaxed max-w-3xl">
+                            DrivenStat began as a passion project for that reason. It was first built for my own drives, then slowly grew into something we thought other driving enthusiasts might find useful too.
                         </p>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4">
+                    <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+                        <h3 className="font-bold text-xl">Why We Built It</h3>
+                        <p className="text-muted-foreground leading-relaxed">
+                            A GPX file has a lot of useful information inside it, but most of that detail is hard to read without the right tools. DrivenStat is our attempt to make that data easier to explore.
+                        </p>
+                        <p className="text-muted-foreground leading-relaxed">
+                            Upload a drive, see the route, inspect the timeline, compare speed and elevation, understand different sections of the road, and keep a record of drives that matter to you.
+                        </p>
+                    </div>
+
+                    <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+                        <h3 className="font-bold text-xl">Where We Want To Take It</h3>
+                        <p className="text-muted-foreground leading-relaxed">
+                            We want DrivenStat to grow into a social network for driving enthusiasts, but with strong privacy at the center.
+                        </p>
+                        <p className="text-muted-foreground leading-relaxed">
+                            You should be able to keep your drives completely private if that is what you want. You should only share a drive when you choose to. Public sharing should feel intentional, not forced.
+                        </p>
+                        <p className="text-muted-foreground leading-relaxed">
+                            Over time, we want DrivenStat to become a place where people can store their own drives, analyze them deeply, discover interesting public drives, and learn from how different routes are driven.
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
                         <div className="rounded-xl border border-border bg-card p-5">
                             <Gauge className="w-6 h-6 text-primary mb-4" />
                             <h3 className="font-bold mb-2">Analyze</h3>
@@ -58,13 +87,6 @@ const About = () => {
                                 Publish selected activities while keeping private drives under your control.
                             </p>
                         </div>
-                    </div>
-
-                    <div className="rounded-xl border border-border bg-card p-6">
-                        <h3 className="font-bold text-xl mb-3">Our Goal</h3>
-                        <p className="text-muted-foreground leading-relaxed">
-                            We are building simple, focused tools for people who care about the details of a drive. This page is placeholder copy for now and can be updated with the final story, team details, and contact information later.
-                        </p>
                     </div>
                 </section>
             </main>
