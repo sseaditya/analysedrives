@@ -17,7 +17,6 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
     AlertDialog,
-    AlertDialogAction,
     AlertDialogCancel,
     AlertDialogContent,
     AlertDialogDescription,
@@ -49,6 +48,7 @@ const ProfileEditor = ({ children, onProfileUpdate }: ProfileEditorProps) => {
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [deactivating, setDeactivating] = useState(false);
+    const [deactivateConfirmText, setDeactivateConfirmText] = useState("");
 
     const [displayName, setDisplayName] = useState("");
     const [car, setCar] = useState("");
@@ -190,7 +190,15 @@ const ProfileEditor = ({ children, onProfileUpdate }: ProfileEditorProps) => {
             return;
         }
 
+        if (deactivateConfirmText.trim().toLowerCase() !== "delete") {
+            toast.error('Type "delete" to confirm account deactivation.');
+            return;
+        }
+
         setDeactivating(true);
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), 60000);
+
         try {
             const response = await fetch("/api/deactivate-account", {
                 method: "POST",
@@ -199,11 +207,15 @@ const ProfileEditor = ({ children, onProfileUpdate }: ProfileEditorProps) => {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({}),
+                signal: controller.signal,
             });
 
+            const body = await response.json().catch(() => null);
             if (!response.ok) {
-                const body = await response.json().catch(() => null);
                 throw new Error(body?.error || "Failed to deactivate account");
+            }
+            if (!body?.ok) {
+                throw new Error("Account deactivation returned an unexpected response.");
             }
 
             localStorage.removeItem(`profile_${user.id}`);
@@ -216,12 +228,18 @@ const ProfileEditor = ({ children, onProfileUpdate }: ProfileEditorProps) => {
 
             toast.success("Your account has been deactivated.");
             setConfirmDeactivateOpen(false);
+            setDeactivateConfirmText("");
             setOpen(false);
             navigate("/", { replace: true });
         } catch (err) {
             console.error("Error deactivating account:", err);
-            toast.error(err instanceof Error ? err.message : "Failed to deactivate account");
+            if (err instanceof DOMException && err.name === "AbortError") {
+                toast.error("Account deactivation timed out. Please try again.");
+            } else {
+                toast.error(err instanceof Error ? err.message : "Failed to deactivate account");
+            }
         } finally {
+            window.clearTimeout(timeoutId);
             setDeactivating(false);
         }
     };
@@ -340,7 +358,14 @@ const ProfileEditor = ({ children, onProfileUpdate }: ProfileEditorProps) => {
                 </DialogContent>
             </Dialog>
 
-            <AlertDialog open={confirmDeactivateOpen} onOpenChange={setConfirmDeactivateOpen}>
+            <AlertDialog
+                open={confirmDeactivateOpen}
+                onOpenChange={(nextOpen) => {
+                    if (deactivating) return;
+                    setConfirmDeactivateOpen(nextOpen);
+                    if (!nextOpen) setDeactivateConfirmText("");
+                }}
+            >
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Deactivate your account?</AlertDialogTitle>
@@ -348,19 +373,30 @@ const ProfileEditor = ({ children, onProfileUpdate }: ProfileEditorProps) => {
                             This permanently deletes your account, uploaded drives, profile data, avatars, and public activity links. This cannot be undone.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
+                    <div className="space-y-2">
+                        <Label htmlFor="deactivate-confirm">
+                            Type <span className="font-semibold text-foreground">delete</span> to confirm.
+                        </Label>
+                        <Input
+                            id="deactivate-confirm"
+                            value={deactivateConfirmText}
+                            onChange={(event) => setDeactivateConfirmText(event.target.value)}
+                            disabled={deactivating}
+                            autoComplete="off"
+                            autoCapitalize="none"
+                            spellCheck={false}
+                        />
+                    </div>
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={deactivating}>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            onClick={(event) => {
-                                event.preventDefault();
-                                handleDeactivateAccount();
-                            }}
-                            disabled={deactivating}
+                        <Button
+                            variant="destructive"
+                            onClick={handleDeactivateAccount}
+                            disabled={deactivating || deactivateConfirmText.trim().toLowerCase() !== "delete"}
                         >
                             {deactivating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                             Deactivate account
-                        </AlertDialogAction>
+                        </Button>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
