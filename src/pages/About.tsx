@@ -32,7 +32,7 @@ const About = () => {
                             Our Story
                         </h2>
                         <p className="text-lg text-muted-foreground leading-relaxed max-w-3xl">
-                            DrivenStat was started by me, Aditya Raskar, along with Ritul Sherkar, my younger cousin.
+                            DrivenStat was started by me, Aditya Raskar and Ritul Sherkar.
                         </p>
                         <p className="text-lg text-muted-foreground leading-relaxed max-w-3xl">
                             I love driving, and I wanted a better way to store and understand my drives. Most tools could show me a route, distance, or average speed, but I wanted more detail. I wanted to know what actually happened during a drive: how much time I spent at different speeds, how long different sections of the road took, where I slowed down, where I gained pace, how elevation changed, and how one part of a route compared with another.
