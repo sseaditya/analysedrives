@@ -28,17 +28,20 @@ function getMapConfig(isDark: boolean, mapType: MapTypeId) {
     const colors = isDark ? darkColors : lightColors;
     let url = "";
     let styleKey = isDark ? "dark" : "light";
+    let tileFilter = "";
     if (mapType === "standard") {
-        url = isDark
-            ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png"
-            : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png";
+        url = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png";
+        if (isDark) {
+            styleKey = "dark_filtered_light";
+            tileFilter = "invert(1) hue-rotate(180deg) brightness(0.42) contrast(0.95) saturate(0.35)";
+        }
     } else if (mapType === "terrain") {
         url = "https://tile.opentopomap.org/{z}/{x}/{y}.png";
         styleKey = "terrain";
         if (!isDark) Object.assign(colors, { bg: "#F2EFE9" });
     }
     // route: url stays empty
-    return { ...colors, url, styleKey: `${styleKey}_${mapType}`, isLight: !isDark };
+    return { ...colors, url, styleKey: `${styleKey}_${mapType}`, tileFilter, isLight: !isDark };
 }
 
 const ACCENT = "#CC785C";
@@ -164,8 +167,7 @@ function drawRoutePath(
 }
 
 // ─── TILE CACHE (keyed by style+zoom+coords) ────────────────────────────────
-type TileImage = HTMLImageElement | HTMLCanvasElement;
-const tileCache = new Map<string, TileImage>();
+const tileCache = new Map<string, HTMLImageElement>();
 
 function tileCacheKey(styleId: string, z: number, x: number, y: number) {
     return `${styleId}_${z}_${x}_${y}`;
@@ -175,7 +177,7 @@ function getLabelTileZoom(zoom: number) {
     return Math.max(0, Math.round(zoom - MAP_TILE_ZOOM_OFFSET));
 }
 
-async function loadTile(styleId: string, tileUrl: string, z: number, x: number, y: number): Promise<TileImage | null> {
+async function loadTile(styleId: string, tileUrl: string, z: number, x: number, y: number): Promise<HTMLImageElement | null> {
     if (!tileUrl) return null; // route-only mode
     const key = tileCacheKey(styleId, z, x, y);
     if (tileCache.has(key)) return tileCache.get(key)!;
@@ -199,7 +201,7 @@ async function loadTile(styleId: string, tileUrl: string, z: number, x: number, 
         const timeout = window.setTimeout(() => {
             img.src = "";
             finish(null);
-        }, 10_000);
+        }, 5_000);
 
         img.crossOrigin = "anonymous";
         img.onload = () => finish(img);
@@ -209,42 +211,10 @@ async function loadTile(styleId: string, tileUrl: string, z: number, x: number, 
 
     const urls = url.includes("@2x.png") ? [url, url.replace("@2x.png", ".png")] : [url];
     for (const candidateUrl of urls) {
-        for (let attempt = 0; attempt < 2; attempt++) {
-            const cacheBust = attempt === 0 ? "" : `${candidateUrl.includes("?") ? "&" : "?"}retry=${attempt}`;
-            const img = await loadOnce(`${candidateUrl}${cacheBust}`);
-            if (img) {
-                tileCache.set(key, img);
-                return img;
-            }
-            await new Promise(resolve => window.setTimeout(resolve, 250 * (attempt + 1)));
-        }
-    }
-
-    if (z > 0) {
-        const parent = await loadTile(styleId, tileUrl, z - 1, Math.floor(x / 2), Math.floor(y / 2));
-        if (parent) {
-            const sourceW = parent.width / 2;
-            const sourceH = parent.height / 2;
-            const fallback = document.createElement("canvas");
-            fallback.width = parent.width;
-            fallback.height = parent.height;
-            const fallbackCtx = fallback.getContext("2d");
-            if (fallbackCtx) {
-                fallbackCtx.imageSmoothingEnabled = true;
-                fallbackCtx.drawImage(
-                    parent,
-                    (Math.abs(x) % 2) * sourceW,
-                    (Math.abs(y) % 2) * sourceH,
-                    sourceW,
-                    sourceH,
-                    0,
-                    0,
-                    fallback.width,
-                    fallback.height,
-                );
-                tileCache.set(key, fallback);
-                return fallback;
-            }
+        const img = await loadOnce(candidateUrl);
+        if (img) {
+            tileCache.set(key, img);
+            return img;
         }
     }
 
@@ -342,7 +312,9 @@ function renderFrame(
     // Map tiles (skip for route-only)
     if (style.url) {
         const previousSmoothing = ctx.imageSmoothingEnabled;
+        const previousFilter = ctx.filter;
         ctx.imageSmoothingEnabled = false;
+        ctx.filter = style.tileFilter;
         const tileZoom = getLabelTileZoom(zoom);
         const drawTileSize = TILE_SIZE * MAP_LABEL_SCALE;
         const cxf = lonToTileX(current.lon, tileZoom), cyf = latToTileY(current.lat, tileZoom);
@@ -363,6 +335,7 @@ function renderFrame(
                 }
             }
         }
+        ctx.filter = previousFilter;
         ctx.imageSmoothingEnabled = previousSmoothing;
     }
 
