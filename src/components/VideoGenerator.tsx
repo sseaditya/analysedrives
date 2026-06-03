@@ -164,7 +164,8 @@ function drawRoutePath(
 }
 
 // ─── TILE CACHE (keyed by style+zoom+coords) ────────────────────────────────
-const tileCache = new Map<string, HTMLImageElement>();
+type TileImage = HTMLImageElement | HTMLCanvasElement;
+const tileCache = new Map<string, TileImage>();
 
 function tileCacheKey(styleId: string, z: number, x: number, y: number) {
     return `${styleId}_${z}_${x}_${y}`;
@@ -174,7 +175,7 @@ function getLabelTileZoom(zoom: number) {
     return Math.max(0, Math.round(zoom - MAP_TILE_ZOOM_OFFSET));
 }
 
-async function loadTile(styleId: string, tileUrl: string, z: number, x: number, y: number): Promise<HTMLImageElement | null> {
+async function loadTile(styleId: string, tileUrl: string, z: number, x: number, y: number): Promise<TileImage | null> {
     if (!tileUrl) return null; // route-only mode
     const key = tileCacheKey(styleId, z, x, y);
     if (tileCache.has(key)) return tileCache.get(key)!;
@@ -206,14 +207,45 @@ async function loadTile(styleId: string, tileUrl: string, z: number, x: number, 
         img.src = src;
     });
 
-    for (let attempt = 0; attempt < 3; attempt++) {
-        const cacheBust = attempt === 0 ? "" : `${url.includes("?") ? "&" : "?"}retry=${attempt}`;
-        const img = await loadOnce(`${url}${cacheBust}`);
-        if (img) {
-            tileCache.set(key, img);
-            return img;
+    const urls = url.includes("@2x.png") ? [url, url.replace("@2x.png", ".png")] : [url];
+    for (const candidateUrl of urls) {
+        for (let attempt = 0; attempt < 2; attempt++) {
+            const cacheBust = attempt === 0 ? "" : `${candidateUrl.includes("?") ? "&" : "?"}retry=${attempt}`;
+            const img = await loadOnce(`${candidateUrl}${cacheBust}`);
+            if (img) {
+                tileCache.set(key, img);
+                return img;
+            }
+            await new Promise(resolve => window.setTimeout(resolve, 250 * (attempt + 1)));
         }
-        await new Promise(resolve => window.setTimeout(resolve, 250 * (attempt + 1)));
+    }
+
+    if (z > 0) {
+        const parent = await loadTile(styleId, tileUrl, z - 1, Math.floor(x / 2), Math.floor(y / 2));
+        if (parent) {
+            const sourceW = parent.width / 2;
+            const sourceH = parent.height / 2;
+            const fallback = document.createElement("canvas");
+            fallback.width = parent.width;
+            fallback.height = parent.height;
+            const fallbackCtx = fallback.getContext("2d");
+            if (fallbackCtx) {
+                fallbackCtx.imageSmoothingEnabled = true;
+                fallbackCtx.drawImage(
+                    parent,
+                    (Math.abs(x) % 2) * sourceW,
+                    (Math.abs(y) % 2) * sourceH,
+                    sourceW,
+                    sourceH,
+                    0,
+                    0,
+                    fallback.width,
+                    fallback.height,
+                );
+                tileCache.set(key, fallback);
+                return fallback;
+            }
+        }
     }
 
     return null;
@@ -275,7 +307,7 @@ async function prefetchTiles(
     }
 
     if (failed.size > 0) {
-        throw new Error(`Failed to load ${failed.size} map tile${failed.size === 1 ? "" : "s"}. Check the network and try again.`);
+        console.warn(`Skipped ${failed.size} map tile${failed.size === 1 ? "" : "s"} after fallback attempts.`);
     }
 }
 
@@ -421,7 +453,7 @@ function renderFrame(
 // ─── COMPONENT ──────────────────────────────────────────────────────────────
 const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorProps) => {
     const [videoPresetId, setVideoPresetId] = useState<VideoPresetId>("square1080");
-    const [zoom, setZoom] = useState(14);
+    const [zoom, setZoom] = useState(16);
     const [isDark, setIsDark] = useState(true);
     const [mapType, setMapType] = useState<MapTypeId>("standard");
     const [speedMultiplier, setSpeedMultiplier] = useState(30);
