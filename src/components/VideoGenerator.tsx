@@ -12,6 +12,7 @@ const MAP_LABEL_SCALE = 2;
 const MAP_TILE_ZOOM_OFFSET = Math.log2(MAP_LABEL_SCALE);
 const ROLLING_WINDOW_SECONDS = 30;
 const SPEED_OPTIONS = [15, 30, 60, 120] as const;
+const TILE_SUBDOMAINS = ["a", "b", "c", "d"];
 
 // Map type tiles
 const MAP_TYPES = [
@@ -29,8 +30,8 @@ function getMapConfig(isDark: boolean, mapType: MapTypeId) {
     let styleKey = isDark ? "dark" : "light";
     if (mapType === "standard") {
         url = isDark
-            ? "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png"
-            : "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png";
+            ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png"
+            : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png";
     } else if (mapType === "terrain") {
         url = "https://tile.opentopomap.org/{z}/{x}/{y}.png";
         styleKey = "terrain";
@@ -177,37 +178,104 @@ async function loadTile(styleId: string, tileUrl: string, z: number, x: number, 
     if (!tileUrl) return null; // route-only mode
     const key = tileCacheKey(styleId, z, x, y);
     if (tileCache.has(key)) return tileCache.get(key)!;
-    const url = tileUrl.replace("{z}", String(z)).replace("{x}", String(x)).replace("{y}", String(y));
-    return new Promise((resolve) => {
+
+    const subdomain = TILE_SUBDOMAINS[Math.abs(x + y) % TILE_SUBDOMAINS.length];
+    const url = tileUrl
+        .replace("{s}", subdomain)
+        .replace("{z}", String(z))
+        .replace("{x}", String(x))
+        .replace("{y}", String(y));
+
+    const loadOnce = (src: string) => new Promise<HTMLImageElement | null>((resolve) => {
         const img = new Image();
+        let settled = false;
+        const finish = (result: HTMLImageElement | null) => {
+            if (settled) return;
+            settled = true;
+            window.clearTimeout(timeout);
+            resolve(result);
+        };
+        const timeout = window.setTimeout(() => {
+            img.src = "";
+            finish(null);
+        }, 10_000);
+
         img.crossOrigin = "anonymous";
-        img.onload = () => { tileCache.set(key, img); resolve(img); };
-        img.onerror = () => resolve(null);
-        img.src = url;
+        img.onload = () => finish(img);
+        img.onerror = () => finish(null);
+        img.src = src;
     });
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+        const cacheBust = attempt === 0 ? "" : `${url.includes("?") ? "&" : "?"}retry=${attempt}`;
+        const img = await loadOnce(`${url}${cacheBust}`);
+        if (img) {
+            tileCache.set(key, img);
+            return img;
+        }
+        await new Promise(resolve => window.setTimeout(resolve, 250 * (attempt + 1)));
+    }
+
+    return null;
 }
 
-async function prefetchTiles(points: ComputedPoint[], styleId: string, tileUrl: string, zoom: number, onProgress?: (p: number) => void) {
-    if (!tileUrl) { onProgress?.(1); return; } // route-only
+function getMapHeight(w: number, h: number) {
+    const statsH = Math.round(Math.min(h * 0.18, w * 0.18));
+    return h - statsH;
+}
+
+function collectTileKeysForViewport(points: ComputedPoint[], zoom: number, w: number, h: number) {
     const tileZoom = getLabelTileZoom(zoom);
+    const drawTileSize = TILE_SIZE * MAP_LABEL_SCALE;
+    const mapH = getMapHeight(w, h);
+    const halfX = Math.ceil(w / drawTileSize / 2) + 1;
+    const halfY = Math.ceil(mapH / drawTileSize / 2) + 1;
     const needed = new Set<string>();
+
     for (const p of points) {
         const tx = Math.floor(lonToTileX(p.lon, tileZoom));
         const ty = Math.floor(latToTileY(p.lat, tileZoom));
-        for (let dx = -3; dx <= 3; dx++) for (let dy = -4; dy <= 4; dy++) needed.add(`${tileZoom}_${tx + dx}_${ty + dy}`);
+        for (let dx = -halfX; dx <= halfX; dx++) {
+            for (let dy = -halfY; dy <= halfY; dy++) {
+                needed.add(`${tileZoom}_${tx + dx}_${ty + dy}`);
+            }
+        }
     }
+
+    return needed;
+}
+
+async function prefetchTiles(
+    points: ComputedPoint[],
+    styleId: string,
+    tileUrl: string,
+    zoom: number,
+    viewport: { w: number; h: number },
+    onProgress?: (p: number) => void,
+) {
+    if (!tileUrl) { onProgress?.(1); return; } // route-only
+    const needed = collectTileKeysForViewport(points, zoom, viewport.w, viewport.h);
     const keys = Array.from(needed);
     // Skip already cached tiles
     const uncached = keys.filter(k => !tileCache.has(`${styleId}_${k}`));
     if (uncached.length === 0) { onProgress?.(1); return; }
 
+    const failed = new Set<string>();
     const batchSize = 30;
     for (let i = 0; i < uncached.length; i += batchSize) {
-        await Promise.all(uncached.slice(i, i + batchSize).map(k => {
+        const results = await Promise.all(uncached.slice(i, i + batchSize).map(async (k) => {
             const [z, x, y] = k.split("_").map(Number);
-            return loadTile(styleId, tileUrl, z, x, y);
+            const img = await loadTile(styleId, tileUrl, z, x, y);
+            return { key: k, loaded: Boolean(img) };
         }));
+        for (const result of results) {
+            if (!result.loaded) failed.add(result.key);
+        }
         onProgress?.(Math.min(1, (i + batchSize) / uncached.length));
+    }
+
+    if (failed.size > 0) {
+        throw new Error(`Failed to load ${failed.size} map tile${failed.size === 1 ? "" : "s"}. Check the network and try again.`);
     }
 }
 
@@ -224,8 +292,8 @@ function renderFrame(
     const isLight = style.isLight;
 
     // Layout: compact stats strip at bottom, map fills the rest
-    const statsH = Math.round(Math.min(H * 0.18, W * 0.18)); // square overlays use a rectangular map plus bottom HUD
-    const mapH = H - statsH; // map gets all remaining height
+    const mapH = getMapHeight(W, H); // map gets all remaining height
+    const statsH = H - mapH;
     const mapCenterX = W / 2;
     const mapCenterY = mapH / 2;
 
@@ -396,13 +464,19 @@ const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorPro
 
         const doPreview = async () => {
             abortRef.current = false;
-            if (mapConfig.url) {
-                await prefetchTiles(pts, mapConfig.styleKey, mapConfig.url, zoom);
+            const ctx = canvas.getContext("2d")!;
+            const W = canvas.width, H = canvas.height;
+            try {
+                if (mapConfig.url) {
+                    await prefetchTiles(pts, mapConfig.styleKey, mapConfig.url, zoom, { w: W, h: H });
+                }
+            } catch (error) {
+                console.error("Failed to load map tiles for preview:", error);
+                setPhase("idle");
+                return;
             }
 
             const totalRealTime = pts[pts.length - 1].elapsedTime;
-            const ctx = canvas.getContext("2d")!;
-            const W = canvas.width, H = canvas.height;
             let frame = 0;
 
             const animate = () => {
@@ -427,10 +501,16 @@ const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorPro
         const pts = computed.current;
         if (pts.length === 0) return;
         setPhase("prefetch");
-        await prefetchTiles(pts, mapConfig.styleKey, mapConfig.url, zoom, (p) => setProgress(p));
-        setProgress(0);
-        setPhase("preview");
-    }, [zoom, isDark, mapType]);
+        try {
+            await prefetchTiles(pts, mapConfig.styleKey, mapConfig.url, zoom, { w: previewW, h: previewH }, (p) => setProgress(p));
+            setProgress(0);
+            setPhase("preview");
+        } catch (error) {
+            console.error("Failed to load map tiles:", error);
+            alert(error instanceof Error ? error.message : "Failed to load map tiles. Check the network and try again.");
+            setPhase("idle");
+        }
+    }, [zoom, isDark, mapType, previewW, previewH, mapConfig.styleKey, mapConfig.url]);
 
     const generateVideo = useCallback(async () => {
         const pts = computed.current;
@@ -482,7 +562,15 @@ const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorPro
         encoder.configure(config);
 
         // Ensure tiles are loaded for the generation zoom/style
-        await prefetchTiles(pts, mapConfig.styleKey, mapConfig.url, zoom);
+        try {
+            await prefetchTiles(pts, mapConfig.styleKey, mapConfig.url, zoom, { w: W, h: H });
+        } catch (error) {
+            encoder.close();
+            console.error("Failed to load map tiles for generation:", error);
+            alert(error instanceof Error ? error.message : "Failed to load map tiles. Check the network and try again.");
+            setPhase("preview");
+            return;
+        }
 
         // IMPORTANT: Reset abort flag here, after all async setup.
         // The preview effect cleanup may have set it to true during the awaits above.
