@@ -436,6 +436,10 @@ const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorPro
 
     const settings: RenderSettings = { zoom, isDark, mapType };
     const mapConfig = getMapConfig(isDark, mapType);
+    const res = VIDEO_PRESETS.find((preset) => preset.id === videoPresetId) ?? VIDEO_PRESETS[0];
+    const previewW = 270;
+    const previewH = Math.round(previewW * (res.h / res.w));
+    const canEdit = phase === "idle" || phase === "preview";
 
     // Compute points once when dialog opens
     useEffect(() => {
@@ -629,11 +633,6 @@ const VideoGenerator = ({ open, onOpenChange, points, title }: VideoGeneratorPro
         setFrameInfo("");
         onOpenChange(false);
     };
-
-    const res = VIDEO_PRESETS.find((preset) => preset.id === videoPresetId) ?? VIDEO_PRESETS[0];
-    const previewW = 270;
-    const previewH = Math.round(previewW * (res.h / res.w));
-    const canEdit = phase === "idle" || phase === "preview";
 
     return (
         <Dialog open={open} onOpenChange={handleClose}>
