@@ -30,11 +30,9 @@ function getMapConfig(isDark: boolean, mapType: MapTypeId) {
     let styleKey = isDark ? "dark" : "light";
     let tileFilter = "";
     if (mapType === "standard") {
-        url = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png";
-        if (isDark) {
-            styleKey = "dark_filtered_light";
-            tileFilter = "invert(1) hue-rotate(180deg) brightness(0.42) contrast(0.95) saturate(0.35)";
-        }
+        url = isDark
+            ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png"
+            : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png";
     } else if (mapType === "terrain") {
         url = "https://tile.opentopomap.org/{z}/{x}/{y}.png";
         styleKey = "terrain";
