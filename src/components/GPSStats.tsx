@@ -234,6 +234,11 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
     return calculateLimitedStats(filteredPoints, speedLimit);
   }, [filteredPoints, speedLimit, showLimiter]);
 
+  const currentSectionStats = zoomRange && subsetStats ? subsetStats : stats;
+  const limitedDisplayAvgSpeed = limitedStats && limitedStats.simulatedTime > 0
+    ? currentSectionStats.totalDistance / (limitedStats.simulatedTime / 3600)
+    : null;
+
   // displayStats: Clamp values if speed cap is active for public viewers
   const displayStats = useMemo(() => {
     if (!isOwner && speedCap && speedCap > 0) {
@@ -756,20 +761,20 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                       <div className="flex items-baseline gap-2">
                         {(() => {
                           // Owner's speed limiter
-                          if (showLimiter && limitedStats && limitedStats.timeAdded > 0) {
+                          if (showLimiter && limitedStats && limitedDisplayAvgSpeed !== null && limitedStats.timeAdded > 0) {
                             if (isMobile) {
                               // Mobile: Two-line stacked
                               return (
                                 <div className="flex flex-col gap-0.5 animate-in fade-in slide-in-from-left-2">
                                   <span className="text-xs font-normal tabular-nums text-muted-foreground/50 line-through">
-                                    {zoomRange && subsetStats ? formatSpeed(subsetStats.avgSpeed) : formatSpeed(stats.avgSpeed)}
+                                    {formatSpeed(currentSectionStats.avgSpeed)}
                                   </span>
                                   <div className="flex items-baseline gap-1.5">
                                     <span className="text-sm font-normal text-[#CC785C] tabular-nums">
-                                      {formatSpeed(limitedStats.newAvgSpeed)}
+                                      {formatSpeed(limitedDisplayAvgSpeed)}
                                     </span>
                                     <span className="text-xs text-[#CC785C] tabular-nums">
-                                      (-{formatSpeed((zoomRange && subsetStats ? subsetStats.avgSpeed : stats.avgSpeed) - limitedStats.newAvgSpeed)})
+                                      (-{formatSpeed(currentSectionStats.avgSpeed - limitedDisplayAvgSpeed)})
                                     </span>
                                   </div>
                                 </div>
@@ -779,13 +784,13 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                             return (
                               <div className="flex items-baseline gap-2 animate-in fade-in slide-in-from-left-2">
                                 <span className="text-lg font-normal tabular-nums text-muted-foreground/50 line-through">
-                                  {zoomRange && subsetStats ? formatSpeed(subsetStats.avgSpeed) : formatSpeed(stats.avgSpeed)}
+                                  {formatSpeed(currentSectionStats.avgSpeed)}
                                 </span>
                                 <span className="text-lg font-normal text-[#CC785C] tabular-nums">
-                                  {formatSpeed(limitedStats.newAvgSpeed)}
+                                  {formatSpeed(limitedDisplayAvgSpeed)}
                                 </span>
                                 <span className="text-sm text-[#CC785C] tabular-nums">
-                                  (-{formatSpeed((zoomRange && subsetStats ? subsetStats.avgSpeed : stats.avgSpeed) - limitedStats.newAvgSpeed)})
+                                  (-{formatSpeed(currentSectionStats.avgSpeed - limitedDisplayAvgSpeed)})
                                 </span>
                               </div>
                             );

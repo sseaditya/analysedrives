@@ -1062,32 +1062,28 @@ export function calculateLimitedStats(points: GPXPoint[], speedLimitKmh: number)
   let cappedSegments = 0;
   let totalSegments = 0;
 
-  for (let i = 1; i < points.length; i++) {
-    const prev = points[i - 1];
-    const curr = points[i];
+  const segments = calculateRobustSpeeds(points);
 
-    const dist = haversineDistance(prev.lat, prev.lon, curr.lat, curr.lon); // km
+  for (const segment of segments) {
+    const { time: segmentTimeSeconds, distance: dist } = segment;
+
+    // Match calculateStats: pauses/gaps are stitched out of both distance and time.
+    if (segmentTimeSeconds <= 0 || segmentTimeSeconds > PAUSE_THRESHOLD) {
+      continue;
+    }
+
     totalDistance += dist;
+    originalTime += segmentTimeSeconds;
+    totalSegments++;
 
-    if (prev.time && curr.time) {
-      const segmentTimeSeconds = (curr.time.getTime() - prev.time.getTime()) / 1000;
+    const segmentSpeedKmh = dist / (segmentTimeSeconds / 3600);
 
-      // PAUSE DETECTION: Skip segments longer than PAUSE_THRESHOLD (60s)
-      if (segmentTimeSeconds > 0 && segmentTimeSeconds <= PAUSE_THRESHOLD) {
-        originalTime += segmentTimeSeconds;
-        totalSegments++;
-
-        const segmentSpeedKmh = dist / (segmentTimeSeconds / 3600);
-
-        if (segmentSpeedKmh > speedLimitKmh && segmentSpeedKmh < MAX_SPEED_CAP) { // Sanity cap
-          // Time if we traveled at speed limit instead
-          const newTimeSeconds = (dist / speedLimitKmh) * 3600;
-          simulatedTime += newTimeSeconds;
-          cappedSegments++;
-        } else {
-          simulatedTime += segmentTimeSeconds;
-        }
-      }
+    if (segmentSpeedKmh > speedLimitKmh) {
+      // Time if we traveled at speed limit instead.
+      simulatedTime += (dist / speedLimitKmh) * 3600;
+      cappedSegments++;
+    } else {
+      simulatedTime += segmentTimeSeconds;
     }
   }
 
