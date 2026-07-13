@@ -166,7 +166,7 @@ const SpeedDistributionChart = ({ points, speedLimit, buckets }: SpeedDistributi
                     axisLine={false}
                     tick={{ ...chartAxisTick, dy: 10 }}
                     minTickGap={8}
-                    label={{ value: "Speed Range (km/h)", position: "insideBottom", offset: -8, ...chartAxisLabel }}
+                    label={{ value: "Speed Range (km/h)", position: "insideBottom", offset: -8, dy: 5, ...chartAxisLabel }}
                 />
                 <YAxis
                     yAxisId="left"
