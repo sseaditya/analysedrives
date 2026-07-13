@@ -12,10 +12,14 @@ interface ShareImageOptions {
   points: GPXPoint[];
   stats: GPXStats;
   hideRadius?: number | null;
+  userName?: string | null;
+  carName?: string | null;
+  theme?: "light" | "dark";
 }
 
 const WIDTH = 1080;
 const HEIGHT = 1920;
+const TILE_SIZE = 256;
 
 const sanitizeFileName = (name: string) =>
   name
@@ -171,6 +175,228 @@ const drawRoute = (ctx: CanvasRenderingContext2D, route: { x: number; y: number 
   ctx.restore();
 };
 
+const escapeXml = (value: string) =>
+  value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+
+const formatShareStats = (stats: GPXStats) => [
+  { label: "Distance", value: formatDistance(stats.totalDistance) },
+  { label: "Elapsed time", value: formatDurationShort(stats.totalTime || stats.movingTime) },
+  { label: "Avg speed", value: formatSpeed(stats.avgSpeed || stats.movingAvgSpeed) },
+];
+
+const getDisplayName = (userName?: string | null) => userName?.trim() || "Driver";
+const getCarName = (carName?: string | null) => carName?.trim() || "Car";
+
+const toRoutePath = (route: { x: number; y: number }[]) =>
+  route.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(" ");
+
+export const createTransparentRouteShareSvg = async ({
+  title,
+  points,
+  stats,
+  hideRadius,
+  userName,
+  carName,
+}: ShareImageOptions): Promise<File> => {
+  const visiblePoints = getPrivacyClippedPoints(points, hideRadius);
+  const route = visiblePoints.length >= 2
+    ? projectRoute(visiblePoints, { x: 90, y: 280, width: 900, height: 830 })
+    : [];
+  const routePath = toRoutePath(route);
+  const statCards = formatShareStats(stats);
+  const safeTitle = escapeXml(title);
+  const safeUserName = escapeXml(getDisplayName(userName));
+  const safeCarName = escapeXml(getCarName(carName));
+
+  const statsMarkup = statCards.map((stat, index) => {
+    const x = 96 + index * 320;
+    return `
+      <g transform="translate(${x} 1518)">
+        <text x="0" y="0" fill="rgba(255,255,255,0.7)" font-size="30" font-weight="600">${escapeXml(stat.label)}</text>
+        <text x="0" y="58" fill="#ffffff" font-size="46" font-weight="700">${escapeXml(stat.value)}</text>
+      </g>`;
+  }).join("");
+
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}">
+  <defs>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#000000" flood-opacity="0.38"/>
+    </filter>
+    <filter id="routeGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="0" stdDeviation="12" flood-color="#ff5a1f" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+  <g font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" filter="url(#softShadow)">
+    <text x="78" y="118" fill="#ffffff" font-size="42" font-weight="700">${safeUserName}</text>
+    <text x="78" y="170" fill="rgba(255,255,255,0.72)" font-size="30" font-weight="500">${safeCarName}</text>
+    <text x="1002" y="118" text-anchor="end" fill="#ffffff" font-size="36" font-weight="800">DrivenStat</text>
+    <text x="78" y="1390" fill="#ffffff" font-size="58" font-weight="800">${safeTitle}</text>
+    ${statsMarkup}
+  </g>
+  ${routePath ? `
+  <path d="${routePath}" fill="none" stroke="rgba(255,255,255,0.88)" stroke-width="22" stroke-linecap="round" stroke-linejoin="round" filter="url(#routeGlow)"/>
+  <path d="${routePath}" fill="none" stroke="#ff5a1f" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="${routePath}" fill="none" stroke="#ffb55a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  ` : `
+  <text x="540" y="720" text-anchor="middle" fill="#ffffff" font-size="42" font-weight="700" font-family="Inter, ui-sans-serif, system-ui">Route hidden by privacy zone</text>
+  `}
+</svg>`;
+
+  return new File([new Blob([svg], { type: "image/svg+xml" })], `${sanitizeFileName(title)}-route-transparent.svg`, {
+    type: "image/svg+xml",
+  });
+};
+
+const lonToTileX = (lon: number, zoom: number) => ((lon + 180) / 360) * 2 ** zoom;
+const latToTileY = (lat: number, zoom: number) => {
+  const latRad = (lat * Math.PI) / 180;
+  return ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * 2 ** zoom;
+};
+
+const loadTile = (src: string) =>
+  new Promise<HTMLImageElement | null>((resolve) => {
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.onload = () => resolve(image);
+    image.onerror = () => resolve(null);
+    image.src = src;
+  });
+
+const getRouteTileViewport = (points: GPXPoint[], width: number, height: number, bottomInset: number) => {
+  const lats = points.map((p) => p.lat);
+  const lons = points.map((p) => p.lon);
+  const minLat = Math.min(...lats);
+  const maxLat = Math.max(...lats);
+  const minLon = Math.min(...lons);
+  const maxLon = Math.max(...lons);
+  const usableWidth = width - 150;
+  const usableHeight = height - bottomInset - 150;
+  let zoom = 3;
+
+  for (let z = 3; z <= 16; z++) {
+    const xSpan = Math.abs(lonToTileX(maxLon, z) - lonToTileX(minLon, z)) * TILE_SIZE;
+    const ySpan = Math.abs(latToTileY(minLat, z) - latToTileY(maxLat, z)) * TILE_SIZE;
+    if (xSpan <= usableWidth && ySpan <= usableHeight) zoom = z;
+    else break;
+  }
+
+  const centerX = ((lonToTileX(minLon, zoom) + lonToTileX(maxLon, zoom)) / 2) * TILE_SIZE;
+  const centerY = ((latToTileY(minLat, zoom) + latToTileY(maxLat, zoom)) / 2) * TILE_SIZE;
+  return { zoom, centerX, centerY };
+};
+
+const projectMapPoint = (point: GPXPoint, viewport: { zoom: number; centerX: number; centerY: number }, width: number, height: number) => ({
+  x: lonToTileX(point.lon, viewport.zoom) * TILE_SIZE - viewport.centerX + width / 2,
+  y: latToTileY(point.lat, viewport.zoom) * TILE_SIZE - viewport.centerY + height / 2 - 130,
+});
+
+const drawMapTiles = async (
+  ctx: CanvasRenderingContext2D,
+  viewport: { zoom: number; centerX: number; centerY: number },
+  theme: "light" | "dark",
+) => {
+  const style = theme === "dark" ? "dark_all" : "rastertiles/voyager";
+  const subdomains = ["a", "b", "c", "d"];
+  const startTileX = Math.floor((viewport.centerX - WIDTH / 2) / TILE_SIZE);
+  const endTileX = Math.ceil((viewport.centerX + WIDTH / 2) / TILE_SIZE);
+  const startTileY = Math.floor((viewport.centerY - HEIGHT / 2 + 130) / TILE_SIZE);
+  const endTileY = Math.ceil((viewport.centerY + HEIGHT / 2 + 130) / TILE_SIZE);
+  const maxTile = 2 ** viewport.zoom;
+
+  ctx.fillStyle = theme === "dark" ? "#171b22" : "#e7ece8";
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+  const tilePromises: Promise<void>[] = [];
+  for (let x = startTileX; x <= endTileX; x++) {
+    for (let y = startTileY; y <= endTileY; y++) {
+      if (y < 0 || y >= maxTile) continue;
+      const wrappedX = ((x % maxTile) + maxTile) % maxTile;
+      const subdomain = subdomains[Math.abs(x + y) % subdomains.length];
+      const url = theme === "dark"
+        ? `https://${subdomain}.basemaps.cartocdn.com/${style}/${viewport.zoom}/${wrappedX}/${y}.png`
+        : `https://${subdomain}.basemaps.cartocdn.com/${style}/${viewport.zoom}/${wrappedX}/${y}.png`;
+      const dx = x * TILE_SIZE - viewport.centerX + WIDTH / 2;
+      const dy = y * TILE_SIZE - viewport.centerY + HEIGHT / 2 - 130;
+      tilePromises.push(loadTile(url).then((tile) => {
+        if (tile) ctx.drawImage(tile, dx, dy, TILE_SIZE, TILE_SIZE);
+      }));
+    }
+  }
+
+  await Promise.all(tilePromises);
+};
+
+export const createMapShareImage = async ({
+  title,
+  points,
+  stats,
+  hideRadius,
+  userName,
+  carName,
+  theme = "dark",
+}: ShareImageOptions): Promise<File> => {
+  const visiblePoints = getPrivacyClippedPoints(points, hideRadius);
+  const canvas = document.createElement("canvas");
+  canvas.width = WIDTH;
+  canvas.height = HEIGHT;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Unable to create image renderer.");
+
+  if (visiblePoints.length >= 2) {
+    const viewport = getRouteTileViewport(visiblePoints, WIDTH, HEIGHT, 540);
+    await drawMapTiles(ctx, viewport, theme);
+    drawRoute(ctx, visiblePoints.map((point) => projectMapPoint(point, viewport, WIDTH, HEIGHT)));
+  } else {
+    ctx.fillStyle = theme === "dark" ? "#171b22" : "#e7ece8";
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  }
+
+  const overlay = ctx.createLinearGradient(0, 980, 0, HEIGHT);
+  overlay.addColorStop(0, "rgba(0,0,0,0)");
+  overlay.addColorStop(0.45, "rgba(0,0,0,0.64)");
+  overlay.addColorStop(1, "rgba(0,0,0,0.88)");
+  ctx.fillStyle = overlay;
+  ctx.fillRect(0, 820, WIDTH, 1100);
+
+  ctx.fillStyle = "#ffffff";
+  ctx.shadowColor = "rgba(0,0,0,0.45)";
+  ctx.shadowBlur = 16;
+  ctx.font = "800 56px Inter, ui-sans-serif, system-ui";
+  drawWrappedText(ctx, title, 76, 1280, 890, 64, 2);
+  ctx.font = "700 32px Inter, ui-sans-serif, system-ui";
+  ctx.fillText(getDisplayName(userName), 76, 1190);
+  ctx.fillText("DrivenStat", 76, 1844);
+  ctx.font = "500 30px Inter, ui-sans-serif, system-ui";
+  ctx.fillStyle = "rgba(255,255,255,0.76)";
+  ctx.fillText(getCarName(carName), 76, 1232);
+
+  const statCards = formatShareStats(stats);
+  statCards.forEach((stat, index) => {
+    const x = 76 + index * 330;
+    ctx.fillStyle = "rgba(255,255,255,0.74)";
+    ctx.font = "500 30px Inter, ui-sans-serif, system-ui";
+    ctx.fillText(stat.label, x, 1488);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "800 48px Inter, ui-sans-serif, system-ui";
+    drawWrappedText(ctx, stat.value, x, 1556, 270, 54, 2);
+  });
+  ctx.shadowBlur = 0;
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((result) => {
+      if (result) resolve(result);
+      else reject(new Error("Unable to export map image."));
+    }, "image/png");
+  });
+
+  return new File([blob], `${sanitizeFileName(title)}-map-${theme}.png`, { type: "image/png" });
+};
+
 export const createActivityShareImage = async ({ title, points, stats, hideRadius }: ShareImageOptions): Promise<File> => {
   const visiblePoints = getPrivacyClippedPoints(points, hideRadius);
   const canvas = document.createElement("canvas");
@@ -280,6 +506,17 @@ export const shareOrDownloadImage = async (file: File, title: string) => {
     return;
   }
 
+  const url = URL.createObjectURL(file);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = file.name;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+};
+
+export const downloadImageFile = (file: File) => {
   const url = URL.createObjectURL(file);
   const anchor = document.createElement("a");
   anchor.href = url;

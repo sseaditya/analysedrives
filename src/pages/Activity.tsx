@@ -11,8 +11,17 @@ import ActivityEditor from "@/components/ActivityEditor";
 import { useIsMobile } from "@/hooks/use-mobile";
 import HeaderProfile from "@/components/HeaderProfile";
 import VideoGenerator from "@/components/VideoGenerator";
-import { createActivityShareImage, shareOrDownloadImage } from "@/utils/shareImage";
+import { createMapShareImage, createTransparentRouteShareSvg, downloadImageFile } from "@/utils/shareImage";
 import { toast } from "sonner";
+import { useTheme } from "@/components/ThemeProvider";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface ActivityState {
   stats: GPXStats;
@@ -45,6 +54,7 @@ const Activity = () => {
   const location = useLocation();
   const { user, loading: authLoading, signInWithGoogle } = useAuth();
   const isMobile = useIsMobile();
+  const { theme } = useTheme();
 
   // Initialize state from location state (if uploaded locally) or null
   // strictly check for 'points' to avoid confusing navigation state { from: ... } with activity data
@@ -262,22 +272,43 @@ const Activity = () => {
     ? metadata.speed_cap
     : null;
 
-  const handleShareImage = async () => {
+  const getResolvedTheme = (): "light" | "dark" => {
+    if (theme === "system") {
+      return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+    return theme;
+  };
+
+  const handleShareImageDownload = async (format: "route" | "map") => {
     if (!data || !isOwner || isSharing) return;
 
     try {
       setIsSharing(true);
-      const file = await createActivityShareImage({
-        title: data.fileName,
-        points: data.points,
-        stats: data.stats,
-        hideRadius: metadata?.hide_radius,
-      });
-      await shareOrDownloadImage(file, data.fileName);
+      const ownerName = ownerProfile?.display_name || ownerProfile?.full_name || user?.user_metadata?.full_name || user?.email || null;
+      const file = format === "route"
+        ? await createTransparentRouteShareSvg({
+          title: data.fileName,
+          points: data.points,
+          stats: data.stats,
+          hideRadius: metadata?.hide_radius,
+          userName: ownerName,
+          carName: ownerProfile?.car,
+        })
+        : await createMapShareImage({
+          title: data.fileName,
+          points: data.points,
+          stats: data.stats,
+          hideRadius: metadata?.hide_radius,
+          userName: ownerName,
+          carName: ownerProfile?.car,
+          theme: getResolvedTheme(),
+        });
+      downloadImageFile(file);
+      toast.success(format === "route" ? "Transparent route SVG downloaded." : "Map image downloaded.");
     } catch (err) {
       if ((err as DOMException)?.name !== "AbortError") {
         console.error("Failed to share activity image:", err);
-        toast.error("Could not create the share image.");
+        toast.error("Could not create the image.");
       }
     } finally {
       setIsSharing(false);
@@ -410,16 +441,29 @@ const Activity = () => {
 
             {isOwner && data && (
               <>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={handleShareImage}
-                  disabled={isSharing}
-                  title="Share Activity Image"
-                >
-                  {isSharing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />}
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      disabled={isSharing}
+                      title="Download Share Image"
+                    >
+                      {isSharing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-64">
+                    <DropdownMenuLabel>Download share image</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onSelect={() => handleShareImageDownload("route")}>
+                      Transparent route SVG
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => handleShareImageDownload("map")}>
+                      Full map PNG ({getResolvedTheme()})
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <Button
                   variant="ghost"
                   size="icon"
