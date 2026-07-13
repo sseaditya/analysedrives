@@ -8,6 +8,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { GPXPoint } from "@/utils/gpxParser";
+import { chartAxisLabel, chartAxisTick } from "@/utils/chartStyles";
 
 interface SpeedChartProps {
   points: GPXPoint[];
@@ -121,19 +122,19 @@ const SpeedChart = ({ points, onHover }: SpeedChartProps) => {
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(23, 5%, 82%)" opacity={0.5} />
             <XAxis
               dataKey="distance"
-              stroke="hsl(24, 9%, 10%)"
-              fontSize={12}
+              stroke="#ffffff"
+              tick={chartAxisTick}
               tickLine={false}
               axisLine={false}
               tickFormatter={(value) => `${value} km`}
             />
             <YAxis
-              stroke="hsl(24, 9%, 10%)"
-              fontSize={12}
+              stroke="#ffffff"
+              tick={chartAxisTick}
               tickLine={false}
               axisLine={false}
               tickFormatter={(value) => `${value}`}
-              label={{ value: "km/h", angle: -90, position: "insideLeft", fontSize: 12 }}
+              label={{ value: "km/h", angle: -90, position: "insideLeft", ...chartAxisLabel }}
             />
             <Tooltip
               contentStyle={{

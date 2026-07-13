@@ -9,6 +9,7 @@ import {
     YAxis
 } from 'recharts';
 import { GPXPoint } from '@/utils/gpxParser';
+import { chartAxisTick } from '@/utils/chartStyles';
 
 interface ChartRangeSliderProps {
     points: GPXPoint[];
@@ -119,10 +120,10 @@ const ChartRangeSlider: React.FC<ChartRangeSliderProps> = ({
                         domain={[0, maxDistance]}
                         ticks={ticks}
                         axisLine={false}
-                        tickLine={{ stroke: '#9ca3af', height: 4 }}
+                        tickLine={{ stroke: '#ffffff', height: 4 }}
                         tickFormatter={(val) => `${Math.round(val)} km`}
                         interval={0} // Force all ticks to show
-                        tick={{ fontSize: 10, fill: '#6b7280' }}
+                        tick={{ ...chartAxisTick, fontSize: 12 }}
                         dy={4}
                     />
                     {/* Hidden YAxis to ensure chart renders correctly */}

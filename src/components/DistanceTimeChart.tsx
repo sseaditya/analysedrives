@@ -13,6 +13,7 @@ import {
 import { GPXPoint, haversineDistance } from "@/utils/gpxParser";
 import { calculateNiceYTicks, calculateNiceTicks } from "@/utils/chartUtils";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { chartAxisLabel, chartAxisTick } from "@/utils/chartStyles";
 
 interface DistanceTimeChartProps {
     points: GPXPoint[];
@@ -220,9 +221,8 @@ const DistanceTimeChart = ({
                     dataKey="elapsedTime"
                     type="number"
                     domain={[minTime, maxTime]}
-                    stroke="hsl(var(--foreground))"
-                    strokeOpacity={0.6}
-                    fontSize={12}
+                    stroke="#ffffff"
+                    tick={chartAxisTick}
                     tickLine={false}
                     axisLine={false}
                     ticks={xAxisTicks}
@@ -230,12 +230,12 @@ const DistanceTimeChart = ({
                     allowDataOverflow
                 />
                 <YAxis
-                    stroke="hsl(15, 52%, 58%)"
-                    fontSize={12}
+                    stroke="#ffffff"
+                    tick={chartAxisTick}
                     tickLine={false}
                     axisLine={false}
                     tickFormatter={(value) => `${value.toFixed(1)} km`}
-                    label={{ value: "Distance (km)", angle: -90, position: "insideLeft", fontSize: 12, fill: "hsl(15, 52%, 58%)" }}
+                    label={{ value: "Distance (km)", angle: -90, position: "insideLeft", ...chartAxisLabel }}
                     width={60}
                     domain={yAxisConfig.domain}
                     ticks={yAxisConfig.ticks}

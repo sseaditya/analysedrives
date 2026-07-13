@@ -11,6 +11,7 @@ import {
 import { useMemo } from "react";
 import { GPXPoint, calculateSpeedDistribution, SpeedBucket } from "@/utils/gpxParser";
 import { calculateNiceYTicks } from "@/utils/chartUtils";
+import { chartAxisLabel, chartAxisTick } from "@/utils/chartStyles";
 
 
 
@@ -160,18 +161,16 @@ const SpeedDistributionChart = ({ points, speedLimit, buckets }: SpeedDistributi
                 ))}
                 <XAxis
                     dataKey="range"
-                    stroke="hsl(var(--foreground))"
-                    strokeOpacity={0.6}
-                    fontSize={10}
+                    stroke="#ffffff"
                     tickLine={false}
                     axisLine={false}
-                    tick={{ dy: 10 }}
-                    label={{ value: "Speed Range (km/h)", position: "insideBottom", offset: -5, fontSize: 10, fill: "currentColor", opacity: 0.5 }}
+                    tick={{ ...chartAxisTick, dy: 10 }}
+                    label={{ value: "Speed Range (km/h)", position: "insideBottom", offset: -5, ...chartAxisLabel }}
                 />
                 <YAxis
                     yAxisId="left"
-                    stroke="hsl(var(--muted-foreground))"
-                    fontSize={10}
+                    stroke="#ffffff"
+                    tick={chartAxisTick}
                     tickLine={false}
                     axisLine={false}
                     tickFormatter={(val) => `${val}m`}
@@ -182,8 +181,8 @@ const SpeedDistributionChart = ({ points, speedLimit, buckets }: SpeedDistributi
                 <YAxis
                     yAxisId="right"
                     orientation="right"
-                    stroke="hsl(var(--muted-foreground))"
-                    fontSize={10}
+                    stroke="#ffffff"
+                    tick={chartAxisTick}
                     tickLine={false}
                     axisLine={false}
                     tickFormatter={(val) => `${val}km`}

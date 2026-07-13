@@ -13,6 +13,7 @@ import { GPXPoint, haversineDistance, PAUSE_THRESHOLD } from "@/utils/gpxParser"
 import { calculateNiceTicks, calculateNiceYTicks } from "@/utils/chartUtils";
 import { useState, useMemo, useEffect, useCallback, useRef, memo } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { chartAxisLabel, chartAxisTick } from "@/utils/chartStyles";
 
 interface SpeedElevationChartProps {
   points: GPXPoint[];
@@ -739,9 +740,8 @@ const SpeedElevationChart = ({
               dataKey={xAxisDataKey}
               type="number"
               domain={speedXDomain}
-              stroke="hsl(var(--foreground))"
-              strokeOpacity={0.6}
-              fontSize={12}
+              stroke="#ffffff"
+              tick={chartAxisTick}
               tickLine={false}
               axisLine={false}
               ticks={xAxisTicks} // Use custom nice ticks
@@ -749,12 +749,12 @@ const SpeedElevationChart = ({
               allowDataOverflow
             />
             <YAxis
-              stroke="hsl(15, 52%, 58%)"
-              fontSize={12}
+              stroke="#ffffff"
+              tick={chartAxisTick}
               tickLine={false}
               axisLine={false}
               tickFormatter={(value) => Math.round(value).toString()}
-              label={{ value: "Speed (km/h)", angle: -90, position: "insideLeft", fontSize: 12, fill: "hsl(15, 52%, 58%)" }}
+              label={{ value: "Speed (km/h)", angle: -90, position: "insideLeft", ...chartAxisLabel }}
               width={60}
               domain={speedYAxisConfig.domain}
               ticks={speedYAxisConfig.ticks}
@@ -857,9 +857,8 @@ const SpeedElevationChart = ({
                 dataKey={xAxisDataKey}
                 type="number"
                 domain={fullXDomain} // Elevation chart acts as a brush (full view)
-                stroke="hsl(var(--foreground))"
-                strokeOpacity={0.6}
-                fontSize={12}
+                stroke="#ffffff"
+                tick={chartAxisTick}
                 tickLine={false}
                 axisLine={false}
                 ticks={elevationXTicks}
@@ -867,8 +866,8 @@ const SpeedElevationChart = ({
                 allowDataOverflow
               />
               <YAxis
-                stroke="hsl(0, 0%, 60%)"
-                fontSize={10}
+                stroke="#ffffff"
+                tick={chartAxisTick}
                 tickLine={false}
                 axisLine={false}
                 tickFormatter={(value) => Math.round(value).toString()}
