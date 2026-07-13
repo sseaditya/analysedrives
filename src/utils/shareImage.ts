@@ -215,13 +215,6 @@ const drawSpeedCodedRoute = (
   ctx.restore();
 };
 
-const escapeXml = (value: string) =>
-  value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-
 const formatShareStats = (stats: GPXStats) => [
   { label: "Distance", value: formatDistance(stats.totalDistance) },
   { label: "Elapsed time", value: formatDurationShort(stats.totalTime || stats.movingTime) },
@@ -231,14 +224,7 @@ const formatShareStats = (stats: GPXStats) => [
 const getDisplayName = (userName?: string | null) => userName?.trim() || "Driver";
 const getCarName = (carName?: string | null) => carName?.trim() || "Car";
 
-const toRoutePath = (route: { x: number; y: number }[]) =>
-  route.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(" ");
-
-const toSpeedSegmentMarkup = (points: GPXPoint[], route: { x: number; y: number }[]) =>
-  buildSpeedSegments(points, route).map((segment) => `
-  <path d="M ${segment.start.x.toFixed(1)} ${segment.start.y.toFixed(1)} L ${segment.end.x.toFixed(1)} ${segment.end.y.toFixed(1)}" fill="none" stroke="${segment.color}" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>`).join("");
-
-export const createTransparentRouteShareSvg = async ({
+export const createTransparentRouteShareImage = async ({
   title,
   points,
   stats,
@@ -247,53 +233,62 @@ export const createTransparentRouteShareSvg = async ({
   carName,
 }: ShareImageOptions): Promise<File> => {
   const visiblePoints = getPrivacyClippedPoints(points, hideRadius);
-  const route = visiblePoints.length >= 2
-    ? projectRoute(visiblePoints, ROUTE_SQUARE)
-    : [];
-  const routePath = toRoutePath(route);
-  const speedSegments = toSpeedSegmentMarkup(visiblePoints, route);
-  const statCards = formatShareStats(stats);
-  const safeTitle = escapeXml(title);
-  const safeUserName = escapeXml(getDisplayName(userName));
-  const safeCarName = escapeXml(getCarName(carName));
+  const canvas = document.createElement("canvas");
+  canvas.width = WIDTH;
+  canvas.height = HEIGHT;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Unable to create image renderer.");
 
-  const statsMarkup = statCards.map((stat, index) => {
+  ctx.clearRect(0, 0, WIDTH, HEIGHT);
+
+  if (visiblePoints.length >= 2) {
+    drawSpeedCodedRoute(ctx, visiblePoints, projectRoute(visiblePoints, ROUTE_SQUARE));
+  } else {
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "700 42px Inter, ui-sans-serif, system-ui";
+    ctx.textAlign = "center";
+    ctx.shadowColor = "rgba(0,0,0,0.45)";
+    ctx.shadowBlur = 12;
+    ctx.fillText("Route hidden by privacy zone", WIDTH / 2, 540);
+    ctx.textAlign = "left";
+  }
+
+  ctx.shadowColor = "rgba(0,0,0,0.45)";
+  ctx.shadowBlur = 16;
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "800 62px Inter, ui-sans-serif, system-ui";
+  drawWrappedText(ctx, title, 78, 1236, 920, 68, 2);
+
+  ctx.font = "700 38px Inter, ui-sans-serif, system-ui";
+  ctx.fillText(getDisplayName(userName), 78, 1322);
+  ctx.font = "500 31px Inter, ui-sans-serif, system-ui";
+  ctx.fillStyle = "rgba(255,255,255,0.74)";
+  ctx.fillText(getCarName(carName), 78, 1374);
+
+  formatShareStats(stats).forEach((stat, index) => {
     const x = 78 + index * 335;
-    return `
-      <g transform="translate(${x} 1610)">
-        <text x="0" y="0" fill="rgba(255,255,255,0.7)" font-size="29" font-weight="600">${escapeXml(stat.label)}</text>
-        <text x="0" y="62" fill="#ffffff" font-size="45" font-weight="750">${escapeXml(stat.value)}</text>
-      </g>`;
-  }).join("");
+    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    ctx.font = "600 29px Inter, ui-sans-serif, system-ui";
+    ctx.fillText(stat.label, x, 1610);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "750 45px Inter, ui-sans-serif, system-ui";
+    drawWrappedText(ctx, stat.value, x, 1672, 285, 52, 2);
+  });
 
-  const svg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}">
-  <defs>
-    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#000000" flood-opacity="0.38"/>
-    </filter>
-    <filter id="routeGlow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="0" stdDeviation="12" flood-color="#1d4ed8" flood-opacity="0.48"/>
-    </filter>
-  </defs>
-  <g font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" filter="url(#softShadow)">
-    <text x="78" y="1236" fill="#ffffff" font-size="62" font-weight="800">${safeTitle}</text>
-    <text x="78" y="1322" fill="#ffffff" font-size="38" font-weight="700">${safeUserName}</text>
-    <text x="78" y="1374" fill="rgba(255,255,255,0.74)" font-size="31" font-weight="500">${safeCarName}</text>
-    <text x="78" y="1836" fill="#ffffff" font-size="34" font-weight="800">DrivenStat</text>
-    ${statsMarkup}
-  </g>
-  ${routePath ? `
-  <path d="${routePath}" fill="none" stroke="rgba(255,255,255,0.88)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" filter="url(#routeGlow)"/>
-  ${speedSegments}
-  <path d="${routePath}" fill="none" stroke="rgba(255,255,255,0.34)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-  ` : `
-  <text x="540" y="540" text-anchor="middle" fill="#ffffff" font-size="42" font-weight="700" font-family="Inter, ui-sans-serif, system-ui">Route hidden by privacy zone</text>
-  `}
-</svg>`;
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "800 34px Inter, ui-sans-serif, system-ui";
+  ctx.fillText("DrivenStat", 78, 1836);
+  ctx.shadowBlur = 0;
 
-  return new File([new Blob([svg], { type: "image/svg+xml" })], `${sanitizeFileName(title)}-route-transparent.svg`, {
-    type: "image/svg+xml",
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((result) => {
+      if (result) resolve(result);
+      else reject(new Error("Unable to export transparent image."));
+    }, "image/png");
+  });
+
+  return new File([blob], `${sanitizeFileName(title)}-route-transparent.png`, {
+    type: "image/png",
   });
 };
 
@@ -399,51 +394,51 @@ export const createMapShareImage = async ({
   if (!ctx) throw new Error("Unable to create image renderer.");
 
   if (visiblePoints.length >= 2) {
-    const viewport = getRouteTileViewport(visiblePoints, ROUTE_SQUARE);
+    const viewport = getRouteTileViewport(visiblePoints, { x: 0, y: 0, width: WIDTH, height: 1320 });
     await drawMapTiles(ctx, viewport, theme, { x: 0, y: 0, width: WIDTH, height: HEIGHT }, {
-      x: TOP_SQUARE.x + TOP_SQUARE.width / 2,
-      y: TOP_SQUARE.y + TOP_SQUARE.height / 2,
+      x: WIDTH / 2,
+      y: 620,
     });
-    drawSpeedCodedRoute(ctx, visiblePoints, visiblePoints.map((point) => projectMapPointInBounds(point, viewport, ROUTE_SQUARE)));
+    drawSpeedCodedRoute(ctx, visiblePoints, visiblePoints.map((point) => projectMapPointInBounds(point, viewport, {
+      x: 0,
+      y: 80,
+      width: WIDTH,
+      height: 980,
+    })));
   } else {
     ctx.fillStyle = theme === "dark" ? "#171b22" : "#e7ece8";
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
   }
 
-  const topFade = ctx.createLinearGradient(0, 700, 0, TOP_SQUARE.height);
-  topFade.addColorStop(0, "rgba(0,0,0,0)");
-  topFade.addColorStop(1, "rgba(0,0,0,0.38)");
-  ctx.fillStyle = topFade;
-  ctx.fillRect(0, 700, WIDTH, 380);
-
-  const overlay = ctx.createLinearGradient(0, TOP_SQUARE.height, 0, HEIGHT);
-  overlay.addColorStop(0, "rgba(0,0,0,0.80)");
+  const overlay = ctx.createLinearGradient(0, 960, 0, HEIGHT);
+  overlay.addColorStop(0, "rgba(0,0,0,0)");
+  overlay.addColorStop(0.38, "rgba(0,0,0,0.66)");
   overlay.addColorStop(1, "rgba(0,0,0,0.94)");
   ctx.fillStyle = overlay;
-  ctx.fillRect(0, TOP_SQUARE.height, WIDTH, HEIGHT - TOP_SQUARE.height);
+  ctx.fillRect(0, 760, WIDTH, 1160);
 
   ctx.fillStyle = "#ffffff";
   ctx.shadowColor = "rgba(0,0,0,0.45)";
   ctx.shadowBlur = 16;
-  ctx.font = "800 60px Inter, ui-sans-serif, system-ui";
-  drawWrappedText(ctx, title, 76, 1210, 920, 66, 2);
+  ctx.font = "800 56px Inter, ui-sans-serif, system-ui";
+  drawWrappedText(ctx, title, 76, 1304, 920, 64, 2);
   ctx.font = "700 34px Inter, ui-sans-serif, system-ui";
-  ctx.fillText(getDisplayName(userName), 76, 1352);
+  ctx.fillText(getDisplayName(userName), 76, 1190);
   ctx.font = "800 34px Inter, ui-sans-serif, system-ui";
   ctx.fillText("DrivenStat", 76, 1844);
   ctx.font = "500 30px Inter, ui-sans-serif, system-ui";
   ctx.fillStyle = "rgba(255,255,255,0.76)";
-  ctx.fillText(getCarName(carName), 76, 1396);
+  ctx.fillText(getCarName(carName), 76, 1234);
 
   const statCards = formatShareStats(stats);
   statCards.forEach((stat, index) => {
     const x = 76 + index * 330;
     ctx.fillStyle = "rgba(255,255,255,0.74)";
     ctx.font = "500 30px Inter, ui-sans-serif, system-ui";
-    ctx.fillText(stat.label, x, 1562);
+    ctx.fillText(stat.label, x, 1508);
     ctx.fillStyle = "#ffffff";
     ctx.font = "800 48px Inter, ui-sans-serif, system-ui";
-    drawWrappedText(ctx, stat.value, x, 1630, 270, 54, 2);
+    drawWrappedText(ctx, stat.value, x, 1576, 270, 54, 2);
   });
   ctx.shadowBlur = 0;
 

@@ -11,7 +11,7 @@ import ActivityEditor from "@/components/ActivityEditor";
 import { useIsMobile } from "@/hooks/use-mobile";
 import HeaderProfile from "@/components/HeaderProfile";
 import VideoGenerator from "@/components/VideoGenerator";
-import { createMapShareImage, createTransparentRouteShareSvg, downloadImageFile } from "@/utils/shareImage";
+import { createMapShareImage, createTransparentRouteShareImage, downloadImageFile } from "@/utils/shareImage";
 import { toast } from "sonner";
 import { useTheme } from "@/components/ThemeProvider";
 import {
@@ -286,7 +286,7 @@ const Activity = () => {
       setIsSharing(true);
       const ownerName = ownerProfile?.display_name || ownerProfile?.full_name || user?.user_metadata?.full_name || user?.email || null;
       const file = format === "route"
-        ? await createTransparentRouteShareSvg({
+        ? await createTransparentRouteShareImage({
           title: data.fileName,
           points: data.points,
           stats: data.stats,
@@ -304,7 +304,7 @@ const Activity = () => {
           theme: getResolvedTheme(),
         });
       downloadImageFile(file);
-      toast.success(format === "route" ? "Transparent route SVG downloaded." : "Map image downloaded.");
+      toast.success(format === "route" ? "Transparent route PNG downloaded." : "Map image downloaded.");
     } catch (err) {
       if ((err as DOMException)?.name !== "AbortError") {
         console.error("Failed to share activity image:", err);
@@ -457,7 +457,7 @@ const Activity = () => {
                     <DropdownMenuLabel>Download share image</DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onSelect={() => handleShareImageDownload("route")}>
-                      Transparent route SVG
+                      Transparent route PNG
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => handleShareImageDownload("map")}>
                       Full map PNG ({getResolvedTheme()})
