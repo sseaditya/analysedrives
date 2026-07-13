@@ -135,7 +135,7 @@ const SpeedDistributionChart = ({ points, speedLimit, buckets }: SpeedDistributi
         <ResponsiveContainer width="100%" height="100%">
             <BarChart
                 data={data}
-                margin={{ top: 10, right: 0, left: -20, bottom: 20 }}
+                margin={{ top: 10, right: 6, left: -12, bottom: 30 }}
             >
                 <defs>
                     <linearGradient id="colorTime" x1="0" y1="0" x2="0" y2="1">
@@ -165,7 +165,8 @@ const SpeedDistributionChart = ({ points, speedLimit, buckets }: SpeedDistributi
                     tickLine={false}
                     axisLine={false}
                     tick={{ ...chartAxisTick, dy: 10 }}
-                    label={{ value: "Speed Range (km/h)", position: "insideBottom", offset: -5, ...chartAxisLabel }}
+                    minTickGap={8}
+                    label={{ value: "Speed Range (km/h)", position: "insideBottom", offset: -8, ...chartAxisLabel }}
                 />
                 <YAxis
                     yAxisId="left"

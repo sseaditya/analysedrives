@@ -227,6 +227,7 @@ const DistanceTimeChart = ({
                     axisLine={false}
                     ticks={xAxisTicks}
                     tickFormatter={formatTimeAxis}
+                    minTickGap={12}
                     allowDataOverflow
                 />
                 <YAxis

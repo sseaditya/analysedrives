@@ -746,6 +746,7 @@ const SpeedElevationChart = ({
               axisLine={false}
               ticks={xAxisTicks} // Use custom nice ticks
               tickFormatter={xAxisFormatter}
+              minTickGap={12}
               allowDataOverflow
             />
             <YAxis
@@ -863,6 +864,7 @@ const SpeedElevationChart = ({
                 axisLine={false}
                 ticks={elevationXTicks}
                 tickFormatter={xAxisFormatter}
+                minTickGap={12}
                 allowDataOverflow
               />
               <YAxis

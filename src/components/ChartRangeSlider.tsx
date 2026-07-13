@@ -124,6 +124,7 @@ const ChartRangeSlider: React.FC<ChartRangeSliderProps> = ({
                         tickFormatter={(val) => `${Math.round(val)} km`}
                         interval={0} // Force all ticks to show
                         tick={{ ...chartAxisTick, fontSize: 12 }}
+                        minTickGap={8}
                         dy={4}
                     />
                     {/* Hidden YAxis to ensure chart renders correctly */}

@@ -1,27 +1,21 @@
 export const chartAxisTick = {
   fill: "#ffffff",
-  fontSize: 13,
-  fontWeight: 700,
-  opacity: 0.96,
-  paintOrder: "stroke",
-  stroke: "rgba(0, 0, 0, 0.38)",
-  strokeWidth: 2.5,
+  fontSize: 12,
+  fontWeight: 500,
+  opacity: 0.92,
   style: {
-    filter:
-      "drop-shadow(0 1px 1px rgba(0, 0, 0, 0.65)) drop-shadow(0 -1px 0 rgba(255, 255, 255, 0.22))",
+    filter: "drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55))",
+    letterSpacing: 0,
   },
 };
 
 export const chartAxisLabel = {
   fill: "#ffffff",
-  fontSize: 13,
-  fontWeight: 800,
-  opacity: 0.98,
-  paintOrder: "stroke",
-  stroke: "rgba(0, 0, 0, 0.42)",
-  strokeWidth: 3,
+  fontSize: 12,
+  fontWeight: 500,
+  opacity: 0.94,
   style: {
-    filter:
-      "drop-shadow(0 1px 1px rgba(0, 0, 0, 0.7)) drop-shadow(0 -1px 0 rgba(255, 255, 255, 0.24))",
+    filter: "drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6))",
+    letterSpacing: 0,
   },
 };

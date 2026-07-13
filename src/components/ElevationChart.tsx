@@ -96,6 +96,7 @@ const ElevationChart = ({ points }: ElevationChartProps) => {
               tickLine={false}
               axisLine={false}
               tickFormatter={(value) => `${value} km`}
+              minTickGap={12}
             />
             <YAxis
               stroke="#ffffff"
