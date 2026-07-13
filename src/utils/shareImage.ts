@@ -17,9 +17,13 @@ interface ShareImageOptions {
   theme?: "light" | "dark";
 }
 
+type Rect = { x: number; y: number; width: number; height: number };
+
 const WIDTH = 1080;
 const HEIGHT = 1920;
 const TILE_SIZE = 256;
+const TOP_SQUARE = { x: 0, y: 0, width: 1080, height: 1080 };
+const ROUTE_SQUARE = { x: 86, y: 86, width: 908, height: 908 };
 
 const sanitizeFileName = (name: string) =>
   name
@@ -97,7 +101,7 @@ const drawWrappedText = (
   });
 };
 
-const projectRoute = (points: GPXPoint[], bounds: { x: number; y: number; width: number; height: number }) => {
+const projectRoute = (points: GPXPoint[], bounds: Rect) => {
   const lats = points.map((p) => p.lat);
   const lons = points.map((p) => p.lon);
   const minLat = Math.min(...lats);
@@ -126,7 +130,37 @@ const projectRoute = (points: GPXPoint[], bounds: { x: number; y: number; width:
   }));
 };
 
-const drawRoute = (ctx: CanvasRenderingContext2D, route: { x: number; y: number }[]) => {
+const getSegmentSpeeds = (points: GPXPoint[]) =>
+  points.slice(1).map((point, index) => {
+    const previous = points[index];
+    if (!previous.time || !point.time) return 0;
+    const hours = (point.time.getTime() - previous.time.getTime()) / 1000 / 3600;
+    if (hours <= 0) return 0;
+    const speed = haversineDistance(previous.lat, previous.lon, point.lat, point.lon) / hours;
+    return Number.isFinite(speed) && speed <= 260 ? speed : 0;
+  });
+
+const getSpeedColor = (speed: number) => {
+  const ratio = Math.max(0, Math.min(speed / 150, 1));
+  const lightness = 90 - ratio * 65;
+  return `hsl(215, 95%, ${lightness.toFixed(1)}%)`;
+};
+
+const buildSpeedSegments = (points: GPXPoint[], route: { x: number; y: number }[]) => {
+  const speeds = getSegmentSpeeds(points);
+  return speeds.map((speed, index) => ({
+    start: route[index],
+    end: route[index + 1],
+    speed,
+    color: getSpeedColor(speed),
+  })).filter((segment) => segment.start && segment.end);
+};
+
+const drawSpeedCodedRoute = (
+  ctx: CanvasRenderingContext2D,
+  points: GPXPoint[],
+  route: { x: number; y: number }[],
+) => {
   if (route.length < 2) return;
 
   const strokePath = () => {
@@ -139,23 +173,29 @@ const drawRoute = (ctx: CanvasRenderingContext2D, route: { x: number; y: number 
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
 
-  ctx.shadowColor = "rgba(255, 126, 64, 0.45)";
-  ctx.shadowBlur = 28;
+  ctx.shadowColor = "rgba(30, 64, 175, 0.45)";
+  ctx.shadowBlur = 24;
   ctx.strokeStyle = "rgba(255, 255, 255, 0.86)";
   ctx.lineWidth = 18;
   strokePath();
   ctx.stroke();
 
   ctx.shadowBlur = 0;
-  ctx.strokeStyle = "#ff7a3d";
   ctx.lineWidth = 10;
-  strokePath();
-  ctx.stroke();
+  buildSpeedSegments(points, route).forEach((segment) => {
+    ctx.beginPath();
+    ctx.strokeStyle = segment.color;
+    ctx.moveTo(segment.start.x, segment.start.y);
+    ctx.lineTo(segment.end.x, segment.end.y);
+    ctx.stroke();
+  });
 
-  ctx.strokeStyle = "#ffd166";
-  ctx.lineWidth = 4;
+  ctx.globalAlpha = 0.34;
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 3;
   strokePath();
   ctx.stroke();
+  ctx.globalAlpha = 1;
 
   const start = route[0];
   const end = route[route.length - 1];
@@ -194,6 +234,10 @@ const getCarName = (carName?: string | null) => carName?.trim() || "Car";
 const toRoutePath = (route: { x: number; y: number }[]) =>
   route.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(" ");
 
+const toSpeedSegmentMarkup = (points: GPXPoint[], route: { x: number; y: number }[]) =>
+  buildSpeedSegments(points, route).map((segment) => `
+  <path d="M ${segment.start.x.toFixed(1)} ${segment.start.y.toFixed(1)} L ${segment.end.x.toFixed(1)} ${segment.end.y.toFixed(1)}" fill="none" stroke="${segment.color}" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>`).join("");
+
 export const createTransparentRouteShareSvg = async ({
   title,
   points,
@@ -204,20 +248,21 @@ export const createTransparentRouteShareSvg = async ({
 }: ShareImageOptions): Promise<File> => {
   const visiblePoints = getPrivacyClippedPoints(points, hideRadius);
   const route = visiblePoints.length >= 2
-    ? projectRoute(visiblePoints, { x: 90, y: 280, width: 900, height: 830 })
+    ? projectRoute(visiblePoints, ROUTE_SQUARE)
     : [];
   const routePath = toRoutePath(route);
+  const speedSegments = toSpeedSegmentMarkup(visiblePoints, route);
   const statCards = formatShareStats(stats);
   const safeTitle = escapeXml(title);
   const safeUserName = escapeXml(getDisplayName(userName));
   const safeCarName = escapeXml(getCarName(carName));
 
   const statsMarkup = statCards.map((stat, index) => {
-    const x = 96 + index * 320;
+    const x = 78 + index * 335;
     return `
-      <g transform="translate(${x} 1518)">
-        <text x="0" y="0" fill="rgba(255,255,255,0.7)" font-size="30" font-weight="600">${escapeXml(stat.label)}</text>
-        <text x="0" y="58" fill="#ffffff" font-size="46" font-weight="700">${escapeXml(stat.value)}</text>
+      <g transform="translate(${x} 1610)">
+        <text x="0" y="0" fill="rgba(255,255,255,0.7)" font-size="29" font-weight="600">${escapeXml(stat.label)}</text>
+        <text x="0" y="62" fill="#ffffff" font-size="45" font-weight="750">${escapeXml(stat.value)}</text>
       </g>`;
   }).join("");
 
@@ -228,22 +273,22 @@ export const createTransparentRouteShareSvg = async ({
       <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#000000" flood-opacity="0.38"/>
     </filter>
     <filter id="routeGlow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="0" stdDeviation="12" flood-color="#ff5a1f" flood-opacity="0.45"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="12" flood-color="#1d4ed8" flood-opacity="0.48"/>
     </filter>
   </defs>
   <g font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" filter="url(#softShadow)">
-    <text x="78" y="118" fill="#ffffff" font-size="42" font-weight="700">${safeUserName}</text>
-    <text x="78" y="170" fill="rgba(255,255,255,0.72)" font-size="30" font-weight="500">${safeCarName}</text>
-    <text x="1002" y="118" text-anchor="end" fill="#ffffff" font-size="36" font-weight="800">DrivenStat</text>
-    <text x="78" y="1390" fill="#ffffff" font-size="58" font-weight="800">${safeTitle}</text>
+    <text x="78" y="1236" fill="#ffffff" font-size="62" font-weight="800">${safeTitle}</text>
+    <text x="78" y="1322" fill="#ffffff" font-size="38" font-weight="700">${safeUserName}</text>
+    <text x="78" y="1374" fill="rgba(255,255,255,0.74)" font-size="31" font-weight="500">${safeCarName}</text>
+    <text x="78" y="1836" fill="#ffffff" font-size="34" font-weight="800">DrivenStat</text>
     ${statsMarkup}
   </g>
   ${routePath ? `
-  <path d="${routePath}" fill="none" stroke="rgba(255,255,255,0.88)" stroke-width="22" stroke-linecap="round" stroke-linejoin="round" filter="url(#routeGlow)"/>
-  <path d="${routePath}" fill="none" stroke="#ff5a1f" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="${routePath}" fill="none" stroke="#ffb55a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="${routePath}" fill="none" stroke="rgba(255,255,255,0.88)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" filter="url(#routeGlow)"/>
+  ${speedSegments}
+  <path d="${routePath}" fill="none" stroke="rgba(255,255,255,0.34)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
   ` : `
-  <text x="540" y="720" text-anchor="middle" fill="#ffffff" font-size="42" font-weight="700" font-family="Inter, ui-sans-serif, system-ui">Route hidden by privacy zone</text>
+  <text x="540" y="540" text-anchor="middle" fill="#ffffff" font-size="42" font-weight="700" font-family="Inter, ui-sans-serif, system-ui">Route hidden by privacy zone</text>
   `}
 </svg>`;
 
@@ -267,15 +312,15 @@ const loadTile = (src: string) =>
     image.src = src;
   });
 
-const getRouteTileViewport = (points: GPXPoint[], width: number, height: number, bottomInset: number) => {
+const getRouteTileViewport = (points: GPXPoint[], routeBounds: Rect) => {
   const lats = points.map((p) => p.lat);
   const lons = points.map((p) => p.lon);
   const minLat = Math.min(...lats);
   const maxLat = Math.max(...lats);
   const minLon = Math.min(...lons);
   const maxLon = Math.max(...lons);
-  const usableWidth = width - 150;
-  const usableHeight = height - bottomInset - 150;
+  const usableWidth = routeBounds.width - 140;
+  const usableHeight = routeBounds.height - 140;
   let zoom = 3;
 
   for (let z = 3; z <= 16; z++) {
@@ -290,22 +335,28 @@ const getRouteTileViewport = (points: GPXPoint[], width: number, height: number,
   return { zoom, centerX, centerY };
 };
 
-const projectMapPoint = (point: GPXPoint, viewport: { zoom: number; centerX: number; centerY: number }, width: number, height: number) => ({
-  x: lonToTileX(point.lon, viewport.zoom) * TILE_SIZE - viewport.centerX + width / 2,
-  y: latToTileY(point.lat, viewport.zoom) * TILE_SIZE - viewport.centerY + height / 2 - 130,
+const projectMapPointInBounds = (
+  point: GPXPoint,
+  viewport: { zoom: number; centerX: number; centerY: number },
+  routeBounds: Rect,
+) => ({
+  x: lonToTileX(point.lon, viewport.zoom) * TILE_SIZE - viewport.centerX + routeBounds.x + routeBounds.width / 2,
+  y: latToTileY(point.lat, viewport.zoom) * TILE_SIZE - viewport.centerY + routeBounds.y + routeBounds.height / 2,
 });
 
 const drawMapTiles = async (
   ctx: CanvasRenderingContext2D,
   viewport: { zoom: number; centerX: number; centerY: number },
   theme: "light" | "dark",
+  coverBounds: Rect = { x: 0, y: 0, width: WIDTH, height: HEIGHT },
+  mapCenter = { x: WIDTH / 2, y: HEIGHT / 2 },
 ) => {
   const style = theme === "dark" ? "dark_all" : "rastertiles/voyager";
   const subdomains = ["a", "b", "c", "d"];
-  const startTileX = Math.floor((viewport.centerX - WIDTH / 2) / TILE_SIZE);
-  const endTileX = Math.ceil((viewport.centerX + WIDTH / 2) / TILE_SIZE);
-  const startTileY = Math.floor((viewport.centerY - HEIGHT / 2 + 130) / TILE_SIZE);
-  const endTileY = Math.ceil((viewport.centerY + HEIGHT / 2 + 130) / TILE_SIZE);
+  const startTileX = Math.floor((viewport.centerX + (coverBounds.x - mapCenter.x)) / TILE_SIZE);
+  const endTileX = Math.ceil((viewport.centerX + (coverBounds.x + coverBounds.width - mapCenter.x)) / TILE_SIZE);
+  const startTileY = Math.floor((viewport.centerY + (coverBounds.y - mapCenter.y)) / TILE_SIZE);
+  const endTileY = Math.ceil((viewport.centerY + (coverBounds.y + coverBounds.height - mapCenter.y)) / TILE_SIZE);
   const maxTile = 2 ** viewport.zoom;
 
   ctx.fillStyle = theme === "dark" ? "#171b22" : "#e7ece8";
@@ -320,8 +371,8 @@ const drawMapTiles = async (
       const url = theme === "dark"
         ? `https://${subdomain}.basemaps.cartocdn.com/${style}/${viewport.zoom}/${wrappedX}/${y}.png`
         : `https://${subdomain}.basemaps.cartocdn.com/${style}/${viewport.zoom}/${wrappedX}/${y}.png`;
-      const dx = x * TILE_SIZE - viewport.centerX + WIDTH / 2;
-      const dy = y * TILE_SIZE - viewport.centerY + HEIGHT / 2 - 130;
+      const dx = x * TILE_SIZE - viewport.centerX + mapCenter.x;
+      const dy = y * TILE_SIZE - viewport.centerY + mapCenter.y;
       tilePromises.push(loadTile(url).then((tile) => {
         if (tile) ctx.drawImage(tile, dx, dy, TILE_SIZE, TILE_SIZE);
       }));
@@ -348,42 +399,51 @@ export const createMapShareImage = async ({
   if (!ctx) throw new Error("Unable to create image renderer.");
 
   if (visiblePoints.length >= 2) {
-    const viewport = getRouteTileViewport(visiblePoints, WIDTH, HEIGHT, 540);
-    await drawMapTiles(ctx, viewport, theme);
-    drawRoute(ctx, visiblePoints.map((point) => projectMapPoint(point, viewport, WIDTH, HEIGHT)));
+    const viewport = getRouteTileViewport(visiblePoints, ROUTE_SQUARE);
+    await drawMapTiles(ctx, viewport, theme, { x: 0, y: 0, width: WIDTH, height: HEIGHT }, {
+      x: TOP_SQUARE.x + TOP_SQUARE.width / 2,
+      y: TOP_SQUARE.y + TOP_SQUARE.height / 2,
+    });
+    drawSpeedCodedRoute(ctx, visiblePoints, visiblePoints.map((point) => projectMapPointInBounds(point, viewport, ROUTE_SQUARE)));
   } else {
     ctx.fillStyle = theme === "dark" ? "#171b22" : "#e7ece8";
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
   }
 
-  const overlay = ctx.createLinearGradient(0, 980, 0, HEIGHT);
-  overlay.addColorStop(0, "rgba(0,0,0,0)");
-  overlay.addColorStop(0.45, "rgba(0,0,0,0.64)");
-  overlay.addColorStop(1, "rgba(0,0,0,0.88)");
+  const topFade = ctx.createLinearGradient(0, 700, 0, TOP_SQUARE.height);
+  topFade.addColorStop(0, "rgba(0,0,0,0)");
+  topFade.addColorStop(1, "rgba(0,0,0,0.38)");
+  ctx.fillStyle = topFade;
+  ctx.fillRect(0, 700, WIDTH, 380);
+
+  const overlay = ctx.createLinearGradient(0, TOP_SQUARE.height, 0, HEIGHT);
+  overlay.addColorStop(0, "rgba(0,0,0,0.80)");
+  overlay.addColorStop(1, "rgba(0,0,0,0.94)");
   ctx.fillStyle = overlay;
-  ctx.fillRect(0, 820, WIDTH, 1100);
+  ctx.fillRect(0, TOP_SQUARE.height, WIDTH, HEIGHT - TOP_SQUARE.height);
 
   ctx.fillStyle = "#ffffff";
   ctx.shadowColor = "rgba(0,0,0,0.45)";
   ctx.shadowBlur = 16;
-  ctx.font = "800 56px Inter, ui-sans-serif, system-ui";
-  drawWrappedText(ctx, title, 76, 1280, 890, 64, 2);
-  ctx.font = "700 32px Inter, ui-sans-serif, system-ui";
-  ctx.fillText(getDisplayName(userName), 76, 1190);
+  ctx.font = "800 60px Inter, ui-sans-serif, system-ui";
+  drawWrappedText(ctx, title, 76, 1210, 920, 66, 2);
+  ctx.font = "700 34px Inter, ui-sans-serif, system-ui";
+  ctx.fillText(getDisplayName(userName), 76, 1352);
+  ctx.font = "800 34px Inter, ui-sans-serif, system-ui";
   ctx.fillText("DrivenStat", 76, 1844);
   ctx.font = "500 30px Inter, ui-sans-serif, system-ui";
   ctx.fillStyle = "rgba(255,255,255,0.76)";
-  ctx.fillText(getCarName(carName), 76, 1232);
+  ctx.fillText(getCarName(carName), 76, 1396);
 
   const statCards = formatShareStats(stats);
   statCards.forEach((stat, index) => {
     const x = 76 + index * 330;
     ctx.fillStyle = "rgba(255,255,255,0.74)";
     ctx.font = "500 30px Inter, ui-sans-serif, system-ui";
-    ctx.fillText(stat.label, x, 1488);
+    ctx.fillText(stat.label, x, 1562);
     ctx.fillStyle = "#ffffff";
     ctx.font = "800 48px Inter, ui-sans-serif, system-ui";
-    drawWrappedText(ctx, stat.value, x, 1556, 270, 54, 2);
+    drawWrappedText(ctx, stat.value, x, 1630, 270, 54, 2);
   });
   ctx.shadowBlur = 0;
 
@@ -443,7 +503,7 @@ export const createActivityShareImage = async ({ title, points, stats, hideRadiu
   drawWrappedText(ctx, title, 92, 116, 890, 66, 2);
 
   if (visiblePoints.length >= 2) {
-    drawRoute(ctx, projectRoute(visiblePoints, mapBounds));
+    drawSpeedCodedRoute(ctx, visiblePoints, projectRoute(visiblePoints, mapBounds));
   } else {
     ctx.fillStyle = "rgba(255,255,255,0.72)";
     ctx.font = "600 42px Inter, ui-sans-serif, system-ui";
