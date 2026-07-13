@@ -215,30 +215,22 @@ const drawSpeedCodedRoute = (
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
 
-  ctx.shadowColor = "rgba(30, 64, 175, 0.45)";
-  ctx.shadowBlur = 20;
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.86)";
-  ctx.lineWidth = 16;
+  ctx.shadowColor = "rgba(37, 99, 235, 0.38)";
+  ctx.shadowBlur = 18;
+  ctx.strokeStyle = "rgba(37, 99, 235, 0.28)";
+  ctx.lineWidth = 15;
   drawSmoothPath(ctx, smoothRoute);
   ctx.stroke();
 
   ctx.shadowBlur = 0;
-  ctx.lineWidth = 9;
-  const speedSegments = buildSpeedSegments(smoothPoints, smoothRoute);
-  for (let i = 0; i < speedSegments.length; i += 3) {
-    const chunk = speedSegments.slice(i, i + 3);
-    ctx.strokeStyle = chunk[Math.floor(chunk.length / 2)].color;
-    const chunkRoute = [chunk[0].start, ...chunk.map((segment) => segment.end)];
-    drawSmoothPath(ctx, chunkRoute);
+  ctx.lineWidth = 7;
+  buildSpeedSegments(smoothPoints, smoothRoute).forEach((segment) => {
+    ctx.beginPath();
+    ctx.strokeStyle = segment.color;
+    ctx.moveTo(segment.start.x, segment.start.y);
+    ctx.lineTo(segment.end.x, segment.end.y);
     ctx.stroke();
-  }
-
-  ctx.globalAlpha = 0.24;
-  ctx.strokeStyle = "#ffffff";
-  ctx.lineWidth = 2;
-  drawSmoothPath(ctx, smoothRoute);
-  ctx.stroke();
-  ctx.globalAlpha = 1;
+  });
 
   const start = smoothRoute[0];
   const end = smoothRoute[smoothRoute.length - 1];
