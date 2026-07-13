@@ -156,6 +156,48 @@ const buildSpeedSegments = (points: GPXPoint[], route: { x: number; y: number }[
   })).filter((segment) => segment.start && segment.end);
 };
 
+const simplifyRouteForShare = (points: GPXPoint[], route: { x: number; y: number }[]) => {
+  if (route.length <= 2) return { points, route };
+
+  const minDistancePx = 5;
+  const sampledPoints: GPXPoint[] = [points[0]];
+  const sampledRoute: { x: number; y: number }[] = [route[0]];
+  let last = route[0];
+
+  for (let i = 1; i < route.length - 1; i++) {
+    const current = route[i];
+    const distance = Math.hypot(current.x - last.x, current.y - last.y);
+    if (distance >= minDistancePx) {
+      sampledPoints.push(points[i]);
+      sampledRoute.push(current);
+      last = current;
+    }
+  }
+
+  sampledPoints.push(points[points.length - 1]);
+  sampledRoute.push(route[route.length - 1]);
+  return { points: sampledPoints, route: sampledRoute };
+};
+
+const drawSmoothPath = (ctx: CanvasRenderingContext2D, route: { x: number; y: number }[]) => {
+  ctx.beginPath();
+  ctx.moveTo(route[0].x, route[0].y);
+
+  if (route.length === 2) {
+    ctx.lineTo(route[1].x, route[1].y);
+    return;
+  }
+
+  for (let i = 1; i < route.length - 1; i++) {
+    const midX = (route[i].x + route[i + 1].x) / 2;
+    const midY = (route[i].y + route[i + 1].y) / 2;
+    ctx.quadraticCurveTo(route[i].x, route[i].y, midX, midY);
+  }
+
+  const end = route[route.length - 1];
+  ctx.lineTo(end.x, end.y);
+};
+
 const drawSpeedCodedRoute = (
   ctx: CanvasRenderingContext2D,
   points: GPXPoint[],
@@ -163,42 +205,43 @@ const drawSpeedCodedRoute = (
 ) => {
   if (route.length < 2) return;
 
-  const strokePath = () => {
-    ctx.beginPath();
-    ctx.moveTo(route[0].x, route[0].y);
-    for (let i = 1; i < route.length; i++) ctx.lineTo(route[i].x, route[i].y);
-  };
+  const simplified = simplifyRouteForShare(points, route);
+  const smoothRoute = simplified.route;
+  const smoothPoints = simplified.points;
 
   ctx.save();
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
 
   ctx.shadowColor = "rgba(30, 64, 175, 0.45)";
-  ctx.shadowBlur = 24;
+  ctx.shadowBlur = 20;
   ctx.strokeStyle = "rgba(255, 255, 255, 0.86)";
-  ctx.lineWidth = 18;
-  strokePath();
+  ctx.lineWidth = 16;
+  drawSmoothPath(ctx, smoothRoute);
   ctx.stroke();
 
   ctx.shadowBlur = 0;
-  ctx.lineWidth = 10;
-  buildSpeedSegments(points, route).forEach((segment) => {
-    ctx.beginPath();
-    ctx.strokeStyle = segment.color;
-    ctx.moveTo(segment.start.x, segment.start.y);
-    ctx.lineTo(segment.end.x, segment.end.y);
+  ctx.lineWidth = 9;
+  const speedSegments = buildSpeedSegments(smoothPoints, smoothRoute);
+  for (let i = 0; i < speedSegments.length; i += 3) {
+    const chunk = speedSegments.slice(i, i + 3);
+    ctx.strokeStyle = chunk[Math.floor(chunk.length / 2)].color;
+    const chunkRoute = [chunk[0].start, ...chunk.map((segment) => segment.end)];
+    drawSmoothPath(ctx, chunkRoute);
     ctx.stroke();
-  });
+  }
 
-  ctx.globalAlpha = 0.34;
+  ctx.globalAlpha = 0.24;
   ctx.strokeStyle = "#ffffff";
-  ctx.lineWidth = 3;
-  strokePath();
+  ctx.lineWidth = 2;
+  drawSmoothPath(ctx, smoothRoute);
   ctx.stroke();
   ctx.globalAlpha = 1;
 
-  const start = route[0];
-  const end = route[route.length - 1];
+  const start = smoothRoute[0];
+  const end = smoothRoute[smoothRoute.length - 1];
   [
     { point: start, color: "#34d399" },
     { point: end, color: "#f87171" },
