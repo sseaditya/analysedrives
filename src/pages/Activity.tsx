@@ -284,23 +284,18 @@ const Activity = () => {
 
     try {
       setIsSharing(true);
-      const ownerName = ownerProfile?.display_name || ownerProfile?.full_name || user?.user_metadata?.full_name || user?.email || null;
       const file = format === "route"
         ? await createTransparentRouteShareImage({
           title: data.fileName,
           points: data.points,
           stats: data.stats,
           hideRadius: metadata?.hide_radius,
-          userName: ownerName,
-          carName: ownerProfile?.car,
         })
         : await createMapShareImage({
           title: data.fileName,
           points: data.points,
           stats: data.stats,
           hideRadius: metadata?.hide_radius,
-          userName: ownerName,
-          carName: ownerProfile?.car,
           theme: getResolvedTheme(),
         });
       downloadImageFile(file);

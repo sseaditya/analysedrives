@@ -12,8 +12,6 @@ interface ShareImageOptions {
   points: GPXPoint[];
   stats: GPXStats;
   hideRadius?: number | null;
-  userName?: string | null;
-  carName?: string | null;
   theme?: "light" | "dark";
 }
 
@@ -217,13 +215,13 @@ const drawSpeedCodedRoute = (
 
   ctx.shadowColor = "rgba(37, 99, 235, 0.38)";
   ctx.shadowBlur = 18;
-  ctx.strokeStyle = "rgba(37, 99, 235, 0.28)";
-  ctx.lineWidth = 15;
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
+  ctx.lineWidth = 22;
   drawSmoothPath(ctx, smoothRoute);
   ctx.stroke();
 
   ctx.shadowBlur = 0;
-  ctx.lineWidth = 7;
+  ctx.lineWidth = 14;
   buildSpeedSegments(smoothPoints, smoothRoute).forEach((segment) => {
     ctx.beginPath();
     ctx.strokeStyle = segment.color;
@@ -253,19 +251,14 @@ const drawSpeedCodedRoute = (
 const formatShareStats = (stats: GPXStats) => [
   { label: "Distance", value: formatDistance(stats.totalDistance) },
   { label: "Elapsed time", value: formatDurationShort(stats.totalTime || stats.movingTime) },
-  { label: "Avg speed", value: formatSpeed(stats.avgSpeed || stats.movingAvgSpeed) },
+  { label: "Average speed", value: formatSpeed(stats.avgSpeed || stats.movingAvgSpeed) },
 ];
-
-const getDisplayName = (userName?: string | null) => userName?.trim() || "Driver";
-const getCarName = (carName?: string | null) => carName?.trim() || "Car";
 
 export const createTransparentRouteShareImage = async ({
   title,
   points,
   stats,
   hideRadius,
-  userName,
-  carName,
 }: ShareImageOptions): Promise<File> => {
   const visiblePoints = getPrivacyClippedPoints(points, hideRadius);
   const canvas = document.createElement("canvas");
@@ -290,15 +283,6 @@ export const createTransparentRouteShareImage = async ({
 
   ctx.shadowColor = "rgba(0,0,0,0.45)";
   ctx.shadowBlur = 16;
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "800 62px Inter, ui-sans-serif, system-ui";
-  drawWrappedText(ctx, title, 78, 1236, 920, 68, 2);
-
-  ctx.font = "700 38px Inter, ui-sans-serif, system-ui";
-  ctx.fillText(getDisplayName(userName), 78, 1322);
-  ctx.font = "500 31px Inter, ui-sans-serif, system-ui";
-  ctx.fillStyle = "rgba(255,255,255,0.74)";
-  ctx.fillText(getCarName(carName), 78, 1374);
 
   formatShareStats(stats).forEach((stat, index) => {
     const x = 78 + index * 335;
@@ -306,8 +290,8 @@ export const createTransparentRouteShareImage = async ({
     ctx.font = "600 29px Inter, ui-sans-serif, system-ui";
     ctx.fillText(stat.label, x, 1610);
     ctx.fillStyle = "#ffffff";
-    ctx.font = "750 45px Inter, ui-sans-serif, system-ui";
-    drawWrappedText(ctx, stat.value, x, 1672, 285, 52, 2);
+    ctx.font = "800 56px Inter, ui-sans-serif, system-ui";
+    ctx.fillText(stat.value, x, 1680);
   });
 
   ctx.fillStyle = "#ffffff";
@@ -417,8 +401,6 @@ export const createMapShareImage = async ({
   points,
   stats,
   hideRadius,
-  userName,
-  carName,
   theme = "dark",
 }: ShareImageOptions): Promise<File> => {
   const visiblePoints = getPrivacyClippedPoints(points, hideRadius);
@@ -455,15 +437,8 @@ export const createMapShareImage = async ({
   ctx.fillStyle = "#ffffff";
   ctx.shadowColor = "rgba(0,0,0,0.45)";
   ctx.shadowBlur = 16;
-  ctx.font = "800 56px Inter, ui-sans-serif, system-ui";
-  drawWrappedText(ctx, title, 76, 1304, 920, 64, 2);
-  ctx.font = "700 34px Inter, ui-sans-serif, system-ui";
-  ctx.fillText(getDisplayName(userName), 76, 1190);
   ctx.font = "800 34px Inter, ui-sans-serif, system-ui";
   ctx.fillText("DrivenStat", 76, 1844);
-  ctx.font = "500 30px Inter, ui-sans-serif, system-ui";
-  ctx.fillStyle = "rgba(255,255,255,0.76)";
-  ctx.fillText(getCarName(carName), 76, 1234);
 
   const statCards = formatShareStats(stats);
   statCards.forEach((stat, index) => {
@@ -472,8 +447,8 @@ export const createMapShareImage = async ({
     ctx.font = "500 30px Inter, ui-sans-serif, system-ui";
     ctx.fillText(stat.label, x, 1508);
     ctx.fillStyle = "#ffffff";
-    ctx.font = "800 48px Inter, ui-sans-serif, system-ui";
-    drawWrappedText(ctx, stat.value, x, 1576, 270, 54, 2);
+    ctx.font = "800 56px Inter, ui-sans-serif, system-ui";
+    ctx.fillText(stat.value, x, 1582);
   });
   ctx.shadowBlur = 0;
 
