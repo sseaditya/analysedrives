@@ -52,7 +52,7 @@
 
     /* Segment comparison series, tuned to the site's book-cloth palette. */
     --segment-drive-1: 15 52% 58%;
-    --segment-drive-2: 190 24% 38%;
+    --segment-drive-2: 0 0% 10%;
 
     --radius: 0.75rem;
   }
@@ -99,7 +99,7 @@
     --ring: 15 52% 58%;
 
     --segment-drive-1: 15 52% 58%;
-    --segment-drive-2: 190 32% 62%;
+    --segment-drive-2: 60 14% 97%;
   }
 }
 

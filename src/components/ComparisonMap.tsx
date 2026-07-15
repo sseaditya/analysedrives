@@ -2,13 +2,30 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useTheme } from "@/components/ThemeProvider";
-import type { ComparisonSeries, Segment } from "@/types/segments";
+import type { ComparisonPoint, ComparisonSeries, Segment } from "@/types/segments";
 
 function themeColor(property: string) {
   return `hsl(${getComputedStyle(document.documentElement).getPropertyValue(property).trim()})`;
 }
 
-export default function ComparisonMap({ segment, series, cursor }: { segment: Segment; series: ComparisonSeries; cursor: number }) {
+function positionAtElapsed(points: ComparisonPoint[], elapsed: number, side: "A" | "B"): L.LatLngExpression {
+  const elapsedKey = side === "A" ? "elapsedA" : "elapsedB";
+  const pointKey = side === "A" ? "pointA" : "pointB";
+  if (elapsed <= 0) return [points[0][pointKey].lat, points[0][pointKey].lon];
+  const last = points[points.length - 1];
+  if (elapsed >= last[elapsedKey]) return [last[pointKey].lat, last[pointKey].lon];
+  let right = points.findIndex((point) => point[elapsedKey] >= elapsed);
+  if (right <= 0) right = 1;
+  const left = right - 1;
+  const startTime = points[left][elapsedKey];
+  const endTime = points[right][elapsedKey];
+  const ratio = endTime > startTime ? (elapsed - startTime) / (endTime - startTime) : 0;
+  const start = points[left][pointKey];
+  const end = points[right][pointKey];
+  return [start.lat + (end.lat - start.lat) * ratio, start.lon + (end.lon - start.lon) * ratio];
+}
+
+export default function ComparisonMap({ segment, series, cursorSeconds }: { segment: Segment; series: ComparisonSeries; cursorSeconds: number }) {
   const elementRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markerARef = useRef<L.CircleMarker | null>(null);
@@ -58,11 +75,10 @@ export default function ComparisonMap({ segment, series, cursor }: { segment: Se
   }, [segment, series, theme]);
 
   useEffect(() => {
-    const point = series.points[Math.max(0, Math.min(cursor, series.points.length - 1))];
-    if (!point) return;
-    markerARef.current?.setLatLng([point.pointA.lat, point.pointA.lon]);
-    markerBRef.current?.setLatLng([point.pointB.lat, point.pointB.lon]);
-  }, [cursor, series]);
+    if (!series.points.length) return;
+    markerARef.current?.setLatLng(positionAtElapsed(series.points, cursorSeconds, "A"));
+    markerBRef.current?.setLatLng(positionAtElapsed(series.points, cursorSeconds, "B"));
+  }, [cursorSeconds, series]);
 
   return <div className="relative overflow-hidden rounded-xl border"><div ref={elementRef} className="h-[420px] w-full" /><div className="absolute bottom-4 left-1/2 z-[400] flex -translate-x-1/2 gap-3 rounded-full border bg-card/90 px-4 py-2 text-xs shadow-lg backdrop-blur"><span className="flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-full bg-[hsl(var(--segment-drive-1))]" />Drive 1</span><span className="flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-full bg-[hsl(var(--segment-drive-2))]" />Drive 2</span></div></div>;
 }
