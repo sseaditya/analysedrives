@@ -26,12 +26,13 @@ vi.mock("@/lib/segmentIndexing", () => ({
 }));
 
 vi.mock("@/utils/segmentMatching", () => ({
-  SEGMENT_EFFORT_ALGORITHM_VERSION: 1,
+  SEGMENT_EFFORT_ALGORITHM_VERSION: 2,
+  SEGMENT_REJECTED_MINIMUM_COVERAGE: 0.5,
   segmentActivityCandidate: mocks.segmentActivityCandidate,
   matchActivityToSegment: mocks.matchActivityToSegment,
 }));
 
-import { findSegmentMatches } from "@/lib/segmentData";
+import { findRejectedSegmentMatches, findSegmentMatches } from "@/lib/segmentData";
 
 const segment: Segment = {
   id: "segment-1",
@@ -46,7 +47,7 @@ const segment: Segment = {
   ],
   distance_km: 1,
   bounds: { minLat: 18.5, minLon: 73.8, maxLat: 18.6, maxLon: 73.9 },
-  efforts_algorithm_version: 1,
+  efforts_algorithm_version: 2,
   created_at: "2026-07-15T00:00:00.000Z",
 };
 
@@ -111,6 +112,36 @@ describe("findSegmentMatches", () => {
     mocks.fetchAccessibleActivities.mockResolvedValue([]);
     mocks.fetchActivitySummary.mockRejectedValue(new Error("not found"));
     mocks.indexSegmentEfforts.mockResolvedValue({ ok: true, checked: 0, matched: 0, failures: 0 });
+  });
+
+  it("only reports rejected drives with at least fifty percent same-direction coverage", async () => {
+    const publicDrive = activity("public-drive", "owner-2", true);
+    const privateDrive = activity("private-drive", "owner-1", false);
+    const lowCoverageDrive = activity("low-coverage-drive", "owner-1", false);
+    mocks.fetchAccessibleActivities.mockResolvedValue([publicDrive, privateDrive, lowCoverageDrive]);
+    mocks.loadActivityTrack.mockImplementation(async (item: ActivitySummary) => ({
+      activity: item,
+      points: [],
+      processedTrack: { version: 4, points: [], stats: {}, previewCoordinates: [] },
+    }));
+    mocks.matchActivityToSegment.mockImplementation((_segment: Segment, loaded: LoadedActivity, _viewer: string, minimumCoverage?: number) => {
+      if (minimumCoverage !== 0.5) return null;
+      if (loaded.activity.id === "private-drive") {
+        const match = liveMatch(loaded, 40);
+        match.coverage = 0.6;
+        return match;
+      }
+      return null;
+    });
+
+    const result = await findRejectedSegmentMatches(segment, "owner-1");
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual(expect.objectContaining({
+      activity: expect.objectContaining({ id: "private-drive", public: false }),
+      reason: "coverage",
+      candidate: expect.objectContaining({ coverage: 0.6 }),
+    }));
   });
 
   it("runs the original live matcher immediately when a completed index is empty", async () => {

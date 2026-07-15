@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Car, Check, Clock, Globe, Loader2, Lock, MapPin, Pencil, Route, Trash2, Trophy } from "lucide-react";
+import { AlertTriangle, Car, Check, Clock, Globe, ListFilter, Loader2, Lock, MapPin, Pencil, Plus, Route, Trash2, Trophy, X } from "lucide-react";
 import ActivityMiniMap from "@/components/ActivityMiniMap";
 import SegmentsHeader from "@/components/SegmentsHeader";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +11,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
-import { fetchSegment, findSegmentMatches } from "@/lib/segmentData";
+import { fetchSegment, findRejectedSegmentMatches, findSegmentMatches } from "@/lib/segmentData";
 import { supabase } from "@/lib/supabase";
 import { formatDuration } from "@/utils/gpxParser";
 
@@ -25,11 +25,20 @@ export default function SegmentLeaderboard() {
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [showRejected, setShowRejected] = useState(false);
+  const [includedRejected, setIncludedRejected] = useState<Set<string>>(() => new Set());
   const segmentQuery = useQuery({ queryKey: ["segment", segmentId], queryFn: () => fetchSegment(segmentId), enabled: !!segmentId });
   const matchesQuery = useQuery({
     queryKey: ["segment-matches", segmentId, user?.id],
     queryFn: () => findSegmentMatches(segmentQuery.data!, user!.id),
     enabled: !!segmentQuery.data && !!user,
+    staleTime: 5 * 60 * 1000,
+  });
+  const qualifyingActivityIds = matchesQuery.data?.matches.map((match) => match.activity.id) ?? [];
+  const rejectedQuery = useQuery({
+    queryKey: ["segment-rejected-matches", segmentId, user?.id],
+    queryFn: () => findRejectedSegmentMatches(segmentQuery.data!, user!.id, qualifyingActivityIds),
+    enabled: showRejected && !!segmentQuery.data && !!user && matchesQuery.isSuccess,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -46,8 +55,27 @@ export default function SegmentLeaderboard() {
   if (segmentQuery.isLoading) return <div className="flex min-h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   if (segmentQuery.isError || !segmentQuery.data) return <div className="flex min-h-screen items-center justify-center text-center"><div><Route className="mx-auto h-10 w-10 text-muted-foreground" /><h1 className="mt-4 text-xl font-bold">Segment unavailable</h1><Button className="mt-4" onClick={() => navigate("/segments")}>Browse segments</Button></div></div>;
   const segment = segmentQuery.data;
-  const matches = matchesQuery.data?.matches ?? [];
+  const includedMatches = (rejectedQuery.data ?? [])
+    .filter((entry) => includedRejected.has(entry.activity.id) && entry.candidate)
+    .map((entry) => entry.candidate!);
+  const matches = [...(matchesQuery.data?.matches ?? []), ...includedMatches]
+    .sort((a, b) => b.avgSpeed - a.avgSpeed || b.coverage - a.coverage)
+    .map((match, index) => ({ ...match, rank: index + 1 }));
   const isCreator = segment.created_by === user?.id;
+
+  const toggleRejected = (id: string) => {
+    setIncludedRejected((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+        if (driveA === id) setDriveA(null);
+        if (driveB === id) setDriveB(null);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   const openEditor = () => { setEditName(segment.name); setEditDescription(segment.description ?? ""); setEditing(true); };
   const saveMetadata = async () => {
@@ -69,14 +97,14 @@ export default function SegmentLeaderboard() {
           <div className="space-y-4 p-6">
             <div className="flex items-start justify-between gap-3"><div><Badge variant="outline">Public segment</Badge><h1 className="mt-3 text-3xl font-bold">{segment.name}</h1><p className="mt-1 text-muted-foreground">Created by {segment.profiles?.display_name || segment.profiles?.full_name || "Driver"}</p></div>{isCreator && <div className="flex gap-1"><Button size="icon" variant="ghost" onClick={openEditor}><Pencil className="h-4 w-4" /></Button><AlertDialog><AlertDialogTrigger asChild><Button size="icon" variant="ghost" className="text-destructive"><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete this public segment?</AlertDialogTitle><AlertDialogDescription>The leaderboard link will stop working. Source drives are not affected.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={deleteSegment}>Delete segment</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></div>}</div>
             {segment.description && <p className="text-sm">{segment.description}</p>}
-            <div className="flex gap-5 text-sm"><span className="flex items-center gap-1"><MapPin className="h-4 w-4 text-primary" />{segment.distance_km.toFixed(1)} km</span><span>80% minimum coverage</span><span>Same direction</span></div>
+            <div className="flex flex-wrap gap-5 text-sm"><span className="flex items-center gap-1"><MapPin className="h-4 w-4 text-primary" />{segment.distance_km.toFixed(1)} km</span><span>80% minimum coverage</span><span>500 m GPS corridor</span><span>Same direction</span></div>
           </div>
         </section>
 
         <section className="space-y-4">
           <div className="flex flex-col justify-between gap-3 md:flex-row md:items-end">
             <div><div className="flex items-center gap-2"><Trophy className="h-6 w-6 text-amber-500" /><h2 className="text-2xl font-bold">Leaderboard</h2></div><p className="text-sm text-muted-foreground">Ranked by displayed average speed across each matched section.</p></div>
-            <Button disabled={!driveA || !driveB} onClick={() => navigate(`/segments/${segment.id}/compare?driveA=${driveA}&driveB=${driveB}`)}>Compare selected drives</Button>
+            <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => setShowRejected((value) => !value)}><ListFilter className="mr-2 h-4 w-4" />{showRejected ? "Hide rejected drives" : "Review rejected drives"}</Button><Button disabled={!driveA || !driveB} onClick={() => navigate(`/segments/${segment.id}/compare?driveA=${driveA}&driveB=${driveB}`)}>Compare selected drives</Button></div>
           </div>
 
           {matchesQuery.isLoading ? <div className="rounded-2xl border p-16 text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin" /><p className="mt-3 text-sm text-muted-foreground">Inspecting accessible drive tracks…</p></div> : matchesQuery.isError ? (
@@ -104,7 +132,7 @@ export default function SegmentLeaderboard() {
                 return (
                   <div key={match.activity.id} className={`grid gap-4 rounded-xl border bg-card p-4 transition md:grid-cols-[48px_1.5fr_repeat(5,minmax(80px,1fr))_150px] md:items-center ${selectedA || selectedB ? "border-primary shadow-sm" : ""}`}>
                     <div className="text-center text-2xl font-black text-muted-foreground">#{match.rank || index + 1}</div>
-                    <div className="min-w-0"><button className="truncate text-left font-bold hover:text-primary" onClick={() => navigate(`/activity/${match.activity.slug || match.activity.id}`)}>{match.activity.title}</button><div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground"><span>{match.activity.profiles?.display_name || match.activity.profiles?.full_name || "Driver"}</span>{match.activity.profiles?.car && <span className="flex items-center gap-1"><Car className="h-3 w-3" />{match.activity.profiles.car}</span>}{match.activity.public ? <Globe className="h-3 w-3" /> : <Lock className="h-3 w-3" />}</div></div>
+                    <div className="min-w-0"><button className="truncate text-left font-bold hover:text-primary" onClick={() => navigate(`/activity/${match.activity.slug || match.activity.id}`)}>{match.activity.title}</button><div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground"><span>{match.activity.profiles?.display_name || match.activity.profiles?.full_name || "Driver"}</span>{match.activity.profiles?.car && <span className="flex items-center gap-1"><Car className="h-3 w-3" />{match.activity.profiles.car}</span>}{match.activity.public ? <Globe className="h-3 w-3" /> : <Lock className="h-3 w-3" />}{includedRejected.has(match.activity.id) && <Badge variant="secondary" className="text-[10px]">Manually included</Badge>}</div></div>
                     <Metric label="Coverage" value={`${(match.coverage * 100).toFixed(0)}%`} />
                     <Metric label="Distance" value={`${match.matchedDistance.toFixed(1)} km`} />
                     <Metric label="Time" value={formatDuration(match.elapsedTime)} icon={<Clock className="h-3 w-3" />} />
@@ -117,6 +145,21 @@ export default function SegmentLeaderboard() {
             </div>
           )}
         </section>
+
+        {showRejected && <section className="space-y-4 rounded-2xl border bg-card p-5">
+          <div><h2 className="text-xl font-bold">Rejected accessible drives</h2><p className="text-sm text-muted-foreground">Public drives and your private drives with 50–79% same-direction coverage. Drives below 50% are not shown. These partial matches can be included for this comparison.</p></div>
+          {rejectedQuery.isLoading ? <div className="py-10 text-center"><Loader2 className="mx-auto h-7 w-7 animate-spin" /><p className="mt-2 text-sm text-muted-foreground">Checking rejected drives…</p></div> : rejectedQuery.isError ? <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-5 text-sm">Could not inspect rejected drives.</div> : (rejectedQuery.data?.length ?? 0) === 0 ? <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">No rejected accessible drives.</div> : <div className="space-y-3">
+            {rejectedQuery.data!.map((entry) => {
+              const included = includedRejected.has(entry.activity.id);
+              const access = entry.activity.public ? (entry.activity.user_id === user?.id ? "Your public drive" : "Public drive") : "Your private drive";
+              const explanation = `${((entry.candidate?.coverage ?? 0) * 100).toFixed(0)}% same-direction coverage — below the automatic 80% requirement.`;
+              return <div key={entry.activity.id} className={`flex flex-col gap-4 rounded-xl border p-4 md:flex-row md:items-center md:justify-between ${included ? "border-primary bg-primary/5" : ""}`}>
+                <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><button className="truncate font-semibold hover:text-primary" onClick={() => navigate(`/activity/${entry.activity.slug || entry.activity.id}`)}>{entry.activity.title}</button><Badge variant="outline">{access}</Badge></div><p className="mt-1 break-words text-sm text-muted-foreground">{explanation}</p></div>
+                <Button className="shrink-0" variant={included ? "secondary" : "outline"} disabled={!entry.candidate} onClick={() => toggleRejected(entry.activity.id)}>{included ? <X className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}{included ? "Remove" : entry.candidate ? "Include drive" : "Cannot include"}</Button>
+              </div>;
+            })}
+          </div>}
+        </section>}
       </main>
       <Dialog open={editing} onOpenChange={setEditing}><DialogContent><DialogHeader><DialogTitle>Edit segment details</DialogTitle></DialogHeader><div className="space-y-3"><Input value={editName} onChange={(event) => setEditName(event.target.value)} maxLength={100} /><Textarea value={editDescription} onChange={(event) => setEditDescription(event.target.value)} maxLength={500} /></div><DialogFooter><Button variant="outline" onClick={() => setEditing(false)}>Cancel</Button><Button onClick={saveMetadata}>Save</Button></DialogFooter></DialogContent></Dialog>
     </div>

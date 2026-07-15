@@ -8,7 +8,7 @@ import SegmentsHeader from "@/components/SegmentsHeader";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { useAuth } from "@/contexts/AuthContext";
-import { fetchSegment, findSegmentMatches, loadLeaderboardMatch } from "@/lib/segmentData";
+import { fetchSegment, findRejectedSegmentMatches, findSegmentMatches, loadLeaderboardMatch } from "@/lib/segmentData";
 import { buildComparisonSeries } from "@/utils/segmentMatching";
 import { formatDuration } from "@/utils/gpxParser";
 
@@ -31,6 +31,15 @@ export default function SegmentCompare() {
     queryFn: async () => {
       const leaderboard = await findSegmentMatches(segmentQuery.data!, user!.id);
       const selected = leaderboard.matches.filter((match) => driveIds.includes(match.activity.id));
+      if (selected.length < driveIds.length) {
+        const rejected = await findRejectedSegmentMatches(
+          segmentQuery.data!,
+          user!.id,
+          leaderboard.matches.map((match) => match.activity.id),
+          driveIds,
+        );
+        selected.push(...rejected.flatMap((entry) => entry.candidate ? [entry.candidate] : []));
+      }
       return Promise.all(selected.map(loadLeaderboardMatch));
     },
     enabled: !!segmentQuery.data && !!user && driveIds.length === 2,

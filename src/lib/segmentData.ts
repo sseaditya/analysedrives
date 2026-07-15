@@ -1,8 +1,8 @@
 import { supabase } from "@/lib/supabase";
 import { fetchAccessibleActivities, fetchActivitySummary, loadActivityTrack } from "@/lib/activityData";
 import { indexSegmentEfforts } from "@/lib/segmentIndexing";
-import { matchActivityToSegment, segmentActivityCandidate, SEGMENT_EFFORT_ALGORITHM_VERSION } from "@/utils/segmentMatching";
-import type { ActivitySummary, RouteAlignment, Segment, SegmentLeaderboardEntry, SegmentMatch } from "@/types/segments";
+import { matchActivityToSegment, segmentActivityCandidate, SEGMENT_EFFORT_ALGORITHM_VERSION, SEGMENT_REJECTED_MINIMUM_COVERAGE } from "@/utils/segmentMatching";
+import type { ActivitySummary, RouteAlignment, Segment, SegmentLeaderboardEntry, SegmentMatch, SegmentRejectedEntry } from "@/types/segments";
 
 function normalizeSegment(record: unknown): Segment {
   const row = record as Segment;
@@ -45,7 +45,7 @@ type LeaderboardRow = {
   alignment: RouteAlignment;
 };
 
-async function calculateLiveMatches(segment: Segment, userId: string) {
+async function fetchLiveActivities(segment: Segment, userId: string) {
   const accessible = await fetchAccessibleActivities(userId);
   if (segment.source_activity_id && !accessible.some((activity) => activity.id === segment.source_activity_id)) {
     try {
@@ -55,7 +55,11 @@ async function calculateLiveMatches(segment: Segment, userId: string) {
       console.warn("Could not load the segment's source activity metadata", error);
     }
   }
-  const activities = accessible.filter((activity) => segmentActivityCandidate(segment, activity));
+  return accessible;
+}
+
+async function calculateLiveMatches(segment: Segment, userId: string) {
+  const activities = (await fetchLiveActivities(segment, userId)).filter((activity) => segmentActivityCandidate(segment, activity));
   const matches: SegmentLeaderboardEntry[] = [];
   let failures = 0;
   const concurrency = 4;
@@ -76,6 +80,35 @@ async function calculateLiveMatches(segment: Segment, userId: string) {
   matches.sort((a, b) => b.avgSpeed - a.avgSpeed || b.coverage - a.coverage);
   matches.forEach((match, index) => { match.rank = index + 1; });
   return { matches, failures, persisted: false as const, initializationError: undefined as string | undefined };
+}
+
+export async function findRejectedSegmentMatches(
+  segment: Segment,
+  userId: string,
+  qualifyingActivityIds: string[] = [],
+  onlyActivityIds?: string[],
+): Promise<SegmentRejectedEntry[]> {
+  const qualifying = new Set(qualifyingActivityIds);
+  const requested = onlyActivityIds ? new Set(onlyActivityIds) : null;
+  const activities = (await fetchLiveActivities(segment, userId)).filter((activity) => (
+    !qualifying.has(activity.id) && (!requested || requested.has(activity.id))
+  ));
+  const rejected: SegmentRejectedEntry[] = [];
+  const concurrency = 4;
+  for (let offset = 0; offset < activities.length; offset += concurrency) {
+    const inspected = await Promise.all(activities.slice(offset, offset + concurrency).map(async (activity): Promise<SegmentRejectedEntry | null> => {
+      try {
+        const loaded = await loadActivityTrack(activity);
+        if (matchActivityToSegment(segment, loaded, userId)) return null;
+        const candidate = matchActivityToSegment(segment, loaded, userId, SEGMENT_REJECTED_MINIMUM_COVERAGE);
+        return candidate ? { activity, reason: "coverage", candidate: { ...candidate, rank: 0 } } : null;
+      } catch {
+        return null;
+      }
+    }));
+    rejected.push(...inspected.filter((entry): entry is SegmentRejectedEntry => entry != null));
+  }
+  return rejected.sort((a, b) => (b.candidate?.coverage ?? -1) - (a.candidate?.coverage ?? -1));
 }
 
 async function fetchPersistedMatches(segmentId: string): Promise<SegmentLeaderboardEntry[]> {

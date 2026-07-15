@@ -18,12 +18,13 @@ import {
 } from "./gpxParser.js";
 
 export const SEGMENT_SAMPLE_KM = 0.1;
-export const SEGMENT_MATCH_TOLERANCE_KM = 0.25;
+export const SEGMENT_MATCH_TOLERANCE_KM = 0.5;
 export const SEGMENT_MATCH_THRESHOLD = 0.8;
-export const SEGMENT_EFFORT_ALGORITHM_VERSION = 1;
+export const SEGMENT_REJECTED_MINIMUM_COVERAGE = 0.5;
+export const SEGMENT_EFFORT_ALGORITHM_VERSION = 2;
 
 const MATCH_GRID_SIZE_DEGREES = 0.002;
-const MATCH_GRID_SEARCH_RADIUS = 2;
+const MATCH_GRID_SEARCH_RADIUS = 3;
 
 type Sample = SegmentGeometryPoint & { sourceIndex: number; time?: Date };
 
@@ -194,7 +195,7 @@ function displayedMetrics(points: GPXPoint[], speedLimit: number | null) {
   };
 }
 
-export function matchActivityToSegment(segment: Segment, loaded: LoadedActivity, viewerId: string): SegmentMatch | null {
+export function matchActivityToSegment(segment: Segment, loaded: LoadedActivity, viewerId: string, minimumCoverage = SEGMENT_MATCH_THRESHOLD): SegmentMatch | null {
   const isOwner = loaded.activity.user_id === viewerId;
   const range = !isOwner && loaded.activity.public
     ? privacyVisibleRange(loaded.points, loaded.activity.hide_radius ?? 0)
@@ -206,11 +207,13 @@ export function matchActivityToSegment(segment: Segment, loaded: LoadedActivity,
   const alignment = buildAlignment(segment.geometry, samples);
   if (!alignment) return null;
 
-  const coveredStart = Math.max(0, segment.geometry[alignment.segmentStartIndex].distance - SEGMENT_MATCH_TOLERANCE_KM);
-  const coveredEnd = Math.min(segment.distance_km, segment.geometry[alignment.segmentEndIndex].distance + SEGMENT_MATCH_TOLERANCE_KM);
+  // GPS corridor width is lateral matching tolerance; it must not also grant
+  // up to 500 m of untravelled road at both ends of the coverage calculation.
+  const coveredStart = Math.max(0, segment.geometry[alignment.segmentStartIndex].distance - SEGMENT_SAMPLE_KM);
+  const coveredEnd = Math.min(segment.distance_km, segment.geometry[alignment.segmentEndIndex].distance + SEGMENT_SAMPLE_KM);
   const coveredDistance = Math.max(0, coveredEnd - coveredStart);
   const coverage = segment.distance_km > 0 ? coveredDistance / segment.distance_km : 0;
-  if (coverage + 1e-6 < SEGMENT_MATCH_THRESHOLD) return null;
+  if (coverage + 1e-6 < minimumCoverage) return null;
 
   const startSource = samples[alignment.activityStartIndex].sourceIndex;
   const endSource = samples[alignment.activityEndIndex].sourceIndex;
