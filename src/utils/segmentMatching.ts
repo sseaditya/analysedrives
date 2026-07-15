@@ -13,6 +13,7 @@ import {
   calculateSpeedDistribution,
   calculateStats,
   haversineDistance,
+  PAUSE_THRESHOLD,
   type GPXPoint,
   type SpeedBucket,
 } from "./gpxParser.js";
@@ -21,12 +22,16 @@ export const SEGMENT_SAMPLE_KM = 0.1;
 export const SEGMENT_MATCH_TOLERANCE_KM = 0.5;
 export const SEGMENT_MATCH_THRESHOLD = 0.8;
 export const SEGMENT_REJECTED_MINIMUM_COVERAGE = 0.5;
-export const SEGMENT_EFFORT_ALGORITHM_VERSION = 2;
+export const SEGMENT_EFFORT_ALGORITHM_VERSION = 3;
 
 const MATCH_GRID_SIZE_DEGREES = 0.002;
 const MATCH_GRID_SEARCH_RADIUS = 3;
 
-type Sample = SegmentGeometryPoint & { sourceIndex: number; time?: Date };
+type Sample = SegmentGeometryPoint & {
+  sourceIndex: number;
+  time?: Date;
+  interpolatesPause?: boolean;
+};
 
 function lerp(a: number, b: number, ratio: number) {
   return a + (b - a) * ratio;
@@ -54,7 +59,12 @@ export function privacyVisibleRange(points: GPXPoint[], hideRadius = 0): [number
 export function extractSegmentGeometry(points: GPXPoint[], startIndex: number, endIndex: number): SegmentGeometryPoint[] {
   const start = Math.max(0, Math.min(startIndex, endIndex));
   const end = Math.min(points.length - 1, Math.max(startIndex, endIndex));
-  return resamplePoints(points.slice(start, end + 1), SEGMENT_SAMPLE_KM).map(({ sourceIndex: _sourceIndex, time: _time, ...point }) => point);
+  return resamplePoints(points.slice(start, end + 1), SEGMENT_SAMPLE_KM).map(({
+    sourceIndex: _sourceIndex,
+    time: _time,
+    interpolatesPause: _interpolatesPause,
+    ...point
+  }) => point);
 }
 
 function resamplePoints(points: GPXPoint[], spacingKm = SEGMENT_SAMPLE_KM): Sample[] {
@@ -72,6 +82,9 @@ function resamplePoints(points: GPXPoint[], spacingKm = SEGMENT_SAMPLE_KM): Samp
     const ratio = span > 0 ? (target - distances[left]) / span : 0;
     const leftTime = points[left].time?.getTime();
     const rightTime = points[sourceIndex].time?.getTime();
+    const interpolatesPause = leftTime != null
+      && rightTime != null
+      && rightTime - leftTime > PAUSE_THRESHOLD * 1000;
     samples.push({
       lat: lerp(points[left].lat, points[sourceIndex].lat, ratio),
       lon: lerp(points[left].lon, points[sourceIndex].lon, ratio),
@@ -79,6 +92,7 @@ function resamplePoints(points: GPXPoint[], spacingKm = SEGMENT_SAMPLE_KM): Samp
       distance: target,
       sourceIndex: left,
       time: leftTime != null && rightTime != null ? new Date(lerp(leftTime, rightTime, ratio)) : points[left].time,
+      interpolatesPause,
     });
   }
   const last = points[points.length - 1];
@@ -145,13 +159,29 @@ function buildAlignment(segmentGeometry: SegmentGeometryPoint[], activitySamples
   }
   if (matches.length < 2) return null;
 
+  // A recording pause leaves no GPS points between its two boundary fixes.
+  // On a bend, distance resampling draws a chord across that hole, so the
+  // chord can sit outside the road corridor even though the fixes immediately
+  // before and after the pause both align with the same route. Keep those two
+  // observed runs connected instead of discarding one side of the effort.
+  const pausePrefix = new Array(activitySamples.length + 1).fill(0);
+  for (let index = 0; index < activitySamples.length; index++) {
+    pausePrefix[index + 1] = pausePrefix[index] + (activitySamples[index].interpolatesPause ? 1 : 0);
+  }
+  const crossesRecordingPause = (startIndex: number, endIndex: number) => {
+    const start = Math.max(0, Math.min(startIndex, endIndex));
+    const end = Math.min(activitySamples.length - 1, Math.max(startIndex, endIndex));
+    return pausePrefix[end + 1] - pausePrefix[start] > 0;
+  };
+
   let bestStart = 0;
   let bestEnd = 0;
   let runStart = 0;
   for (let i = 1; i < matches.length; i++) {
     const segmentGap = matches[i].segmentIndex - matches[i - 1].segmentIndex;
     const activityGap = matches[i].activityIndex - matches[i - 1].activityIndex;
-    if (segmentGap > 3 || activityGap > 6) runStart = i;
+    const recordingPause = crossesRecordingPause(matches[i - 1].activityIndex, matches[i].activityIndex);
+    if ((segmentGap > 3 || activityGap > 6) && !recordingPause) runStart = i;
     if (matches[i].segmentIndex - matches[runStart].segmentIndex > matches[bestEnd].segmentIndex - matches[bestStart].segmentIndex) {
       bestStart = runStart;
       bestEnd = i;

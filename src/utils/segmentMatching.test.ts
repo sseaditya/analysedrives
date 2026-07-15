@@ -20,6 +20,29 @@ function route(startKm: number, endKm: number, stepKm = 0.05, lon = 73.5, speedK
   });
 }
 
+function curvedRouteWithPausedMiddle(): { complete: GPXPoint[]; paused: GPXPoint[] } {
+  const pointCount = 301;
+  const radiusKm = 3;
+  const startedAt = new Date("2026-01-01T10:00:00Z").getTime();
+  const complete = Array.from({ length: pointCount }, (_, index): GPXPoint => {
+    const angle = Math.PI * index / (pointCount - 1);
+    const distance = radiusKm * angle;
+    return {
+      lat: 18 + radiusKm * Math.sin(angle) / KM_PER_LAT,
+      lon: 73.5 + radiusKm * Math.cos(angle) / (KM_PER_LAT * Math.cos(18 * Math.PI / 180)),
+      ele: 500,
+      time: new Date(startedAt + distance / 60 * 3600_000),
+    };
+  });
+  const paused = complete
+    .filter((_, index) => index <= 50 || index >= 250)
+    .map((point, index) => ({
+      ...point,
+      time: index > 50 ? new Date(point.time!.getTime() + 30 * 60_000) : point.time,
+    }));
+  return { complete, paused };
+}
+
 function segmentFrom(points: GPXPoint[]): Segment {
   const geometry = extractSegmentGeometry(points, 0, points.length - 1);
   return {
@@ -54,6 +77,17 @@ describe("segment extraction and matching", () => {
     const match = matchActivityToSegment(segment, loaded(route(0, 30)), "owner");
     expect(match).not.toBeNull();
     expect(match!.coverage).toBeGreaterThan(0.98);
+  });
+
+  it("keeps both sides of a curved match across a recording pause", () => {
+    const { complete, paused } = curvedRouteWithPausedMiddle();
+    const segment = segmentFrom(complete);
+    const match = matchActivityToSegment(segment, loaded(paused), "owner");
+
+    expect(match).not.toBeNull();
+    expect(match!.coverage).toBeGreaterThan(0.98);
+    expect(match!.alignment.segmentStartIndex).toBeLessThanOrEqual(2);
+    expect(match!.alignment.segmentEndIndex).toBeGreaterThanOrEqual(segment.geometry.length - 3);
   });
 
   it("accepts GPS drift inside the 500 metre road corridor", () => {
