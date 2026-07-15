@@ -3,6 +3,12 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
 import type { ActivitySummary, LoadedActivity, Segment } from "../src/types/segments.js";
 import type { GPXPoint, ProcessedTrack } from "../src/utils/gpxParser.js";
+import { generateProcessedTrack, PROCESSED_TRACK_VERSION } from "../src/utils/gpxParser.js";
+import {
+  coarseSegmentCandidate,
+  matchActivityToSegment,
+  SEGMENT_EFFORT_ALGORITHM_VERSION,
+} from "../src/utils/segmentMatching.js";
 
 function namedKey(json: string | undefined) {
   if (!json) return undefined;
@@ -88,7 +94,6 @@ async function parseServerGPX(xml: string): Promise<GPXPoint[]> {
 }
 
 async function loadActivity(admin: any, activity: ActivitySummary): Promise<LoadedActivity> {
-  const { generateProcessedTrack, PROCESSED_TRACK_VERSION } = await import("../src/utils/gpxParser.js");
   const processedPath = activity.file_path.replace(/\.gpx$/i, "") + ".processed.json";
   const { data: processedBlob, error: processedError } = await admin.storage.from("gpx-files").download(processedPath);
   if (!processedError && processedBlob) {
@@ -110,7 +115,6 @@ async function loadActivity(admin: any, activity: ActivitySummary): Promise<Load
 }
 
 async function effortValues(segment: Segment, loaded: LoadedActivity) {
-  const { matchActivityToSegment, SEGMENT_EFFORT_ALGORITHM_VERSION } = await import("../src/utils/segmentMatching.js");
   const raw = matchActivityToSegment(segment, loaded, loaded.activity.user_id);
   if (!raw) return null;
   const publicMatch = loaded.activity.public
@@ -140,7 +144,6 @@ async function effortValues(segment: Segment, loaded: LoadedActivity) {
 }
 
 async function indexPair(admin: any, segment: Segment, loaded: LoadedActivity) {
-  const { coarseSegmentCandidate } = await import("../src/utils/segmentMatching.js");
   const candidate = coarseSegmentCandidate(segment, loaded.activity);
   const values = candidate ? await effortValues(segment, loaded) : null;
   if (!values) {
@@ -178,7 +181,6 @@ async function indexActivity(admin: any, activity: ActivitySummary) {
 }
 
 async function indexSegment(admin: any, segment: Segment, requesterId: string) {
-  const { coarseSegmentCandidate, SEGMENT_EFFORT_ALGORITHM_VERSION } = await import("../src/utils/segmentMatching.js");
   const { data, error } = await admin.from("activities").select(ACTIVITY_SELECT);
   if (error) throw error;
   let matched = 0;
@@ -246,10 +248,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { data: authData, error: authError } = await auth.auth.getUser(token);
   if (authError || !authData.user) return res.status(401).json({ error: "Invalid authorization token" });
 
-  let stage = "load matching engine";
+  let stage = "validate request";
   try {
-    const { SEGMENT_EFFORT_ALGORITHM_VERSION } = await import("../src/utils/segmentMatching.js");
-    stage = "validate request";
     const activityId = typeof req.body?.activityId === "string" ? req.body.activityId : null;
     const segmentId = typeof req.body?.segmentId === "string" ? req.body.segmentId : null;
     if ((activityId ? 1 : 0) + (segmentId ? 1 : 0) !== 1) {
