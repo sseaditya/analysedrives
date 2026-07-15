@@ -27,9 +27,12 @@ const supabaseAnonKey = process.env.SUPABASE_PUBLISHABLE_KEY
   || process.env.VITE_SUPABASE_ANON_KEY;
 // Vercel Marketplace uses SUPABASE_SECRET_KEY. Older integrations use the
 // service-role JWT; Supabase-hosted environments may provide a named JSON map.
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  || process.env.SUPABASE_SECRET_KEY
-  || namedKey(process.env.SUPABASE_SECRET_KEYS);
+// Prefer keys supplied by the current Marketplace-linked database. A legacy
+// SUPABASE_SERVICE_ROLE_KEY can remain configured after a database transfer
+// and otherwise point this API at the new URL with an old project's key.
+const supabaseServiceRoleKey = process.env.SUPABASE_SECRET_KEY
+  || namedKey(process.env.SUPABASE_SECRET_KEYS)
+  || process.env.SUPABASE_SERVICE_ROLE_KEY;
 const PUBLIC_VIEWER_ID = "00000000-0000-0000-0000-000000000000";
 
 const ACTIVITY_SELECT = "id, slug, user_id, title, file_path, created_at, public, speed_cap, hide_radius, stats";

@@ -69,30 +69,95 @@ async function calculateLiveMatches(segment: Segment, userId: string) {
   return { matches, failures, persisted: false as const, initializationError: undefined as string | undefined };
 }
 
+async function fetchPersistedMatches(segmentId: string): Promise<SegmentLeaderboardEntry[]> {
+  const { data, error } = await supabase.rpc("get_segment_leaderboard", { target_segment_id: segmentId });
+  if (error) throw error;
+  return ((data || []) as LeaderboardRow[]).map((row) => ({
+    rank: Number(row.rank),
+    activity: row.activity,
+    score: row.score,
+    coverage: row.coverage,
+    matchedDistance: row.matched_distance,
+    elapsedTime: row.elapsed_time,
+    avgSpeed: row.avg_speed,
+    maxSpeed: row.max_speed,
+    alignment: row.alignment,
+  }));
+}
+
+function describeError(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export async function findSegmentMatches(segment: Segment, userId: string): Promise<{ matches: SegmentLeaderboardEntry[]; failures: number; persisted: boolean; initializationError?: string }> {
-  try {
-    if ((segment.efforts_algorithm_version || 0) < SEGMENT_EFFORT_ALGORITHM_VERSION) {
-      await indexSegmentEfforts({ segmentId: segment.id });
+  const issues: string[] = [];
+  let indexingAttempted = false;
+  let indexingFailures = 0;
+
+  if ((segment.efforts_algorithm_version || 0) < SEGMENT_EFFORT_ALGORITHM_VERSION) {
+    indexingAttempted = true;
+    try {
+      const result = await indexSegmentEfforts({ segmentId: segment.id });
+      indexingFailures = result.failures ?? 0;
+      if (result.failureDetails?.[0]) issues.push(result.failureDetails[0]);
+    } catch (error) {
+      issues.push(describeError(error));
+      console.warn("Could not initialize saved segment efforts", error);
     }
-    const { data, error } = await supabase.rpc("get_segment_leaderboard", { target_segment_id: segment.id });
-    if (error) throw error;
-    const matches = ((data || []) as LeaderboardRow[]).map((row) => ({
-      rank: Number(row.rank),
-      activity: row.activity,
-      score: row.score,
-      coverage: row.coverage,
-      matchedDistance: row.matched_distance,
-      elapsedTime: row.elapsed_time,
-      avgSpeed: row.avg_speed,
-      maxSpeed: row.max_speed,
-      alignment: row.alignment,
-    }));
-    return { matches, failures: 0, persisted: true };
-  } catch (error) {
-    console.warn("Persisted segment leaderboard unavailable; using live matching", error);
-    const live = await calculateLiveMatches(segment, userId);
-    return { ...live, initializationError: error instanceof Error ? error.message : String(error) };
   }
+
+  try {
+    const matches = await fetchPersistedMatches(segment.id);
+    if (matches.length > 0) {
+      return {
+        matches,
+        failures: indexingFailures,
+        persisted: true,
+        initializationError: issues[0],
+      };
+    }
+  } catch (error) {
+    issues.push(describeError(error));
+    console.warn("Could not read saved segment leaderboard", error);
+  }
+
+  // A previous backfill may have marked the algorithm version complete while
+  // persisting zero efforts (for example during a database/storage transfer).
+  // Retry that state once even when the segment claims to be current.
+  if (!indexingAttempted) {
+    try {
+      const result = await indexSegmentEfforts({ segmentId: segment.id, force: true });
+      indexingFailures = result.failures ?? 0;
+      if (result.failureDetails?.[0]) issues.push(result.failureDetails[0]);
+      const matches = await fetchPersistedMatches(segment.id);
+      if (matches.length > 0) {
+        return {
+          matches,
+          failures: indexingFailures,
+          persisted: true,
+          initializationError: issues[0],
+        };
+      }
+    } catch (error) {
+      issues.push(describeError(error));
+      console.warn("Could not repair empty saved segment leaderboard", error);
+    }
+  }
+
+  // Preserve the original, pre-persistence implementation as the reliable
+  // fallback. An empty RPC result is not proof that no accessible drive
+  // qualifies; calculate from the user's public + owned drives before showing
+  // an empty leaderboard.
+  const live = await calculateLiveMatches(segment, userId);
+  const initializationError = issues[0]
+    ?? (live.matches.length === 0 && live.failures > 0
+      ? `${live.failures} accessible drive${live.failures === 1 ? "" : "s"} could not be loaded.`
+      : undefined);
+  return {
+    ...live,
+    failures: live.failures,
+    initializationError,
+  };
 }
 
 export async function loadLeaderboardMatch(entry: SegmentLeaderboardEntry): Promise<SegmentMatch> {

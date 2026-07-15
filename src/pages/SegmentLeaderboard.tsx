@@ -82,7 +82,18 @@ export default function SegmentLeaderboard() {
           {matchesQuery.isLoading ? <div className="rounded-2xl border p-16 text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin" /><p className="mt-3 text-sm text-muted-foreground">Inspecting accessible drive tracks…</p></div> : matchesQuery.isError ? (
             <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-8 text-center">Could not calculate matches.</div>
           ) : matches.length === 0 ? (
-            <div className="rounded-2xl border border-dashed p-16 text-center"><Route className="mx-auto h-10 w-10 text-muted-foreground" /><h3 className="mt-3 font-semibold">No qualifying drives yet</h3><p className="text-sm text-muted-foreground">Drives need at least 80% same-direction coverage.</p></div>
+            <div className="space-y-3">
+              {(matchesQuery.data?.failures ?? 0) > 0 || matchesQuery.data?.initializationError ? (
+                <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-8 text-center">
+                  <AlertTriangle className="mx-auto h-8 w-8 text-amber-500" />
+                  <h3 className="mt-3 font-semibold">Some drive files could not be checked</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">The saved index and live backup were both attempted. Refresh after confirming the migrated GPX files are available.</p>
+                  {matchesQuery.data?.initializationError && <p className="mx-auto mt-2 max-w-2xl break-words text-xs text-muted-foreground">{matchesQuery.data.initializationError}</p>}
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed p-16 text-center"><Route className="mx-auto h-10 w-10 text-muted-foreground" /><h3 className="mt-3 font-semibold">No qualifying drives yet</h3><p className="text-sm text-muted-foreground">The saved index and live matcher checked accessible drives; none covered at least 80% in the same direction.</p></div>
+              )}
+            </div>
           ) : (
             <div className="space-y-3">
               {matchesQuery.data && matchesQuery.data.failures > 0 && <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm"><AlertTriangle className="h-4 w-4 text-amber-500" />{matchesQuery.data.failures} inaccessible drive{matchesQuery.data.failures === 1 ? " was" : "s were"} skipped.</div>}

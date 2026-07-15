@@ -32,7 +32,11 @@ export async function indexSegmentEfforts(request: IndexRequest): Promise<Segmen
   }
 
   const payload = await response.json() as SegmentIndexResult;
-  if ((payload.failures ?? 0) > 0) {
+  // A migrated database can contain stale activity rows whose storage objects
+  // no longer exist. Do not throw away successfully persisted matches just
+  // because another drive failed to load. Callers can surface the partial
+  // failure while still reading the usable leaderboard rows.
+  if ((payload.failures ?? 0) > 0 && (payload.matched ?? 0) === 0) {
     const detail = payload.failureDetails?.[0] ? ` ${payload.failureDetails[0]}` : "";
     throw new Error(`Segment indexing skipped ${payload.failures} inaccessible drive${payload.failures === 1 ? "" : "s"}.${detail}`);
   }
