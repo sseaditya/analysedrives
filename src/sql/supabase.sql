@@ -20,7 +20,18 @@ create policy "Owner Access"
 on storage.objects for select
 using (
   bucket_id = 'gpx-files'
-  and auth.uid() = owner
+  and (
+    auth.uid() = owner
+    or exists (
+      select 1
+      from public.activities
+      where public.activities.user_id = auth.uid()
+        and (
+          public.activities.file_path = storage.objects.name
+          or replace(public.activities.file_path, '.gpx', '.processed.json') = storage.objects.name
+        )
+    )
+  )
 );
 
 drop policy if exists "Public Access to Public Files" on storage.objects;

@@ -154,12 +154,20 @@ async function indexActivity(admin: any, activity: ActivitySummary) {
   return { checked: data?.length || 0, matched, failures };
 }
 
-async function indexSegment(admin: any, segment: Segment) {
+async function indexSegment(admin: any, segment: Segment, requesterId: string) {
   const { data, error } = await admin.from("activities").select(ACTIVITY_SELECT);
   if (error) throw error;
   let matched = 0;
   let failures = 0;
-  const activities = (data || []) as ActivitySummary[];
+  // Index the requester's drives first. If a large global backfill approaches
+  // the function deadline, the segment creator still gets a useful complete
+  // personal leaderboard instead of only whichever row happened to run first.
+  const activities = ((data || []) as ActivitySummary[]).sort((a, b) => {
+    const requesterOrder = Number(b.user_id === requesterId) - Number(a.user_id === requesterId);
+    if (requesterOrder) return requesterOrder;
+    const sourceOrder = Number(b.id === segment.source_activity_id) - Number(a.id === segment.source_activity_id);
+    return sourceOrder;
+  });
   const concurrency = 4;
   for (let offset = 0; offset < activities.length; offset += concurrency) {
     const results = await Promise.allSettled(activities.slice(offset, offset + concurrency).map(async (activity) => {
@@ -227,7 +235,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!force && (segment.efforts_algorithm_version || 0) >= SEGMENT_EFFORT_ALGORITHM_VERSION) {
       return res.status(200).json({ ok: true, skipped: true });
     }
-    return res.status(200).json({ ok: true, ...(await indexSegment(admin, segment)) });
+    return res.status(200).json({ ok: true, ...(await indexSegment(admin, segment, authData.user.id)) });
   } catch (error) {
     console.error("Segment indexing failed", error);
     return res.status(500).json({ error: error instanceof Error ? error.message : "Segment indexing failed" });
