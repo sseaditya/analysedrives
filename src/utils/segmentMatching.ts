@@ -13,8 +13,6 @@ import {
   calculateSpeedDistribution,
   calculateStats,
   haversineDistance,
-  MAX_SPEED_CAP,
-  PAUSE_THRESHOLD,
   type GPXPoint,
   type SpeedBucket,
 } from "./gpxParser.js";
@@ -23,7 +21,7 @@ export const SEGMENT_SAMPLE_KM = 0.1;
 export const SEGMENT_MATCH_TOLERANCE_KM = 0.5;
 export const SEGMENT_MATCH_THRESHOLD = 0.8;
 export const SEGMENT_REJECTED_MINIMUM_COVERAGE = 0.5;
-export const SEGMENT_EFFORT_ALGORITHM_VERSION = 4;
+export const SEGMENT_EFFORT_ALGORITHM_VERSION = 5;
 
 const MATCH_GRID_SIZE_DEGREES = 0.002;
 const MATCH_GRID_SEARCH_RADIUS = 3;
@@ -113,7 +111,7 @@ function nearbyKeys(lat: number, lon: number): string[] {
   return keys;
 }
 
-function buildAlignment(segmentGeometry: SegmentGeometryPoint[], activitySamples: Sample[]): RouteAlignment | null {
+export function buildAlignment(segmentGeometry: SegmentGeometryPoint[], activitySamples: Sample[]): RouteAlignment | null {
   if (segmentGeometry.length < 2 || activitySamples.length < 2) return null;
   const grid = new Map<string, number[]>();
   activitySamples.forEach((point, index) => {
@@ -123,43 +121,64 @@ function buildAlignment(segmentGeometry: SegmentGeometryPoint[], activitySamples
     grid.set(key, indices);
   });
 
-  const matches: { segmentIndex: number; activityIndex: number }[] = [];
-  let lastActivityIndex = -1;
+  type AlignmentState = {
+    segmentIndex: number;
+    activityIndex: number;
+    startSegmentIndex: number;
+    cumulativeError: number;
+    previous: AlignmentState | null;
+  };
+  const statesBySegment: AlignmentState[][] = [];
+  let bestState: AlignmentState | null = null;
+
+  const betterState = (candidate: AlignmentState, current: AlignmentState | null) => {
+    if (!current) return true;
+    const candidateSpan = candidate.segmentIndex - candidate.startSegmentIndex;
+    const currentSpan = current.segmentIndex - current.startSegmentIndex;
+    return candidateSpan > currentSpan
+      || (candidateSpan === currentSpan && candidate.cumulativeError < current.cumulativeError);
+  };
+
   for (let segmentIndex = 0; segmentIndex < segmentGeometry.length; segmentIndex++) {
     const point = segmentGeometry[segmentIndex];
-    let bestIndex = -1;
-    let bestDistance = Infinity;
+    const candidates = new Map<number, number>();
     for (const key of nearbyKeys(point.lat, point.lon)) {
       for (const candidateIndex of grid.get(key) ?? []) {
-        if (candidateIndex < lastActivityIndex) continue;
         const candidate = activitySamples[candidateIndex];
         const distance = haversineDistance(point.lat, point.lon, candidate.lat, candidate.lon);
-        if (distance <= SEGMENT_MATCH_TOLERANCE_KM && distance < bestDistance) {
-          bestDistance = distance;
-          bestIndex = candidateIndex;
-        }
+        if (distance <= SEGMENT_MATCH_TOLERANCE_KM) candidates.set(candidateIndex, distance);
       }
     }
-    if (bestIndex >= 0) {
-      matches.push({ segmentIndex, activityIndex: bestIndex });
-      lastActivityIndex = bestIndex;
-    }
-  }
-  if (matches.length < 2) return null;
 
-  let bestStart = 0;
-  let bestEnd = 0;
-  let runStart = 0;
-  for (let i = 1; i < matches.length; i++) {
-    const segmentGap = matches[i].segmentIndex - matches[i - 1].segmentIndex;
-    const activityGap = matches[i].activityIndex - matches[i - 1].activityIndex;
-    if (segmentGap > 3 || activityGap > 6) runStart = i;
-    if (matches[i].segmentIndex - matches[runStart].segmentIndex > matches[bestEnd].segmentIndex - matches[bestStart].segmentIndex) {
-      bestStart = runStart;
-      bestEnd = i;
+    const states: AlignmentState[] = [];
+    for (const [activityIndex, distance] of candidates) {
+      let bestPrevious: AlignmentState | null = null;
+      for (let previousSegmentIndex = Math.max(0, segmentIndex - 3); previousSegmentIndex < segmentIndex; previousSegmentIndex++) {
+        for (const previous of statesBySegment[previousSegmentIndex] ?? []) {
+          const activityGap = activityIndex - previous.activityIndex;
+          if (activityGap <= 0 || activityGap > 6) continue;
+          if (betterState(previous, bestPrevious)) bestPrevious = previous;
+        }
+      }
+      const state: AlignmentState = {
+        segmentIndex,
+        activityIndex,
+        startSegmentIndex: bestPrevious?.startSegmentIndex ?? segmentIndex,
+        cumulativeError: (bestPrevious?.cumulativeError ?? 0) + distance,
+        previous: bestPrevious,
+      };
+      states.push(state);
+      if (betterState(state, bestState)) bestState = state;
     }
+    statesBySegment.push(states);
   }
-  const run = matches.slice(bestStart, bestEnd + 1);
+  if (!bestState || !bestState.previous) return null;
+
+  const run: { segmentIndex: number; activityIndex: number }[] = [];
+  for (let state: AlignmentState | null = bestState; state; state = state.previous) {
+    run.push({ segmentIndex: state.segmentIndex, activityIndex: state.activityIndex });
+  }
+  run.reverse();
   return {
     segmentStartIndex: run[0].segmentIndex,
     segmentEndIndex: run[run.length - 1].segmentIndex,
@@ -183,90 +202,16 @@ function publicSpeedLimit(loaded: LoadedActivity, viewerId: string): number | nu
   return limits.length ? Math.min(...limits) : null;
 }
 
-type PauseConnector = { distance: number; speed: number; elapsed: number };
-
-function rawActiveSpeed(points: GPXPoint[], endIndex: number): number | null {
-  if (endIndex <= 0 || endIndex >= points.length) return null;
-  const previous = points[endIndex - 1];
-  const point = points[endIndex];
-  const seconds = previous.time && point.time
-    ? (point.time.getTime() - previous.time.getTime()) / 1000
-    : 0;
-  if (seconds <= 0 || seconds > PAUSE_THRESHOLD) return null;
-  const distance = haversineDistance(previous.lat, previous.lon, point.lat, point.lon);
-  const speed = distance / (seconds / 3600);
-  return speed > 0 && speed <= MAX_SPEED_CAP ? speed : null;
-}
-
-function nearbyActiveSpeed(points: GPXPoint[], pauseEndIndex: number, fallbackSpeed: number): number {
-  const speeds: number[] = [];
-  for (let offset = 1; offset <= 5 && speeds.length < 2; offset++) {
-    const before = rawActiveSpeed(points, pauseEndIndex - offset);
-    const after = rawActiveSpeed(points, pauseEndIndex + offset);
-    if (before != null) speeds.push(before);
-    if (after != null) speeds.push(after);
-  }
-  if (speeds.length) return speeds.reduce((sum, speed) => sum + speed, 0) / speeds.length;
-  return fallbackSpeed > 0 && fallbackSpeed <= MAX_SPEED_CAP ? fallbackSpeed : 0;
-}
-
-function pauseConnectorAt(points: GPXPoint[], endIndex: number, fallbackSpeed: number): PauseConnector | null {
-  if (endIndex <= 0 || endIndex >= points.length) return null;
-  const previous = points[endIndex - 1];
-  const point = points[endIndex];
-  const seconds = previous.time && point.time
-    ? (point.time.getTime() - previous.time.getTime()) / 1000
-    : 0;
-  if (seconds <= PAUSE_THRESHOLD) return null;
-
-  // A short displacement at a pause boundary is the closest connection
-  // between the final pre-pause fix and the first post-pause fix. The shared
-  // stats code deliberately removes it together with the stopped duration,
-  // but a segment effort must retain this small piece of road.
-  const distance = haversineDistance(previous.lat, previous.lon, point.lat, point.lon);
-  if (distance <= 0 || distance > SEGMENT_MATCH_TOLERANCE_KM) return null;
-  const speed = nearbyActiveSpeed(points, endIndex, fallbackSpeed);
-  return {
-    distance,
-    speed,
-    elapsed: speed > 0 ? distance / speed * 3600 : 0,
-  };
-}
-
-function pauseConnectors(points: GPXPoint[], fallbackSpeed: number): PauseConnector[] {
-  const connectors: PauseConnector[] = [];
-  for (let index = 1; index < points.length; index++) {
-    const connector = pauseConnectorAt(points, index, fallbackSpeed);
-    if (connector) connectors.push(connector);
-  }
-  return connectors;
-}
-
 function displayedMetrics(points: GPXPoint[], speedLimit: number | null) {
   const stats = calculateStats(points);
-  const connectors = pauseConnectors(points, stats.avgSpeed);
-  const connectorDistance = connectors.reduce((sum, connector) => sum + connector.distance, 0);
-  const distance = stats.totalDistance + connectorDistance;
-  const connectorElapsed = connectors.reduce((sum, connector) => sum + connector.elapsed, 0);
   if (!speedLimit) {
-    const elapsed = stats.totalTime + connectorElapsed;
-    return {
-      distance,
-      elapsed,
-      avgSpeed: elapsed > 0 ? distance / (elapsed / 3600) : 0,
-      maxSpeed: stats.maxSpeed,
-    };
+    return { distance: stats.totalDistance, elapsed: stats.totalTime, avgSpeed: stats.avgSpeed, maxSpeed: stats.maxSpeed };
   }
   const limited = calculateLimitedStats(points, speedLimit);
-  const limitedConnectorElapsed = connectors.reduce((sum, connector) => {
-    const speed = Math.min(connector.speed, speedLimit);
-    return sum + (speed > 0 ? connector.distance / speed * 3600 : 0);
-  }, 0);
-  const elapsed = (limited?.simulatedTime ?? stats.totalTime) + limitedConnectorElapsed;
   return {
-    distance,
-    elapsed,
-    avgSpeed: Math.min(elapsed > 0 ? distance / (elapsed / 3600) : 0, speedLimit),
+    distance: stats.totalDistance,
+    elapsed: limited?.simulatedTime ?? stats.totalTime,
+    avgSpeed: Math.min(limited?.newAvgSpeed ?? stats.avgSpeed, speedLimit),
     maxSpeed: Math.min(stats.maxSpeed, speedLimit),
   };
 }
@@ -322,9 +267,7 @@ function alignmentMap(alignment: RouteAlignment) {
 }
 
 function speedAt(loaded: LoadedActivity, index: number, cap: number | null) {
-  const processedSpeed = loaded.processedTrack.points[index]?.speed ?? 0;
-  const fallbackSpeed = positiveNumber(loaded.processedTrack.stats.avgSpeed) ?? 0;
-  const speed = processedSpeed || pauseConnectorAt(loaded.points, index, fallbackSpeed)?.speed || 0;
+  const speed = loaded.processedTrack.points[index]?.speed ?? 0;
   return Math.min(cap ?? Infinity, speed);
 }
 
@@ -337,16 +280,7 @@ function processedElapsedBetween(loaded: LoadedActivity, startIndex: number, end
     const point = loaded.processedTrack.points[index];
     const seconds = point.elapsedTime - previous.elapsedTime;
     const distance = point.distance - previous.distance;
-    if (seconds <= 0) {
-      const fallbackSpeed = positiveNumber(loaded.processedTrack.stats.avgSpeed) ?? 0;
-      const connector = pauseConnectorAt(loaded.points, index, fallbackSpeed);
-      if (connector) {
-        const speed = Math.min(connector.speed, cap ?? Infinity);
-        if (speed > 0) elapsed += connector.distance / speed * 3600;
-      }
-      continue;
-    }
-    if (distance < 0) continue;
+    if (seconds <= 0 || distance < 0) continue;
     const rawSpeed = distance / (seconds / 3600);
     elapsed += cap && rawSpeed > cap ? distance / cap * 3600 : seconds;
   }

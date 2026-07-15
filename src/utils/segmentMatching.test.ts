@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { applySpeedLimitToDistribution, calculateSpeedDistribution, generateProcessedTrack, type GPXPoint } from "@/utils/gpxParser";
 import type { ActivitySummary, LoadedActivity, Segment } from "@/types/segments";
-import { buildComparisonSeries, comparisonActivityPoints, comparisonSpeedDistribution, extractSegmentGeometry, matchActivityToSegment, privacyVisibleRange, segmentActivityCandidate, segmentBounds } from "@/utils/segmentMatching";
+import { buildAlignment, buildComparisonSeries, comparisonActivityPoints, comparisonSpeedDistribution, extractSegmentGeometry, matchActivityToSegment, privacyVisibleRange, segmentActivityCandidate, segmentBounds } from "@/utils/segmentMatching";
 
 const KM_PER_LAT = 111.195;
 
@@ -65,28 +65,54 @@ describe("segment extraction and matching", () => {
     expect(match!.coverage).toBeGreaterThan(0.98);
   });
 
-  it("retains a short connection between pause and resume fixes", () => {
-    const complete = route(0, 10, 0.1, 73.5, 60);
-    const paused = withPause(complete, 50);
-    const segment = segmentFrom(complete);
-    const match = matchActivityToSegment(segment, loaded(paused), "owner");
+  it("keeps the paused source activity aligned across its full selected range", () => {
+    const paused = withPause(route(0, 10, 0.05, 73.5, 60), 100);
+    const segment = segmentFrom(paused);
+    const match = matchActivityToSegment(segment, loaded(paused, { id: "source" }), "owner");
 
     expect(match).not.toBeNull();
     expect(match!.coverage).toBeGreaterThan(0.98);
-    expect(match!.matchedDistance).toBeCloseTo(segment.distance_km, 1);
-    expect(match!.elapsedTime).toBeCloseTo(600, 0);
-    expect(match!.avgSpeed).toBeCloseTo(60, 0);
+    expect(match!.alignment.activityStartIndex).toBeLessThan(5);
+    expect(match!.alignment.activityEndIndex).toBeGreaterThan(paused.length - 5);
   });
 
-  it("does not create a zero-time jump in comparisons across a short pause connection", () => {
-    const complete = route(0, 10, 0.1, 73.5, 60);
-    const paused = withPause(complete, 50);
-    const segment = segmentFrom(complete);
-    const normalMatch = matchActivityToSegment(segment, loaded(complete, { id: "normal" }), "owner")!;
-    const pausedMatch = matchActivityToSegment(segment, loaded(paused, { id: "paused" }), "owner")!;
-    const comparison = buildComparisonSeries(segment, normalMatch, pausedMatch, "owner")!;
+  it("does not collapse a covered section onto one nearest activity point", () => {
+    const geometry = extractSegmentGeometry(route(0, 0.5, 0.05), 0, 10);
+    const center = geometry[Math.floor(geometry.length / 2)];
+    const clusteredSamples = geometry.map((_, index) => ({
+      lat: center.lat,
+      lon: center.lon,
+      ele: center.ele,
+      distance: index * 0.1,
+      sourceIndex: index,
+    }));
+    const alignment = buildAlignment(geometry, clusteredSamples);
 
-    expect(comparison.points.at(-1)!.elapsedB).toBeCloseTo(comparison.points.at(-1)!.elapsedA, 0);
+    expect(alignment).not.toBeNull();
+    expect(alignment!.activityStartIndex).toBe(0);
+    expect(alignment!.activityEndIndex).toBe(geometry.length - 1);
+    expect(new Set(alignment!.points.map((point) => point.activityIndex)).size).toBe(alignment!.points.length);
+  });
+
+  it("prefers a continuous route over a closer dead-end candidate", () => {
+    const geometry = extractSegmentGeometry(route(0, 1, 0.05), 0, 20);
+    const continuousPass = geometry.map((point, index) => ({
+      ...point,
+      lon: point.lon + 0.001,
+      sourceIndex: index,
+    }));
+    const closerDeadEnd = {
+      ...geometry[0],
+      distance: geometry.at(-1)!.distance + 0.1,
+      sourceIndex: continuousPass.length,
+    };
+    const alignment = buildAlignment(geometry, [...continuousPass, closerDeadEnd]);
+
+    expect(alignment).not.toBeNull();
+    expect(alignment!.segmentStartIndex).toBe(0);
+    expect(alignment!.segmentEndIndex).toBe(geometry.length - 1);
+    expect(alignment!.activityStartIndex).toBe(0);
+    expect(alignment!.activityEndIndex).toBe(continuousPass.length - 1);
   });
 
   it("accepts GPS drift inside the 500 metre road corridor", () => {
