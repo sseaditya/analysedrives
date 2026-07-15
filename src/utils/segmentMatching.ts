@@ -13,6 +13,7 @@ import {
   calculateSpeedDistribution,
   calculateStats,
   haversineDistance,
+  MAX_SPEED_CAP,
   PAUSE_THRESHOLD,
   type GPXPoint,
   type SpeedBucket,
@@ -22,16 +23,12 @@ export const SEGMENT_SAMPLE_KM = 0.1;
 export const SEGMENT_MATCH_TOLERANCE_KM = 0.5;
 export const SEGMENT_MATCH_THRESHOLD = 0.8;
 export const SEGMENT_REJECTED_MINIMUM_COVERAGE = 0.5;
-export const SEGMENT_EFFORT_ALGORITHM_VERSION = 3;
+export const SEGMENT_EFFORT_ALGORITHM_VERSION = 4;
 
 const MATCH_GRID_SIZE_DEGREES = 0.002;
 const MATCH_GRID_SEARCH_RADIUS = 3;
 
-type Sample = SegmentGeometryPoint & {
-  sourceIndex: number;
-  time?: Date;
-  interpolatesPause?: boolean;
-};
+type Sample = SegmentGeometryPoint & { sourceIndex: number; time?: Date };
 
 function lerp(a: number, b: number, ratio: number) {
   return a + (b - a) * ratio;
@@ -59,12 +56,7 @@ export function privacyVisibleRange(points: GPXPoint[], hideRadius = 0): [number
 export function extractSegmentGeometry(points: GPXPoint[], startIndex: number, endIndex: number): SegmentGeometryPoint[] {
   const start = Math.max(0, Math.min(startIndex, endIndex));
   const end = Math.min(points.length - 1, Math.max(startIndex, endIndex));
-  return resamplePoints(points.slice(start, end + 1), SEGMENT_SAMPLE_KM).map(({
-    sourceIndex: _sourceIndex,
-    time: _time,
-    interpolatesPause: _interpolatesPause,
-    ...point
-  }) => point);
+  return resamplePoints(points.slice(start, end + 1), SEGMENT_SAMPLE_KM).map(({ sourceIndex: _sourceIndex, time: _time, ...point }) => point);
 }
 
 function resamplePoints(points: GPXPoint[], spacingKm = SEGMENT_SAMPLE_KM): Sample[] {
@@ -82,9 +74,6 @@ function resamplePoints(points: GPXPoint[], spacingKm = SEGMENT_SAMPLE_KM): Samp
     const ratio = span > 0 ? (target - distances[left]) / span : 0;
     const leftTime = points[left].time?.getTime();
     const rightTime = points[sourceIndex].time?.getTime();
-    const interpolatesPause = leftTime != null
-      && rightTime != null
-      && rightTime - leftTime > PAUSE_THRESHOLD * 1000;
     samples.push({
       lat: lerp(points[left].lat, points[sourceIndex].lat, ratio),
       lon: lerp(points[left].lon, points[sourceIndex].lon, ratio),
@@ -92,7 +81,6 @@ function resamplePoints(points: GPXPoint[], spacingKm = SEGMENT_SAMPLE_KM): Samp
       distance: target,
       sourceIndex: left,
       time: leftTime != null && rightTime != null ? new Date(lerp(leftTime, rightTime, ratio)) : points[left].time,
-      interpolatesPause,
     });
   }
   const last = points[points.length - 1];
@@ -159,29 +147,13 @@ function buildAlignment(segmentGeometry: SegmentGeometryPoint[], activitySamples
   }
   if (matches.length < 2) return null;
 
-  // A recording pause leaves no GPS points between its two boundary fixes.
-  // On a bend, distance resampling draws a chord across that hole, so the
-  // chord can sit outside the road corridor even though the fixes immediately
-  // before and after the pause both align with the same route. Keep those two
-  // observed runs connected instead of discarding one side of the effort.
-  const pausePrefix = new Array(activitySamples.length + 1).fill(0);
-  for (let index = 0; index < activitySamples.length; index++) {
-    pausePrefix[index + 1] = pausePrefix[index] + (activitySamples[index].interpolatesPause ? 1 : 0);
-  }
-  const crossesRecordingPause = (startIndex: number, endIndex: number) => {
-    const start = Math.max(0, Math.min(startIndex, endIndex));
-    const end = Math.min(activitySamples.length - 1, Math.max(startIndex, endIndex));
-    return pausePrefix[end + 1] - pausePrefix[start] > 0;
-  };
-
   let bestStart = 0;
   let bestEnd = 0;
   let runStart = 0;
   for (let i = 1; i < matches.length; i++) {
     const segmentGap = matches[i].segmentIndex - matches[i - 1].segmentIndex;
     const activityGap = matches[i].activityIndex - matches[i - 1].activityIndex;
-    const recordingPause = crossesRecordingPause(matches[i - 1].activityIndex, matches[i].activityIndex);
-    if ((segmentGap > 3 || activityGap > 6) && !recordingPause) runStart = i;
+    if (segmentGap > 3 || activityGap > 6) runStart = i;
     if (matches[i].segmentIndex - matches[runStart].segmentIndex > matches[bestEnd].segmentIndex - matches[bestStart].segmentIndex) {
       bestStart = runStart;
       bestEnd = i;
@@ -211,16 +183,90 @@ function publicSpeedLimit(loaded: LoadedActivity, viewerId: string): number | nu
   return limits.length ? Math.min(...limits) : null;
 }
 
+type PauseConnector = { distance: number; speed: number; elapsed: number };
+
+function rawActiveSpeed(points: GPXPoint[], endIndex: number): number | null {
+  if (endIndex <= 0 || endIndex >= points.length) return null;
+  const previous = points[endIndex - 1];
+  const point = points[endIndex];
+  const seconds = previous.time && point.time
+    ? (point.time.getTime() - previous.time.getTime()) / 1000
+    : 0;
+  if (seconds <= 0 || seconds > PAUSE_THRESHOLD) return null;
+  const distance = haversineDistance(previous.lat, previous.lon, point.lat, point.lon);
+  const speed = distance / (seconds / 3600);
+  return speed > 0 && speed <= MAX_SPEED_CAP ? speed : null;
+}
+
+function nearbyActiveSpeed(points: GPXPoint[], pauseEndIndex: number, fallbackSpeed: number): number {
+  const speeds: number[] = [];
+  for (let offset = 1; offset <= 5 && speeds.length < 2; offset++) {
+    const before = rawActiveSpeed(points, pauseEndIndex - offset);
+    const after = rawActiveSpeed(points, pauseEndIndex + offset);
+    if (before != null) speeds.push(before);
+    if (after != null) speeds.push(after);
+  }
+  if (speeds.length) return speeds.reduce((sum, speed) => sum + speed, 0) / speeds.length;
+  return fallbackSpeed > 0 && fallbackSpeed <= MAX_SPEED_CAP ? fallbackSpeed : 0;
+}
+
+function pauseConnectorAt(points: GPXPoint[], endIndex: number, fallbackSpeed: number): PauseConnector | null {
+  if (endIndex <= 0 || endIndex >= points.length) return null;
+  const previous = points[endIndex - 1];
+  const point = points[endIndex];
+  const seconds = previous.time && point.time
+    ? (point.time.getTime() - previous.time.getTime()) / 1000
+    : 0;
+  if (seconds <= PAUSE_THRESHOLD) return null;
+
+  // A short displacement at a pause boundary is the closest connection
+  // between the final pre-pause fix and the first post-pause fix. The shared
+  // stats code deliberately removes it together with the stopped duration,
+  // but a segment effort must retain this small piece of road.
+  const distance = haversineDistance(previous.lat, previous.lon, point.lat, point.lon);
+  if (distance <= 0 || distance > SEGMENT_MATCH_TOLERANCE_KM) return null;
+  const speed = nearbyActiveSpeed(points, endIndex, fallbackSpeed);
+  return {
+    distance,
+    speed,
+    elapsed: speed > 0 ? distance / speed * 3600 : 0,
+  };
+}
+
+function pauseConnectors(points: GPXPoint[], fallbackSpeed: number): PauseConnector[] {
+  const connectors: PauseConnector[] = [];
+  for (let index = 1; index < points.length; index++) {
+    const connector = pauseConnectorAt(points, index, fallbackSpeed);
+    if (connector) connectors.push(connector);
+  }
+  return connectors;
+}
+
 function displayedMetrics(points: GPXPoint[], speedLimit: number | null) {
   const stats = calculateStats(points);
+  const connectors = pauseConnectors(points, stats.avgSpeed);
+  const connectorDistance = connectors.reduce((sum, connector) => sum + connector.distance, 0);
+  const distance = stats.totalDistance + connectorDistance;
+  const connectorElapsed = connectors.reduce((sum, connector) => sum + connector.elapsed, 0);
   if (!speedLimit) {
-    return { distance: stats.totalDistance, elapsed: stats.totalTime, avgSpeed: stats.avgSpeed, maxSpeed: stats.maxSpeed };
+    const elapsed = stats.totalTime + connectorElapsed;
+    return {
+      distance,
+      elapsed,
+      avgSpeed: elapsed > 0 ? distance / (elapsed / 3600) : 0,
+      maxSpeed: stats.maxSpeed,
+    };
   }
   const limited = calculateLimitedStats(points, speedLimit);
+  const limitedConnectorElapsed = connectors.reduce((sum, connector) => {
+    const speed = Math.min(connector.speed, speedLimit);
+    return sum + (speed > 0 ? connector.distance / speed * 3600 : 0);
+  }, 0);
+  const elapsed = (limited?.simulatedTime ?? stats.totalTime) + limitedConnectorElapsed;
   return {
-    distance: stats.totalDistance,
-    elapsed: limited?.simulatedTime ?? stats.totalTime,
-    avgSpeed: Math.min(limited?.newAvgSpeed ?? stats.avgSpeed, speedLimit),
+    distance,
+    elapsed,
+    avgSpeed: Math.min(elapsed > 0 ? distance / (elapsed / 3600) : 0, speedLimit),
     maxSpeed: Math.min(stats.maxSpeed, speedLimit),
   };
 }
@@ -276,7 +322,9 @@ function alignmentMap(alignment: RouteAlignment) {
 }
 
 function speedAt(loaded: LoadedActivity, index: number, cap: number | null) {
-  const speed = loaded.processedTrack.points[index]?.speed ?? 0;
+  const processedSpeed = loaded.processedTrack.points[index]?.speed ?? 0;
+  const fallbackSpeed = positiveNumber(loaded.processedTrack.stats.avgSpeed) ?? 0;
+  const speed = processedSpeed || pauseConnectorAt(loaded.points, index, fallbackSpeed)?.speed || 0;
   return Math.min(cap ?? Infinity, speed);
 }
 
@@ -289,7 +337,16 @@ function processedElapsedBetween(loaded: LoadedActivity, startIndex: number, end
     const point = loaded.processedTrack.points[index];
     const seconds = point.elapsedTime - previous.elapsedTime;
     const distance = point.distance - previous.distance;
-    if (seconds <= 0 || distance < 0) continue;
+    if (seconds <= 0) {
+      const fallbackSpeed = positiveNumber(loaded.processedTrack.stats.avgSpeed) ?? 0;
+      const connector = pauseConnectorAt(loaded.points, index, fallbackSpeed);
+      if (connector) {
+        const speed = Math.min(connector.speed, cap ?? Infinity);
+        if (speed > 0) elapsed += connector.distance / speed * 3600;
+      }
+      continue;
+    }
+    if (distance < 0) continue;
     const rawSpeed = distance / (seconds / 3600);
     elapsed += cap && rawSpeed > cap ? distance / cap * 3600 : seconds;
   }

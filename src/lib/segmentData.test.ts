@@ -26,7 +26,7 @@ vi.mock("@/lib/segmentIndexing", () => ({
 }));
 
 vi.mock("@/utils/segmentMatching", () => ({
-  SEGMENT_EFFORT_ALGORITHM_VERSION: 2,
+  SEGMENT_EFFORT_ALGORITHM_VERSION: 4,
   SEGMENT_REJECTED_MINIMUM_COVERAGE: 0.5,
   segmentActivityCandidate: mocks.segmentActivityCandidate,
   matchActivityToSegment: mocks.matchActivityToSegment,
@@ -47,7 +47,7 @@ const segment: Segment = {
   ],
   distance_km: 1,
   bounds: { minLat: 18.5, minLon: 73.8, maxLat: 18.6, maxLon: 73.9 },
-  efforts_algorithm_version: 2,
+  efforts_algorithm_version: 4,
   created_at: "2026-07-15T00:00:00.000Z",
 };
 
@@ -173,6 +173,25 @@ describe("findSegmentMatches", () => {
     expect(mocks.fetchAccessibleActivities).not.toHaveBeenCalled();
     expect(mocks.indexSegmentEfforts).not.toHaveBeenCalled();
     expect(result.matches[0].activity.id).toBe("base-drive");
+  });
+
+  it("recomputes and refreshes efforts saved by an older matching algorithm", async () => {
+    const staleSegment = { ...segment, efforts_algorithm_version: 3 };
+    const base = activity("base-drive", "owner-1", true);
+    mocks.fetchAccessibleActivities.mockResolvedValue([base]);
+    mocks.loadActivityTrack.mockResolvedValue({
+      activity: base,
+      points: [],
+      processedTrack: { version: 4, points: [], stats: {}, previewCoordinates: [] },
+    });
+    mocks.matchActivityToSegment.mockImplementation((_segment: Segment, loaded: LoadedActivity) => liveMatch(loaded, 45));
+
+    const result = await findSegmentMatches(staleSegment, "owner-1");
+
+    expect(mocks.rpc).not.toHaveBeenCalled();
+    expect(result.persisted).toBe(false);
+    expect(result.matches.map((match) => match.activity.id)).toEqual(["base-drive"]);
+    expect(mocks.indexSegmentEfforts).toHaveBeenCalledWith({ segmentId: segment.id, force: true });
   });
 
   it("rejects a creator cache that is missing its origin drive", async () => {
