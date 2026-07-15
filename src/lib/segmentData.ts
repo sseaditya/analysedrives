@@ -66,10 +66,10 @@ async function calculateLiveMatches(segment: Segment, userId: string) {
   }
   matches.sort((a, b) => b.avgSpeed - a.avgSpeed || b.coverage - a.coverage);
   matches.forEach((match, index) => { match.rank = index + 1; });
-  return { matches, failures, persisted: false as const };
+  return { matches, failures, persisted: false as const, initializationError: undefined as string | undefined };
 }
 
-export async function findSegmentMatches(segment: Segment, userId: string): Promise<{ matches: SegmentLeaderboardEntry[]; failures: number; persisted: boolean }> {
+export async function findSegmentMatches(segment: Segment, userId: string): Promise<{ matches: SegmentLeaderboardEntry[]; failures: number; persisted: boolean; initializationError?: string }> {
   try {
     if ((segment.efforts_algorithm_version || 0) < SEGMENT_EFFORT_ALGORITHM_VERSION) {
       await indexSegmentEfforts({ segmentId: segment.id });
@@ -90,7 +90,8 @@ export async function findSegmentMatches(segment: Segment, userId: string): Prom
     return { matches, failures: 0, persisted: true };
   } catch (error) {
     console.warn("Persisted segment leaderboard unavailable; using live matching", error);
-    return calculateLiveMatches(segment, userId);
+    const live = await calculateLiveMatches(segment, userId);
+    return { ...live, initializationError: error instanceof Error ? error.message : String(error) };
   }
 }
 

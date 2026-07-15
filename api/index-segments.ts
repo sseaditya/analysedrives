@@ -21,12 +21,23 @@ const supabaseAnonKey = process.env.SUPABASE_PUBLISHABLE_KEY
   || process.env.VITE_SUPABASE_ANON_KEY;
 // Vercel Marketplace uses SUPABASE_SECRET_KEY. Older integrations use the
 // service-role JWT; Supabase-hosted environments may provide a named JSON map.
-const supabaseServiceRoleKey = process.env.SUPABASE_SECRET_KEY
-  || namedKey(process.env.SUPABASE_SECRET_KEYS)
-  || process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  || process.env.SUPABASE_SECRET_KEY
+  || namedKey(process.env.SUPABASE_SECRET_KEYS);
 const PUBLIC_VIEWER_ID = "00000000-0000-0000-0000-000000000000";
 
 const ACTIVITY_SELECT = "id, slug, user_id, title, file_path, created_at, public, speed_cap, hide_radius, stats";
+
+function errorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === "object") {
+    const value = error as { message?: unknown; details?: unknown; hint?: unknown; code?: unknown };
+    const parts = [value.message, value.details, value.hint, value.code]
+      .filter((part): part is string => typeof part === "string" && part.length > 0);
+    if (parts.length) return [...new Set(parts)].join(" · ");
+  }
+  return String(error || "Unknown indexing error");
+}
 
 function bearerToken(header?: string | string[]) {
   if (Array.isArray(header) || !header?.startsWith("Bearer ")) return null;
@@ -77,7 +88,7 @@ async function parseServerGPX(xml: string): Promise<GPXPoint[]> {
 }
 
 async function loadActivity(admin: any, activity: ActivitySummary): Promise<LoadedActivity> {
-  const { generateProcessedTrack, PROCESSED_TRACK_VERSION } = await import("../src/utils/gpxParser");
+  const { generateProcessedTrack, PROCESSED_TRACK_VERSION } = await import("../src/utils/gpxParser.js");
   const processedPath = activity.file_path.replace(/\.gpx$/i, "") + ".processed.json";
   const { data: processedBlob, error: processedError } = await admin.storage.from("gpx-files").download(processedPath);
   if (!processedError && processedBlob) {
@@ -99,7 +110,7 @@ async function loadActivity(admin: any, activity: ActivitySummary): Promise<Load
 }
 
 async function effortValues(segment: Segment, loaded: LoadedActivity) {
-  const { matchActivityToSegment, SEGMENT_EFFORT_ALGORITHM_VERSION } = await import("../src/utils/segmentMatching");
+  const { matchActivityToSegment, SEGMENT_EFFORT_ALGORITHM_VERSION } = await import("../src/utils/segmentMatching.js");
   const raw = matchActivityToSegment(segment, loaded, loaded.activity.user_id);
   if (!raw) return null;
   const publicMatch = loaded.activity.public
@@ -129,7 +140,7 @@ async function effortValues(segment: Segment, loaded: LoadedActivity) {
 }
 
 async function indexPair(admin: any, segment: Segment, loaded: LoadedActivity) {
-  const { coarseSegmentCandidate } = await import("../src/utils/segmentMatching");
+  const { coarseSegmentCandidate } = await import("../src/utils/segmentMatching.js");
   const candidate = coarseSegmentCandidate(segment, loaded.activity);
   const values = candidate ? await effortValues(segment, loaded) : null;
   if (!values) {
@@ -153,23 +164,26 @@ async function indexActivity(admin: any, activity: ActivitySummary) {
   const loaded = await loadActivity(admin, activity);
   let matched = 0;
   let failures = 0;
+  const failureDetails: string[] = [];
   for (const segment of (data || []) as Segment[]) {
     try {
       if (await indexPair(admin, segment, loaded)) matched++;
     } catch (error) {
       failures++;
+      failureDetails.push(`${segment.id}: ${errorMessage(error)}`);
       console.error("Could not index activity against segment", activity.id, segment.id, error);
     }
   }
-  return { checked: data?.length || 0, matched, failures };
+  return { checked: data?.length || 0, matched, failures, failureDetails: failureDetails.slice(0, 5) };
 }
 
 async function indexSegment(admin: any, segment: Segment, requesterId: string) {
-  const { coarseSegmentCandidate, SEGMENT_EFFORT_ALGORITHM_VERSION } = await import("../src/utils/segmentMatching");
+  const { coarseSegmentCandidate, SEGMENT_EFFORT_ALGORITHM_VERSION } = await import("../src/utils/segmentMatching.js");
   const { data, error } = await admin.from("activities").select(ACTIVITY_SELECT);
   if (error) throw error;
   let matched = 0;
   let failures = 0;
+  const failureDetails: string[] = [];
   // Index the requester's drives first. If a large global backfill approaches
   // the function deadline, the segment creator still gets a useful complete
   // personal leaderboard instead of only whichever row happened to run first.
@@ -193,6 +207,7 @@ async function indexSegment(admin: any, segment: Segment, requesterId: string) {
         if (result.value) matched++;
       } else {
         failures++;
+        failureDetails.push(errorMessage(result.reason));
         console.error("Could not index segment activity", segment.id, result.reason);
       }
     }
@@ -204,7 +219,7 @@ async function indexSegment(admin: any, segment: Segment, requesterId: string) {
     }).eq("id", segment.id);
     if (updateError) throw updateError;
   }
-  return { checked: activities.length, matched, failures };
+  return { checked: activities.length, matched, failures, failureDetails: failureDetails.slice(0, 5) };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -231,8 +246,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { data: authData, error: authError } = await auth.auth.getUser(token);
   if (authError || !authData.user) return res.status(401).json({ error: "Invalid authorization token" });
 
+  let stage = "load matching engine";
   try {
-    const { SEGMENT_EFFORT_ALGORITHM_VERSION } = await import("../src/utils/segmentMatching");
+    const { SEGMENT_EFFORT_ALGORITHM_VERSION } = await import("../src/utils/segmentMatching.js");
+    stage = "validate request";
     const activityId = typeof req.body?.activityId === "string" ? req.body.activityId : null;
     const segmentId = typeof req.body?.segmentId === "string" ? req.body.segmentId : null;
     if ((activityId ? 1 : 0) + (segmentId ? 1 : 0) !== 1) {
@@ -240,13 +257,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (activityId) {
+      stage = "load activity metadata";
       const { data, error } = await admin.from("activities").select(ACTIVITY_SELECT).eq("id", activityId).single();
       if (error || !data) return res.status(404).json({ error: "Activity not found" });
       const activity = data as ActivitySummary;
       if (activity.user_id !== authData.user.id) return res.status(403).json({ error: "Not allowed to index this activity" });
+      stage = "index activity";
       return res.status(200).json({ ok: true, ...(await indexActivity(admin, activity)) });
     }
 
+    stage = "load segment metadata";
     const { data, error } = await admin.from("segments").select("*").eq("id", segmentId!).single();
     if (error || !data) return res.status(404).json({ error: "Segment not found" });
     const segment = data as Segment;
@@ -254,9 +274,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!force && (segment.efforts_algorithm_version || 0) >= SEGMENT_EFFORT_ALGORITHM_VERSION) {
       return res.status(200).json({ ok: true, skipped: true });
     }
+    stage = "index segment drives";
     return res.status(200).json({ ok: true, ...(await indexSegment(admin, segment, authData.user.id)) });
   } catch (error) {
     console.error("Segment indexing failed", error);
-    return res.status(500).json({ error: error instanceof Error ? error.message : "Segment indexing failed" });
+    return res.status(500).json({ error: errorMessage(error), stage });
   }
 }

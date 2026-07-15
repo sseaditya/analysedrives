@@ -86,7 +86,7 @@ export default function SegmentLeaderboard() {
           ) : (
             <div className="space-y-3">
               {matchesQuery.data && matchesQuery.data.failures > 0 && <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm"><AlertTriangle className="h-4 w-4 text-amber-500" />{matchesQuery.data.failures} inaccessible drive{matchesQuery.data.failures === 1 ? " was" : "s were"} skipped.</div>}
-              {matchesQuery.data && !matchesQuery.data.persisted && <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm"><AlertTriangle className="h-4 w-4 text-amber-500" />Showing live results while the saved leaderboard is being initialized.</div>}
+              {matchesQuery.data && !matchesQuery.data.persisted && <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" /><span>Showing live results because the saved leaderboard could not be updated.{matchesQuery.data.initializationError && <span className="mt-1 block break-words text-xs text-muted-foreground">{matchesQuery.data.initializationError}</span>}</span></div>}
               {matches.map((match, index) => {
                 const selectedA = driveA === match.activity.id;
                 const selectedB = driveB === match.activity.id;
