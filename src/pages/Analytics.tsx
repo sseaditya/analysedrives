@@ -539,42 +539,42 @@ const Analytics = () => {
                 </div>
 
                 {/* Fastest consecutive-distance records */}
-                <div className="bg-card border border-border rounded-2xl p-6">
-                    <div className="mb-6">
-                        <h3 className="text-lg font-semibold flex items-center gap-2">
-                            <Trophy className="w-5 h-5 text-primary" />
+                <div className="bg-card border border-border rounded-xl p-4">
+                    <div className="mb-3">
+                        <h3 className="text-base font-semibold flex items-center gap-2">
+                            <Trophy className="w-4 h-4 text-primary" />
                             Your Fastest Consecutive Distances
                         </h3>
-                        <p className="text-sm text-muted-foreground mt-1">
+                        <p className="text-xs text-muted-foreground mt-0.5">
                             Personal records across your public and private activities in the selected period.
                         </p>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
                         {fastestDistanceRecords.map(({ distanceKm, record }) => (
-                            <div key={distanceKm} className="rounded-xl border border-border bg-muted/20 p-4 min-h-36">
-                                <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">
+                            <div key={distanceKm} className="rounded-lg border border-border bg-muted/20 px-3 py-2.5 min-w-0">
+                                <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide whitespace-nowrap">
                                     Fastest {distanceKm} km
                                 </span>
                                 {record ? (
                                     <>
-                                        <div className="flex items-baseline justify-between gap-3 mt-2">
-                                            <span className="text-2xl font-bold tabular-nums">{formatDuration(record.effort.elapsedTime)}</span>
-                                            <span className="text-sm font-semibold text-primary tabular-nums">{record.effort.averageSpeed.toFixed(1)} km/h</span>
+                                        <div className="mt-1">
+                                            <span className="block text-base font-semibold tabular-nums leading-tight">{formatDuration(record.effort.elapsedTime)}</span>
+                                            <span className="block text-xs font-medium text-primary tabular-nums mt-0.5 whitespace-nowrap">{record.effort.averageSpeed.toFixed(1)} km/h</span>
                                         </div>
                                         <button
                                             type="button"
                                             onClick={() => navigate(`/activity/${record.activity.slug ?? record.activity.id}`, { state: { from: '/analytics' } })}
-                                            className="mt-4 w-full flex items-center justify-between gap-3 text-left rounded-lg bg-background border border-border px-3 py-2 hover:border-primary/50 transition-colors"
+                                            className="mt-2 w-full flex items-center justify-between gap-1.5 text-left rounded-md bg-background border border-border px-2 py-1.5 hover:border-primary/50 transition-colors min-w-0"
                                         >
-                                            <span className="text-sm font-medium truncate">{record.activity.title}</span>
-                                            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground shrink-0">
+                                            <span className="text-xs font-medium truncate">{record.activity.title}</span>
+                                            <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground shrink-0">
                                                 {record.activity.public ? <Globe className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
                                                 {record.activity.public ? 'Public' : 'Private'}
                                             </span>
                                         </button>
                                     </>
                                 ) : (
-                                    <div className="h-24 flex items-center text-sm text-muted-foreground">
+                                    <div className="h-12 flex items-center text-xs text-muted-foreground">
                                         No qualifying ride yet.
                                     </div>
                                 )}
