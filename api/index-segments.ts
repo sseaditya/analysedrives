@@ -4,9 +4,26 @@ import { createClient } from "@supabase/supabase-js";
 import type { ActivitySummary, LoadedActivity, Segment } from "../src/types/segments";
 import type { GPXPoint, ProcessedTrack } from "../src/utils/gpxParser";
 
+function namedKey(json: string | undefined) {
+  if (!json) return undefined;
+  try {
+    const keys = JSON.parse(json) as Record<string, unknown>;
+    return typeof keys.default === "string" ? keys.default : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseAnonKey = process.env.SUPABASE_PUBLISHABLE_KEY
+  || namedKey(process.env.SUPABASE_PUBLISHABLE_KEYS)
+  || process.env.SUPABASE_ANON_KEY
+  || process.env.VITE_SUPABASE_ANON_KEY;
+// Vercel Marketplace uses SUPABASE_SECRET_KEY. Older integrations use the
+// service-role JWT; Supabase-hosted environments may provide a named JSON map.
+const supabaseServiceRoleKey = process.env.SUPABASE_SECRET_KEY
+  || namedKey(process.env.SUPABASE_SECRET_KEYS)
+  || process.env.SUPABASE_SERVICE_ROLE_KEY;
 const PUBLIC_VIEWER_ID = "00000000-0000-0000-0000-000000000000";
 
 const ACTIVITY_SELECT = "id, slug, user_id, title, file_path, created_at, public, speed_cap, hide_radius, stats";
@@ -197,7 +214,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method Not Allowed" });
   if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
-    return res.status(500).json({ error: "Server misconfiguration" });
+    return res.status(500).json({
+      error: "Server misconfiguration",
+      missing: [
+        !supabaseUrl && "SUPABASE_URL",
+        !supabaseAnonKey && "SUPABASE_PUBLISHABLE_KEY or SUPABASE_ANON_KEY",
+        !supabaseServiceRoleKey && "SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY",
+      ].filter(Boolean),
+    });
   }
   const token = bearerToken(req.headers.authorization);
   if (!token) return res.status(401).json({ error: "Missing authorization token" });
