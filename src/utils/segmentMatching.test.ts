@@ -33,7 +33,7 @@ function loaded(points: GPXPoint[], overrides: Partial<ActivitySummary> = {}): L
   const activity: ActivitySummary = {
     id: overrides.id ?? "drive", slug: null, user_id: overrides.user_id ?? "owner", title: overrides.title ?? "Drive",
     file_path: "owner/drive.gpx", created_at: "2026-01-01", public: overrides.public ?? true,
-    speed_cap: overrides.speed_cap ?? null, hide_radius: overrides.hide_radius ?? 0, stats: null,
+    speed_cap: overrides.speed_cap ?? null, hide_radius: overrides.hide_radius ?? 0, stats: overrides.stats ?? null,
   };
   return { activity, points, processedTrack: generateProcessedTrack(points) };
 }
@@ -48,8 +48,8 @@ describe("segment extraction and matching", () => {
 
   it("accepts GPS drift inside the road corridor", () => {
     const segment = segmentFrom(route(0, 10));
-    const drifted = route(0, 10, 0.04, 73.5005);
-    expect(matchActivityToSegment(segment, loaded(drifted), "owner")?.coverage).toBeGreaterThan(0.95);
+    const drifted = route(0, 10, 0.04, 73.5012);
+    expect(matchActivityToSegment(segment, loaded(drifted), "owner")?.coverage).toBeGreaterThan(0.98);
   });
 
   it("rejects the reverse direction", () => {
@@ -82,6 +82,20 @@ describe("segment extraction and matching", () => {
     expect(match!.avgSpeed).toBeLessThanOrEqual(80);
   });
 
+  it("uses the lower recorded top speed for public metrics and elapsed time", () => {
+    const points = route(0, 10, 0.05, 73.5, 120);
+    const segment = segmentFrom(points);
+    const match = matchActivityToSegment(segment, loaded(points, {
+      user_id: "other",
+      speed_cap: 100,
+      stats: { maxSpeed: 80 },
+    }), "viewer");
+    expect(match).not.toBeNull();
+    expect(match!.maxSpeed).toBeLessThanOrEqual(80);
+    expect(match!.avgSpeed).toBeLessThanOrEqual(80);
+    expect(match!.elapsedTime).toBeGreaterThanOrEqual(match!.matchedDistance / 80 * 3600 - 1);
+  });
+
   it("builds a common-distance comparison for two qualifying drives", () => {
     const segment = segmentFrom(route(0, 10));
     const a = matchActivityToSegment(segment, loaded(route(-2, 12, 0.05, 73.5, 70), { id: "a" }), "owner")!;
@@ -90,5 +104,21 @@ describe("segment extraction and matching", () => {
     expect(comparison).not.toBeNull();
     expect(comparison!.distance).toBeGreaterThan(9.5);
     expect(comparison!.points.some((point) => point.speedB > point.speedA)).toBe(true);
+  });
+
+  it("uses processed speeds and capped elapsed time in public comparisons", () => {
+    const points = route(0, 10, 0.05, 73.5, 120);
+    const segment = segmentFrom(points);
+    const a = matchActivityToSegment(segment, loaded(points, { id: "a" }), "viewer")!;
+    const b = matchActivityToSegment(segment, loaded(points, {
+      id: "b",
+      user_id: "other",
+      speed_cap: 100,
+      stats: { maxSpeed: 80 },
+    }), "viewer")!;
+    const comparison = buildComparisonSeries(segment, a, b, "viewer");
+    expect(comparison).not.toBeNull();
+    expect(Math.max(...comparison!.points.map((point) => point.speedB))).toBeLessThanOrEqual(80);
+    expect(comparison!.points.at(-1)!.elapsedB).toBeGreaterThanOrEqual(comparison!.distance / 80 * 3600 - 1);
   });
 });

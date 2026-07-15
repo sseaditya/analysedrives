@@ -33,7 +33,9 @@ with check (
 );
 
 create or replace function public.protect_segment_geometry()
-returns trigger language plpgsql security invoker as $$
+returns trigger language plpgsql security invoker
+set search_path = public
+as $$
 begin
   if new.geometry is distinct from old.geometry
     or new.distance_km is distinct from old.distance_km

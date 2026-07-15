@@ -7,10 +7,10 @@ import type {
   SegmentGeometryPoint,
   SegmentMatch,
 } from "@/types/segments";
-import { haversineDistance, PAUSE_THRESHOLD, type GPXPoint } from "@/utils/gpxParser";
+import { calculateLimitedStats, calculateStats, haversineDistance, type GPXPoint } from "@/utils/gpxParser";
 
 export const SEGMENT_SAMPLE_KM = 0.1;
-export const SEGMENT_MATCH_TOLERANCE_KM = 0.1;
+export const SEGMENT_MATCH_TOLERANCE_KM = 0.15;
 export const SEGMENT_MATCH_THRESHOLD = 0.8;
 
 type Sample = SegmentGeometryPoint & { sourceIndex: number; time?: Date };
@@ -71,6 +71,17 @@ function resamplePoints(points: GPXPoint[], spacingKm = SEGMENT_SAMPLE_KM): Samp
   const last = points[points.length - 1];
   samples.push({ lat: last.lat, lon: last.lon, ele: last.ele ?? null, distance: total, sourceIndex: points.length - 1, time: last.time });
   return samples;
+}
+
+function processedMatchingPoints(loaded: LoadedActivity): GPXPoint[] {
+  return loaded.points.map((point, index) => {
+    const processed = loaded.processedTrack.points[index];
+    return {
+      ...point,
+      lat: Number.isFinite(processed?.smoothedLat) ? processed.smoothedLat : point.lat,
+      lon: Number.isFinite(processed?.smoothedLon) ? processed.smoothedLon : point.lon,
+    };
+  });
 }
 
 function gridKey(lat: number, lon: number) {
@@ -143,22 +154,32 @@ function buildAlignment(segmentGeometry: SegmentGeometryPoint[], activitySamples
   };
 }
 
-function displayedMetrics(points: GPXPoint[], speedCap: number | null) {
-  let distance = 0;
-  let elapsed = 0;
-  let maxSpeed = 0;
-  for (let i = 1; i < points.length; i++) {
-    const segmentDistance = haversineDistance(points[i - 1].lat, points[i - 1].lon, points[i].lat, points[i].lon);
-    const seconds = points[i - 1].time && points[i].time ? (points[i].time!.getTime() - points[i - 1].time!.getTime()) / 1000 : 0;
-    if (seconds <= 0 || seconds > PAUSE_THRESHOLD) continue;
-    const rawSpeed = segmentDistance / (seconds / 3600);
-    const speed = speedCap ? Math.min(rawSpeed, speedCap) : rawSpeed;
-    distance += segmentDistance;
-    elapsed += speed > 0 ? (segmentDistance / speed) * 3600 : seconds;
-    maxSpeed = Math.max(maxSpeed, speed);
+function positiveNumber(value: unknown): number | null {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : null;
+}
+
+function publicSpeedLimit(loaded: LoadedActivity, viewerId: string): number | null {
+  if (loaded.activity.user_id === viewerId || !loaded.activity.public) return null;
+  const privacyCap = positiveNumber(loaded.activity.speed_cap);
+  const recordedTopSpeed = positiveNumber(loaded.activity.stats?.maxSpeed)
+    ?? positiveNumber(loaded.processedTrack.stats.maxSpeed);
+  const limits = [privacyCap, recordedTopSpeed].filter((value): value is number => value != null);
+  return limits.length ? Math.min(...limits) : null;
+}
+
+function displayedMetrics(points: GPXPoint[], speedLimit: number | null) {
+  const stats = calculateStats(points);
+  if (!speedLimit) {
+    return { distance: stats.totalDistance, elapsed: stats.totalTime, avgSpeed: stats.avgSpeed, maxSpeed: stats.maxSpeed };
   }
-  const average = elapsed > 0 ? distance / (elapsed / 3600) : 0;
-  return { distance, elapsed, avgSpeed: speedCap ? Math.min(average, speedCap) : average, maxSpeed };
+  const limited = calculateLimitedStats(points, speedLimit);
+  return {
+    distance: stats.totalDistance,
+    elapsed: limited?.simulatedTime ?? stats.totalTime,
+    avgSpeed: Math.min(limited?.newAvgSpeed ?? stats.avgSpeed, speedLimit),
+    maxSpeed: Math.min(stats.maxSpeed, speedLimit),
+  };
 }
 
 export function matchActivityToSegment(segment: Segment, loaded: LoadedActivity, viewerId: string): SegmentMatch | null {
@@ -168,19 +189,21 @@ export function matchActivityToSegment(segment: Segment, loaded: LoadedActivity,
     : [0, loaded.points.length - 1] as [number, number];
   if (range[1] <= range[0]) return null;
   const visiblePoints = loaded.points.slice(range[0], range[1] + 1);
-  const samples = resamplePoints(visiblePoints);
+  const visibleMatchingPoints = processedMatchingPoints(loaded).slice(range[0], range[1] + 1);
+  const samples = resamplePoints(visibleMatchingPoints);
   const alignment = buildAlignment(segment.geometry, samples);
   if (!alignment) return null;
 
-  const coveredDistance = segment.geometry[alignment.segmentEndIndex].distance - segment.geometry[alignment.segmentStartIndex].distance;
+  const coveredStart = Math.max(0, segment.geometry[alignment.segmentStartIndex].distance - SEGMENT_MATCH_TOLERANCE_KM);
+  const coveredEnd = Math.min(segment.distance_km, segment.geometry[alignment.segmentEndIndex].distance + SEGMENT_MATCH_TOLERANCE_KM);
+  const coveredDistance = Math.max(0, coveredEnd - coveredStart);
   const coverage = segment.distance_km > 0 ? coveredDistance / segment.distance_km : 0;
   if (coverage + 1e-6 < SEGMENT_MATCH_THRESHOLD) return null;
 
   const startSource = samples[alignment.activityStartIndex].sourceIndex;
   const endSource = samples[alignment.activityEndIndex].sourceIndex;
   const matchedPoints = visiblePoints.slice(startSource, Math.min(visiblePoints.length, endSource + 2));
-  const cap = !isOwner && loaded.activity.public ? loaded.activity.speed_cap : null;
-  const metrics = displayedMetrics(matchedPoints, cap);
+  const metrics = displayedMetrics(matchedPoints, publicSpeedLimit(loaded, viewerId));
   const offsetAlignment: RouteAlignment = {
     ...alignment,
     activityStartIndex: startSource + range[0],
@@ -207,12 +230,25 @@ function alignmentMap(alignment: RouteAlignment) {
   return new Map(alignment.points.map((point) => [point.segmentIndex, point.activityIndex]));
 }
 
-function speedAt(points: GPXPoint[], index: number, cap: number | null) {
-  if (index <= 0 || index >= points.length) return 0;
-  const seconds = points[index - 1].time && points[index].time ? (points[index].time!.getTime() - points[index - 1].time!.getTime()) / 1000 : 0;
-  if (seconds <= 0 || seconds > PAUSE_THRESHOLD) return 0;
-  const distance = haversineDistance(points[index - 1].lat, points[index - 1].lon, points[index].lat, points[index].lon);
-  return Math.min(cap ?? Infinity, distance / (seconds / 3600));
+function speedAt(loaded: LoadedActivity, index: number, cap: number | null) {
+  const speed = loaded.processedTrack.points[index]?.speed ?? 0;
+  return Math.min(cap ?? Infinity, speed);
+}
+
+function processedElapsedBetween(loaded: LoadedActivity, startIndex: number, endIndex: number, cap: number | null) {
+  let elapsed = 0;
+  const start = Math.max(0, Math.min(startIndex, endIndex));
+  const end = Math.min(loaded.processedTrack.points.length - 1, Math.max(startIndex, endIndex));
+  for (let index = start + 1; index <= end; index++) {
+    const previous = loaded.processedTrack.points[index - 1];
+    const point = loaded.processedTrack.points[index];
+    const seconds = point.elapsedTime - previous.elapsedTime;
+    const distance = point.distance - previous.distance;
+    if (seconds <= 0 || distance < 0) continue;
+    const rawSpeed = distance / (seconds / 3600);
+    elapsed += cap && rawSpeed > cap ? distance / cap * 3600 : seconds;
+  }
+  return elapsed;
 }
 
 export function buildComparisonSeries(segment: Segment, matchA: SegmentMatch, matchB: SegmentMatch, viewerId: string): ComparisonSeries | null {
@@ -224,8 +260,10 @@ export function buildComparisonSeries(segment: Segment, matchA: SegmentMatch, ma
   const points: ComparisonSeries["points"] = [];
   let elapsedA = 0;
   let elapsedB = 0;
-  const capA = matchA.activity.user_id !== viewerId && matchA.activity.public ? matchA.activity.speed_cap : null;
-  const capB = matchB.activity.user_id !== viewerId && matchB.activity.public ? matchB.activity.speed_cap : null;
+  const capA = publicSpeedLimit(matchA.loadedActivity, viewerId);
+  const capB = publicSpeedLimit(matchB.loadedActivity, viewerId);
+  let previousIndexA: number | null = null;
+  let previousIndexB: number | null = null;
   for (let segmentIndex = start; segmentIndex <= end; segmentIndex++) {
     const indexA = mapA.get(segmentIndex);
     const indexB = mapB.get(segmentIndex);
@@ -233,12 +271,11 @@ export function buildComparisonSeries(segment: Segment, matchA: SegmentMatch, ma
     const pointA = matchA.loadedActivity.points[indexA];
     const pointB = matchB.loadedActivity.points[indexB];
     if (!pointA || !pointB) continue;
-    const speedA = speedAt(matchA.loadedActivity.points, indexA, capA);
-    const speedB = speedAt(matchB.loadedActivity.points, indexB, capB);
+    const speedA = speedAt(matchA.loadedActivity, indexA, capA);
+    const speedB = speedAt(matchB.loadedActivity, indexB, capB);
     if (points.length) {
-      const step = segment.geometry[segmentIndex].distance - segment.geometry[points[points.length - 1].segmentIndex].distance;
-      if (speedA > 0) elapsedA += step / speedA * 3600;
-      if (speedB > 0) elapsedB += step / speedB * 3600;
+      elapsedA += processedElapsedBetween(matchA.loadedActivity, previousIndexA!, indexA, capA);
+      elapsedB += processedElapsedBetween(matchB.loadedActivity, previousIndexB!, indexB, capB);
     }
     points.push({
       segmentIndex,
@@ -251,6 +288,8 @@ export function buildComparisonSeries(segment: Segment, matchA: SegmentMatch, ma
       elapsedA,
       elapsedB,
     });
+    previousIndexA = indexA;
+    previousIndexB = indexB;
   }
   if (points.length < 2) return null;
   return { startSegmentIndex: start, endSegmentIndex: end, distance: points[points.length - 1].distance, points };

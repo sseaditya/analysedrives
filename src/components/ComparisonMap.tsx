@@ -14,7 +14,11 @@ export default function ComparisonMap({ segment, series, cursor }: { segment: Se
 
   useEffect(() => {
     if (!elementRef.current || mapRef.current) return;
-    mapRef.current = L.map(elementRef.current, { preferCanvas: true, scrollWheelZoom: true });
+    // The comparison only renders three short paths and two markers. Leaflet's
+    // canvas renderer keeps those layers in a linked draw list, which can be
+    // left in an invalid state when React tears down and recreates this effect.
+    // SVG is inexpensive here and removes that renderer lifecycle race.
+    mapRef.current = L.map(elementRef.current, { preferCanvas: false, scrollWheelZoom: true });
     return () => { mapRef.current?.remove(); mapRef.current = null; };
   }, []);
 
@@ -37,8 +41,8 @@ export default function ComparisonMap({ segment, series, cursor }: { segment: Se
     L.polyline(reference, { color: "#ffffff", weight: 8, opacity: 0.25, dashArray: "6 8" }).addTo(group);
     L.polyline(routeA, { color: "#f97316", weight: 5, opacity: 0.75 }).addTo(group);
     L.polyline(routeB, { color: "#3b82f6", weight: 5, opacity: 0.65 }).addTo(group);
-    markerARef.current = L.circleMarker(routeA[0], { radius: 9, color: "white", weight: 3, fillColor: "#f97316", fillOpacity: 1 }).bindTooltip("Drive 1", { permanent: false }).addTo(map);
-    markerBRef.current = L.circleMarker(routeB[0], { radius: 7, color: "white", weight: 2, fillColor: "#3b82f6", fillOpacity: 1 }).bindTooltip("Drive 2", { permanent: false }).addTo(map);
+    markerARef.current = L.circleMarker(routeA[0], { radius: 9, color: "white", weight: 3, fillColor: "#f97316", fillOpacity: 1 }).bindTooltip("Drive 1", { permanent: false }).addTo(group);
+    markerBRef.current = L.circleMarker(routeB[0], { radius: 7, color: "white", weight: 2, fillColor: "#3b82f6", fillOpacity: 1 }).bindTooltip("Drive 2", { permanent: false }).addTo(group);
     map.fitBounds(L.latLngBounds([...routeA, ...routeB]), { padding: [40, 40], maxZoom: 16 });
     return () => { group.remove(); markerARef.current = null; markerBRef.current = null; };
   }, [segment, series]);
