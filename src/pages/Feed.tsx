@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { MapPin, LogOut, Clock, Activity, Search, Globe, Car, BarChart3, ChevronLeft, ChevronRight, LogIn } from "lucide-react";
+import { MapPin, LogOut, Clock, Activity, Search, Globe, Car, BarChart3, ChevronLeft, ChevronRight, LogIn, Route } from "lucide-react";
 import { formatDistance } from "@/utils/gpxParser";
 import { supabase } from "@/lib/supabase";
 import ActivityMiniMap from "@/components/ActivityMiniMap";
@@ -196,6 +196,10 @@ const Feed = () => {
                     <div className="flex items-center gap-4 flex-shrink-0">
                         {user ? (
                             <>
+                                <Button variant="ghost" size="sm" onClick={() => navigate('/segments')} className="text-muted-foreground hover:text-primary gap-2">
+                                    <Route className="w-4 h-4" />
+                                    <span className="hidden md:inline">Segments</span>
+                                </Button>
                                 <Button
                                     variant="ghost"
                                     size="sm"

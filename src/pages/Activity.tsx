@@ -3,7 +3,7 @@ import { Pencil, Trash2, Loader2, ArrowLeft, Globe, Lock, Fuel, Check, LogIn, Ma
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import GPSStats from "@/components/GPSStats";
-import { GPXStats, GPXPoint, parseGPX, calculateStats, ProcessedTrack, generateProcessedTrack, PROCESSED_TRACK_VERSION } from "@/utils/gpxParser";
+import { GPXStats, GPXPoint } from "@/utils/gpxParser";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,6 +14,9 @@ import VideoGenerator from "@/components/VideoGenerator";
 import { createMapShareImage, createTransparentRouteShareImage, downloadImageFile } from "@/utils/shareImage";
 import { toast } from "sonner";
 import { useTheme } from "@/components/ThemeProvider";
+import SegmentCreator from "@/components/SegmentCreator";
+import { loadActivityTrack } from "@/lib/activityData";
+import type { ActivitySummary } from "@/types/segments";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -165,89 +168,22 @@ const Activity = () => {
             });
           }
 
-          let points: GPXPoint[] = [];
-          let stats: GPXStats;
-          let previewCoordinates: [number, number][];
-
-          // 2. Try to download pre-processed JSON first
-          // Robust naming convention
-          const processedPath = record.file_path.replace(/\.gpx$/i, '') + '.processed.json';
-
-          // Check if processed file exists before downloading (avoids 400 errors in console)
-          const pathParts = processedPath.split('/');
-          const fileName = pathParts.pop()!;
-          const folder = pathParts.join('/');
-          const { data: fileList } = await supabase.storage
-            .from('gpx-files')
-            .list(folder, { search: fileName, limit: 1 });
-
-          const processedExists = fileList && fileList.some(f => f.name === fileName);
-
-          const { data: processedData, error: processedError } = processedExists
-            ? await supabase.storage.from('gpx-files').download(processedPath)
-            : { data: null, error: null };
-
-          let useFallback = true;
-          if (!processedError && processedData) {
-            const text = await processedData.text();
-            try {
-              const processedTrack = JSON.parse(text) as ProcessedTrack;
-
-              if (processedTrack.version === PROCESSED_TRACK_VERSION) {
-                // HIT: Use cached data
-                points = processedTrack.points.map(p => ({
-                  lat: p.lat,
-                  lon: p.lon,
-                  ele: p.ele,
-                  time: p.time ? new Date(p.time) : undefined,
-                }));
-                stats = processedTrack.stats;
-                useFallback = false;
-              } else {
-                console.log(`Version mismatch: Cached ${processedTrack.version} vs App ${PROCESSED_TRACK_VERSION}. Falling back.`);
-              }
-            } catch (e) {
-              console.warn("Error parsing processed track JSON", e);
-            }
-          }
-
-          if (useFallback) {
-            // MISS: Fallback to raw GPX
-            const { data: fileData, error: storageError } = await supabase.storage
-              .from('gpx-files')
-              .download(record.file_path);
-
-            if (storageError) {
-              console.error("Storage Error:", storageError);
-              setErrorDetails(`Storage Error: ${storageError.message}`);
-              setAccessDenied(true);
-              setLoading(false);
-              return;
-            }
-
-            // 3. Parse Raw GPX & Lazily Cache
-            const text = await fileData.text();
-            points = parseGPX(text);
-
-            // LAZY GENERATION: Create full processed track now
-            const processedTrack = generateProcessedTrack(points);
-            stats = processedTrack.stats;
-
-            // Fire-and-forget upload to cache for next time
-            // Use robust naming convention
-            const cachePath = record.file_path.replace(/\.gpx$/i, '') + '.processed.json';
-            supabase.storage
-              .from('gpx-files')
-              .upload(cachePath, new Blob([JSON.stringify(processedTrack)], { type: 'application/json' }))
-              .then(({ error }) => {
-                if (error) console.warn("Background cache upload failed:", error);
-                else console.log("Lazily cached processed track:", cachePath);
-              });
-          }
+          const loaded = await loadActivityTrack({
+            id: record.id,
+            slug: record.slug,
+            user_id: record.user_id,
+            title: record.title,
+            file_path: record.file_path,
+            created_at: record.created_at,
+            public: record.public,
+            speed_cap: record.speed_cap,
+            hide_radius: record.hide_radius,
+            stats: record.stats,
+          } as ActivitySummary);
 
           setData({
-            stats,
-            points,
+            stats: loaded.processedTrack.stats,
+            points: loaded.points,
             fileName: record.title
           });
 
@@ -408,6 +344,14 @@ const Activity = () => {
             </div>
             {isOwner && metadata && (
               <>
+                {metadata.public && data && (
+                  <SegmentCreator
+                    activityId={metadata.id}
+                    activityTitle={metadata.title}
+                    points={data.points}
+                    hideRadius={metadata.hide_radius ?? 0}
+                  />
+                )}
                 <Button
                   variant="ghost"
                   size="icon"

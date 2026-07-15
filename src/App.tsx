@@ -20,6 +20,9 @@ import HowTo from "./pages/HowTo";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
 import About from "./pages/About";
+import Segments from "./pages/Segments";
+import SegmentLeaderboard from "./pages/SegmentLeaderboard";
+import SegmentCompare from "./pages/SegmentCompare";
 
 const App = () => (
   <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
@@ -53,6 +56,9 @@ const App = () => (
               <Route path="/strava-callback" element={<StravaCallback />} />
               <Route path="/how-to" element={<HowTo />} />
               <Route path="/about" element={<About />} />
+              <Route path="/segments" element={<ProtectedRoute><Segments /></ProtectedRoute>} />
+              <Route path="/segments/:segmentId" element={<ProtectedRoute><SegmentLeaderboard /></ProtectedRoute>} />
+              <Route path="/segments/:segmentId/compare" element={<ProtectedRoute><SegmentCompare /></ProtectedRoute>} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/privacy" element={<Privacy />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
