@@ -6,7 +6,7 @@ import type {
   Segment,
   SegmentGeometryPoint,
   SegmentMatch,
-} from "../types/segments";
+} from "../types/segments.js";
 import {
   applySpeedLimitToDistribution,
   calculateLimitedStats,
@@ -15,7 +15,7 @@ import {
   haversineDistance,
   type GPXPoint,
   type SpeedBucket,
-} from "./gpxParser";
+} from "./gpxParser.js";
 
 export const SEGMENT_SAMPLE_KM = 0.1;
 export const SEGMENT_MATCH_TOLERANCE_KM = 0.25;

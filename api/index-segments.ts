@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
-import type { ActivitySummary, LoadedActivity, Segment } from "../src/types/segments";
-import type { GPXPoint, ProcessedTrack } from "../src/utils/gpxParser";
+import type { ActivitySummary, LoadedActivity, Segment } from "../src/types/segments.js";
+import type { GPXPoint, ProcessedTrack } from "../src/utils/gpxParser.js";
 
 function namedKey(json: string | undefined) {
   if (!json) return undefined;

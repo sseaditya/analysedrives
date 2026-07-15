@@ -1,4 +1,4 @@
-import type { GPXPoint, GPXStats, ProcessedTrack } from "../utils/gpxParser";
+import type { GPXPoint, GPXStats, ProcessedTrack } from "../utils/gpxParser.js";
 
 export interface SegmentGeometryPoint {
   lat: number;
