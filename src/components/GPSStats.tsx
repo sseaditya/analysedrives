@@ -191,8 +191,19 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
 
   const tabs = [
     { id: "overview", label: "Overview", icon: MapPin },
-    { id: "structure", label: "Route Structure", icon: Spline },
+    { id: "structure", label: "Route Details", icon: Spline },
   ];
+
+  const fastestDistanceEfforts = useMemo(() => {
+    return (stats.fastestDistances ?? []).map((effort) => {
+      if (isOwner || !speedCap || effort.averageSpeed <= speedCap) return effort;
+      return {
+        ...effort,
+        averageSpeed: speedCap,
+        elapsedTime: (effort.distanceKm / speedCap) * 3600,
+      };
+    });
+  }, [stats.fastestDistances, isOwner, speedCap]);
 
   // Calculate stats for the selected zoom range
   const { filteredPoints, subsetStats } = useMemo(() => {
@@ -978,6 +989,33 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
           {/* ROUTE STRUCTURE TAB (Consolidated & Refined) */}
           {activeTab === "structure" && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+
+              {fastestDistanceEfforts.length > 0 && (
+                <div>
+                  <h3 className="text-xl font-bold mb-2 flex items-center gap-2">
+                    <Gauge className="w-6 h-6 text-primary" />
+                    Fastest Consecutive Distance
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    Quickest continuous window for each distance completed by this ride.
+                  </p>
+                  <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+                    {fastestDistanceEfforts.map((effort) => (
+                      <div key={effort.distanceKm} className="bg-card border border-border rounded-xl p-4 shadow-sm">
+                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                          Fastest {effort.distanceKm} km
+                        </span>
+                        <span className="block text-xl font-semibold tabular-nums mt-2">
+                          {formatDuration(effort.elapsedTime)}
+                        </span>
+                        <span className="block text-sm text-primary tabular-nums mt-1">
+                          {formatSpeed(effort.averageSpeed)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* SECTION 1: ALL METRICS (Consolidated) */}
               <div>

@@ -96,8 +96,20 @@ export interface GPXStats {
   hardAccelPoints?: [number, number, number][]; // [lat, lon, m/s²]
   hardBrakePoints?: [number, number, number][]; // [lat, lon, m/s²]
   speedDistribution?: SpeedBucket[];
+  fastestDistances?: FastestDistanceEffort[];
 }
 
+export const FASTEST_DISTANCE_TARGETS = [10, 20, 50, 100, 200, 500] as const;
+
+export interface FastestDistanceEffort {
+  distanceKm: number;
+  elapsedTime: number; // seconds
+  averageSpeed: number; // km/h
+  startDistanceKm: number;
+  endDistanceKm: number;
+  startPointIndex: number;
+  endPointIndex: number;
+}
 
 export interface SpeedBucket {
   range: string;
@@ -107,7 +119,7 @@ export interface SpeedBucket {
 }
 
 // Current version for cache invalidation - increment when parsing logic changes
-export const PROCESSED_TRACK_VERSION = 4;
+export const PROCESSED_TRACK_VERSION = 5;
 
 // Pre-computed point data for cached tracks
 export interface ProcessedPoint {
@@ -242,6 +254,112 @@ export function calculateSpeedDistribution(points: GPXPoint[], bucketSize: numbe
   }
 
   return result;
+}
+
+interface DistanceTimeVertex {
+  distance: number;
+  time: number;
+  pointIndex: number;
+}
+
+function interpolateVertexTime(
+  vertices: DistanceTimeVertex[],
+  distance: number,
+  edge: "start" | "end",
+): { time: number; pointIndex: number } {
+  let low = 0;
+  let high = vertices.length - 1;
+  while (low < high) {
+    const mid = Math.floor((low + high) / 2);
+    if (vertices[mid].distance < distance) low = mid + 1;
+    else high = mid;
+  }
+
+  const right = vertices[low];
+  if (right.distance === distance) {
+    // A stationary pause creates multiple timestamps at one distance. A best
+    // window may start after it, but a window ending there stops before it.
+    let exactIndex = low;
+    if (edge === "start") {
+      while (exactIndex + 1 < vertices.length && vertices[exactIndex + 1].distance === distance) exactIndex++;
+    }
+    return { time: vertices[exactIndex].time, pointIndex: vertices[exactIndex].pointIndex };
+  }
+  if (low === 0) return { time: right.time, pointIndex: right.pointIndex };
+  const left = vertices[low - 1];
+  const span = right.distance - left.distance;
+  const ratio = span > 0 ? (distance - left.distance) / span : 0;
+  return {
+    time: left.time + ratio * (right.time - left.time),
+    pointIndex: ratio <= 0.5 ? left.pointIndex : right.pointIndex,
+  };
+}
+
+/** Finds the quickest exact-length windows inside continuous recorded sections. */
+export function calculateFastestDistances(
+  points: GPXPoint[],
+  targets: readonly number[] = FASTEST_DISTANCE_TARGETS,
+): FastestDistanceEffort[] {
+  if (points.length < 2) return [];
+
+  const segments = calculateRobustSpeeds(points);
+  const sections: DistanceTimeVertex[][] = [];
+  let section: DistanceTimeVertex[] = [{ distance: 0, time: 0, pointIndex: 0 }];
+
+  segments.forEach((segment, index) => {
+    if (segment.time <= 0 || (segment.time > PAUSE_THRESHOLD && segment.distance > 0.1)) {
+      if (section.length > 1) sections.push(section);
+      section = [{ distance: 0, time: 0, pointIndex: index + 1 }];
+      return;
+    }
+    const previous = section[section.length - 1];
+    section.push({
+      distance: previous.distance + segment.distance,
+      time: previous.time + segment.time,
+      pointIndex: index + 1,
+    });
+  });
+  if (section.length > 1) sections.push(section);
+
+  const efforts: FastestDistanceEffort[] = [];
+  for (const target of targets) {
+    let best: FastestDistanceEffort | null = null;
+
+    for (const vertices of sections) {
+      const sectionDistance = vertices[vertices.length - 1].distance;
+      if (sectionDistance + 1e-9 < target) continue;
+
+      // A piecewise-linear optimum occurs when either window edge meets a
+      // recorded segment boundary, so these candidates preserve exact km.
+      const lastStart = Math.max(0, sectionDistance - target);
+      const candidates = new Set<number>([0, lastStart]);
+      for (const vertex of vertices) {
+        if (vertex.distance <= lastStart) candidates.add(vertex.distance);
+        const shifted = vertex.distance - target;
+        if (shifted >= 0 && shifted <= lastStart) candidates.add(shifted);
+      }
+
+      for (const startDistance of candidates) {
+        const endDistance = startDistance + target;
+        const start = interpolateVertexTime(vertices, startDistance, "start");
+        const end = interpolateVertexTime(vertices, endDistance, "end");
+        const elapsedTime = end.time - start.time;
+        if (elapsedTime <= 0 || (best && elapsedTime >= best.elapsedTime)) continue;
+        best = {
+          distanceKm: target,
+          elapsedTime,
+          averageSpeed: target / (elapsedTime / 3600),
+          startDistanceKm: startDistance,
+          endDistanceKm: endDistance,
+          startPointIndex: start.pointIndex,
+          endPointIndex: end.pointIndex,
+        };
+      }
+    }
+
+    if (best) efforts.push(best);
+  }
+  return efforts;
 }
 
 export function applySpeedLimitToDistribution(buckets: SpeedBucket[], speedLimit?: number | null): SpeedBucket[] {
@@ -918,7 +1036,8 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
     totalHeadingChange, tightTurnsCount, hairpinCount, twistinessScore,
     longestStraightSection, medianStraightLength, percentStraight,
     tightTurnPoints, hairpinPoints, hardAccelPoints, hardBrakePoints,
-    speedDistribution: calculateSpeedDistribution(points)
+    speedDistribution: calculateSpeedDistribution(points),
+    fastestDistances: calculateFastestDistances(points)
   };
 }
 

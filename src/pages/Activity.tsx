@@ -62,7 +62,7 @@ const Activity = () => {
   // Initialize state from location state (if uploaded locally) or null
   // strictly check for 'points' to avoid confusing navigation state { from: ... } with activity data
   const [data, setData] = useState<ActivityState | null>(() => {
-    const state = location.state as any;
+    const state = location.state as Partial<ActivityState> | null;
     if (state && state.points && state.stats) {
       return state as ActivityState;
     }
@@ -181,15 +181,40 @@ const Activity = () => {
             stats: record.stats,
           } as ActivitySummary);
 
+          // Older rides are upgraded once when their owner opens them. The
+          // versioned processed file and DB summary then serve future views.
+          if (user?.id === record.user_id && !Array.isArray(record.stats?.fastestDistances)) {
+            try {
+              const processedPath = record.file_path.replace(/\.gpx$/i, '') + '.processed.json';
+              const { error: processedUploadError } = await supabase.storage
+                .from('gpx-files')
+                .upload(processedPath, new Blob([JSON.stringify(loaded.processedTrack)], { type: 'application/json' }), { upsert: true });
+              if (processedUploadError) throw processedUploadError;
+              const { error: statsUpdateError } = await supabase
+                .from('activities')
+                .update({
+                  stats: {
+                    ...(record.stats ?? {}),
+                    ...loaded.processedTrack.stats,
+                    previewCoordinates: loaded.processedTrack.previewCoordinates,
+                  },
+                })
+                .eq('id', record.id);
+              if (statsUpdateError) throw statsUpdateError;
+            } catch (upgradeError) {
+              console.warn('Activity loaded, but its fastest-distance cache could not be persisted', upgradeError);
+            }
+          }
+
           setData({
             stats: loaded.processedTrack.stats,
             points: loaded.points,
             fileName: record.title
           });
 
-        } catch (err: any) {
+        } catch (err: unknown) {
           console.error("Error loading activity:", err);
-          setErrorDetails(err.message || "Unknown error occurred");
+          setErrorDetails(err instanceof Error ? err.message : "Unknown error occurred");
           setAccessDenied(true);
         } finally {
           setLoading(false);

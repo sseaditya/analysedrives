@@ -1,8 +1,8 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, BarChart3, Map as MapIcon, RefreshCcw, Loader2, TrendingUp, User, Globe } from "lucide-react";
+import { ArrowLeft, BarChart3, Map as MapIcon, RefreshCcw, Loader2, TrendingUp, User, Globe, Trophy, Lock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import HeaderProfile from "@/components/HeaderProfile";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -10,7 +10,7 @@ import SpeedDistributionChart from "@/components/SpeedDistributionChart";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import React from "react";
-import { SpeedBucket, parseGPX, calculateStats, generatePreviewPolyline, formatDistance, generateProcessedTrack, haversineDistance } from "@/utils/gpxParser";
+import { SpeedBucket, parseGPX, formatDistance, formatDuration, generateProcessedTrack, haversineDistance, FASTEST_DISTANCE_TARGETS, type FastestDistanceEffort } from "@/utils/gpxParser";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
@@ -30,6 +30,7 @@ const TIME_PERIOD_OPTIONS: { value: TimePeriod; label: string; days?: number }[]
 
 interface ActivityRecord {
     id: string;
+    slug: number | null;
     user_id: string;
     title: string;
     file_path: string;
@@ -42,6 +43,7 @@ interface ActivityRecord {
         totalTime?: number;
         maxSpeed?: number;
         startTime?: string;
+        fastestDistances?: FastestDistanceEffort[];
     } | null;
     created_at: string;
 }
@@ -62,11 +64,7 @@ const Analytics = () => {
     const mapInstanceRef = useRef<L.Map | null>(null);
     const layerGroupRef = useRef<L.LayerGroup | null>(null);
 
-    useEffect(() => {
-        fetchActivities();
-    }, [user]);
-
-    const fetchActivities = async () => {
+    const fetchActivities = useCallback(async () => {
         if (!user) return;
         try {
             // Fetch user's own activities
@@ -93,7 +91,11 @@ const Analytics = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [user]);
+
+    useEffect(() => {
+        fetchActivities();
+    }, [fetchActivities]);
 
     const handleRepairData = async () => {
         if (!user || isRepairing) return;
@@ -241,6 +243,20 @@ const Analytics = () => {
                 ...b,
                 range: `${b.minSpeed}-${b.minSpeed + 10}`
             }));
+    }, [periodActivities]);
+
+    // Personal records intentionally include every activity owned by the user,
+    // regardless of whether its visibility is public or private.
+    const fastestDistanceRecords = useMemo(() => {
+        return FASTEST_DISTANCE_TARGETS.map(distanceKm => {
+            let record: { effort: FastestDistanceEffort; activity: ActivityRecord } | null = null;
+            for (const activity of periodActivities) {
+                const effort = activity.stats?.fastestDistances?.find(item => item.distanceKm === distanceKm);
+                if (!effort || (record && effort.elapsedTime >= record.effort.elapsedTime)) continue;
+                record = { effort, activity };
+            }
+            return { distanceKm, record };
+        });
     }, [periodActivities]);
 
     // Helper function to clip track coordinates by hide_radius
@@ -519,6 +535,51 @@ const Analytics = () => {
                             <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Max Speed</span>
                             <div className="text-2xl font-bold mt-1 text-foreground">{cumulativeStats.maxSpeed.toFixed(0)} <span className="text-sm">km/h</span></div>
                         </div>
+                    </div>
+                </div>
+
+                {/* Fastest consecutive-distance records */}
+                <div className="bg-card border border-border rounded-2xl p-6">
+                    <div className="mb-6">
+                        <h3 className="text-lg font-semibold flex items-center gap-2">
+                            <Trophy className="w-5 h-5 text-primary" />
+                            Your Fastest Consecutive Distances
+                        </h3>
+                        <p className="text-sm text-muted-foreground mt-1">
+                            Personal records across your public and private activities in the selected period.
+                        </p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {fastestDistanceRecords.map(({ distanceKm, record }) => (
+                            <div key={distanceKm} className="rounded-xl border border-border bg-muted/20 p-4 min-h-36">
+                                <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">
+                                    Fastest {distanceKm} km
+                                </span>
+                                {record ? (
+                                    <>
+                                        <div className="flex items-baseline justify-between gap-3 mt-2">
+                                            <span className="text-2xl font-bold tabular-nums">{formatDuration(record.effort.elapsedTime)}</span>
+                                            <span className="text-sm font-semibold text-primary tabular-nums">{record.effort.averageSpeed.toFixed(1)} km/h</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => navigate(`/activity/${record.activity.slug ?? record.activity.id}`, { state: { from: '/analytics' } })}
+                                            className="mt-4 w-full flex items-center justify-between gap-3 text-left rounded-lg bg-background border border-border px-3 py-2 hover:border-primary/50 transition-colors"
+                                        >
+                                            <span className="text-sm font-medium truncate">{record.activity.title}</span>
+                                            <span className="inline-flex items-center gap-1 text-xs text-muted-foreground shrink-0">
+                                                {record.activity.public ? <Globe className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
+                                                {record.activity.public ? 'Public' : 'Private'}
+                                            </span>
+                                        </button>
+                                    </>
+                                ) : (
+                                    <div className="h-24 flex items-center text-sm text-muted-foreground">
+                                        No qualifying ride yet.
+                                    </div>
+                                )}
+                            </div>
+                        ))}
                     </div>
                 </div>
 
