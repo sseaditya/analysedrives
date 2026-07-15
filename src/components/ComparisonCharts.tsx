@@ -11,13 +11,14 @@ import {
   YAxis,
 } from "recharts";
 import { Button } from "@/components/ui/button";
+import { useIsMobile } from "@/hooks/use-mobile";
 import type { ComparisonSeries, SegmentMatch } from "@/types/segments";
-import { calculateNiceYTicks } from "@/utils/chartUtils";
+import { calculateNiceTicks, calculateNiceYTicks } from "@/utils/chartUtils";
 import { chartAxisLabel, chartAxisTick } from "@/utils/chartStyles";
 
-interface TimelineMouseState { activePayload?: Array<{ payload?: { index?: number } }> }
+interface TimelineMouseState { activePayload?: Array<{ payload?: { index?: number; distance?: number } }> }
 
-const chartMargin = { top: 10, right: 18, left: 0, bottom: 0 };
+const chartMargin = { top: 10, right: 30, left: 0, bottom: 0 };
 
 function ComparisonGrid({ xTicks, yTicks }: { xTicks: number[]; yTicks: number[] }) {
   return <>
@@ -27,14 +28,38 @@ function ComparisonGrid({ xTicks, yTicks }: { xTicks: number[]; yTicks: number[]
 }
 
 export function ComparisonTimeline({ series, matchA, matchB, onCursor }: { series: ComparisonSeries; matchA: SegmentMatch; matchB: SegmentMatch; onCursor: (index: number) => void }) {
-  const data = useMemo(() => series.points.map((point, index) => ({
-    index,
-    distance: Number(point.distance.toFixed(3)),
-    elevation: point.elevation,
-    speedA: Number(point.speedA.toFixed(1)),
-    speedB: Number(point.speedB.toFixed(1)),
-  })), [series]);
-  const xConfig = useMemo(() => calculateNiceYTicks(0, series.distance, 7), [series.distance]);
+  const isMobile = useIsMobile();
+  const [hoverDistance, setHoverDistance] = useState<number | null>(null);
+  const targetPoints = isMobile ? 200 : 500;
+  const data = useMemo(() => {
+    const raw = series.points;
+    if (!raw.length) return [];
+    const count = Math.min(raw.length, targetPoints);
+    const selectedIndexes = Array.from({ length: count }, (_, position) => (
+      count === 1 ? 0 : Math.round(position * (raw.length - 1) / (count - 1))
+    ));
+
+    return selectedIndexes.map((index) => {
+      const windowStart = Math.max(0, index - 2);
+      const windowEnd = Math.min(raw.length - 1, index + 2);
+      let speedA = 0;
+      let speedB = 0;
+      for (let sample = windowStart; sample <= windowEnd; sample++) {
+        speedA += raw[sample].speedA;
+        speedB += raw[sample].speedB;
+      }
+      const sampleCount = windowEnd - windowStart + 1;
+      return {
+        index,
+        distance: raw[index].distance,
+        elevation: raw[index].elevation,
+        speedA: Number((speedA / sampleCount).toFixed(1)),
+        speedB: Number((speedB / sampleCount).toFixed(1)),
+      };
+    });
+  }, [series, targetPoints]);
+  const xDomain = useMemo<[number, number]>(() => [0, series.distance], [series.distance]);
+  const xTicks = useMemo(() => calculateNiceTicks(0, series.distance, "distance", 8), [series.distance]);
   const speedConfig = useMemo(() => calculateNiceYTicks(0, Math.max(1, ...data.flatMap((point) => [point.speedA, point.speedB])), 7), [data]);
   const elevations = useMemo(() => data.flatMap((point) => point.elevation == null ? [] : [point.elevation]), [data]);
   const elevationConfig = useMemo(() => {
@@ -45,36 +70,40 @@ export function ComparisonTimeline({ series, matchA, matchB, onCursor }: { serie
     return calculateNiceYTicks(min - padding, max + padding, 3);
   }, [elevations]);
   const handleMove = (state: TimelineMouseState) => {
-    const index = state?.activePayload?.[0]?.payload?.index;
-    if (typeof index === "number") onCursor(index);
+    const point = state?.activePayload?.[0]?.payload;
+    if (typeof point?.index === "number") {
+      setHoverDistance(typeof point.distance === "number" ? point.distance : null);
+      onCursor(point.index);
+    }
   };
+  const formatDistanceAxis = (value: number) => Number.isInteger(value) ? `${value} km` : `${Number(value.toFixed(1))} km`;
 
-  return <div className="h-[360px] w-full rounded-2xl border border-border bg-card p-3 select-none">
-    <div className="h-[70%] w-full pb-4">
+  return <div className="flex h-[300px] w-full cursor-crosshair select-none flex-col rounded-2xl border border-border bg-card p-3">
+    <div className="mb-4 min-h-0 w-full flex-[7]">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={chartMargin} onMouseMove={handleMove}>
+        <AreaChart data={data} margin={chartMargin} onMouseMove={handleMove} onMouseLeave={() => setHoverDistance(null)}>
           <defs>
             <linearGradient id="compareSpeedA" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(15, 52%, 58%)" stopOpacity={0.42} /><stop offset="95%" stopColor="hsl(15, 52%, 58%)" stopOpacity={0} /></linearGradient>
             <linearGradient id="compareSpeedB" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--foreground))" stopOpacity={0.18} /><stop offset="95%" stopColor="hsl(var(--foreground))" stopOpacity={0} /></linearGradient>
           </defs>
-          <ComparisonGrid xTicks={xConfig.ticks} yTicks={speedConfig.ticks} />
-          <XAxis dataKey="distance" type="number" domain={xConfig.domain} ticks={xConfig.ticks} tick={chartAxisTick} tickLine={false} axisLine={false} tickFormatter={(value) => `${value} km`} allowDataOverflow />
-          <YAxis domain={speedConfig.domain} ticks={speedConfig.ticks} tick={chartAxisTick} tickLine={false} axisLine={false} width={60} label={{ value: "Speed (km/h)", angle: -90, position: "insideLeft", ...chartAxisLabel }} />
-          <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: "16px", fontSize: "12px" }} formatter={(value: number, name: string) => [`${value.toFixed(1)} km/h`, name]} labelFormatter={(value) => `${value} km`} />
-          <Area type="monotone" dataKey="speedA" name={matchA.activity.title} stroke="hsl(var(--segment-drive-1))" strokeWidth={1.5} fill="url(#compareSpeedA)" isAnimationActive={false} />
-          <Area type="monotone" dataKey="speedB" name={matchB.activity.title} stroke="hsl(var(--segment-drive-2))" strokeWidth={1.5} fill="url(#compareSpeedB)" isAnimationActive={false} />
+          <ComparisonGrid xTicks={xTicks} yTicks={speedConfig.ticks} />
+          <XAxis dataKey="distance" type="number" domain={xDomain} ticks={xTicks} tick={chartAxisTick} tickLine={false} axisLine={false} tickFormatter={formatDistanceAxis} minTickGap={12} allowDataOverflow />
+          <YAxis domain={speedConfig.domain} ticks={speedConfig.ticks} tick={chartAxisTick} tickLine={false} axisLine={false} width={60} tickFormatter={(value) => Math.round(value).toString()} label={{ value: "Speed (km/h)", angle: -90, position: "insideLeft", ...chartAxisLabel }} />
+          <Area type="monotone" dataKey="speedA" name={matchA.activity.title} stroke="hsl(var(--segment-drive-1))" strokeWidth={isMobile ? 1 : 1.5} fill="url(#compareSpeedA)" dot={false} activeDot={false} isAnimationActive={false} />
+          <Area type="monotone" dataKey="speedB" name={matchB.activity.title} stroke="hsl(var(--segment-drive-2))" strokeWidth={isMobile ? 1 : 1.5} fill="url(#compareSpeedB)" dot={false} activeDot={false} isAnimationActive={false} />
+          {hoverDistance !== null && <ReferenceLine x={hoverDistance} stroke="hsl(var(--foreground))" strokeOpacity={1} isFront />}
         </AreaChart>
       </ResponsiveContainer>
     </div>
-    {elevations.length > 0 && <div className="h-[30%] w-full">
+    {elevations.length > 0 && <div className="min-h-0 w-full flex-[2.5]">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={chartMargin} onMouseMove={handleMove}>
+        <AreaChart data={data} margin={chartMargin} onMouseMove={handleMove} onMouseLeave={() => setHoverDistance(null)}>
           <defs><linearGradient id="compareElevation" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(0, 0%, 60%)" stopOpacity={0.4} /><stop offset="95%" stopColor="hsl(0, 0%, 60%)" stopOpacity={0.1} /></linearGradient></defs>
-          <ComparisonGrid xTicks={xConfig.ticks} yTicks={elevationConfig.ticks} />
-          <XAxis dataKey="distance" type="number" domain={xConfig.domain} ticks={xConfig.ticks} tick={chartAxisTick} tickLine={false} axisLine={false} tickFormatter={(value) => `${value} km`} allowDataOverflow />
+          <ComparisonGrid xTicks={xTicks} yTicks={elevationConfig.ticks} />
+          <XAxis dataKey="distance" type="number" domain={xDomain} ticks={xTicks} tick={chartAxisTick} tickLine={false} axisLine={false} tickFormatter={formatDistanceAxis} minTickGap={12} allowDataOverflow />
           <YAxis domain={elevationConfig.domain} ticks={elevationConfig.ticks} tick={chartAxisTick} tickLine={false} axisLine={false} width={60} tickFormatter={(value) => Math.round(value).toString()} />
-          <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: "16px", fontSize: "12px" }} formatter={(value: number) => [`${value.toFixed(0)} m`, "Elevation"]} labelFormatter={(value) => `${value} km`} />
-          <Area type="monotone" dataKey="elevation" name="Elevation" stroke="hsl(0, 0%, 50%)" strokeWidth={1.5} fill="url(#compareElevation)" isAnimationActive={false} />
+          <Area type="monotone" dataKey="elevation" name="Elevation" stroke="hsl(0, 0%, 50%)" strokeWidth={1.5} fill="url(#compareElevation)" dot={false} activeDot={false} isAnimationActive={false} />
+          {hoverDistance !== null && <ReferenceLine x={hoverDistance} stroke="hsl(var(--foreground))" strokeOpacity={1} isFront />}
         </AreaChart>
       </ResponsiveContainer>
     </div>}

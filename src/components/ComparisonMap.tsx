@@ -66,10 +66,9 @@ export default function ComparisonMap({ segment, series, cursorSeconds }: { segm
     L.polyline(reference, { color: referenceColor, weight: 8, opacity: 0.22, dashArray: "6 8" }).addTo(group);
     L.polyline(routeA, { color: driveAColor, weight: 5, opacity: 0.8 }).addTo(group);
     L.polyline(routeB, { color: driveBColor, weight: 5, opacity: 0.75 }).addTo(group);
-    // Drive 2 is intentionally smaller. When the GPS traces coincide, it sits
-    // inside Drive 1 instead of covering it, leaving both series visible.
-    markerARef.current = L.circleMarker(routeA[0], { radius: 12, color: markerOutline, weight: 2, fillColor: driveAColor, fillOpacity: 1 }).bindTooltip("Drive 1", { permanent: false }).addTo(group);
-    markerBRef.current = L.circleMarker(routeB[0], { radius: 5, color: markerOutline, weight: 2, fillColor: driveBColor, fillOpacity: 1 }).bindTooltip("Drive 2", { permanent: false }).addTo(group);
+    const driveMarkerRadius = 8;
+    markerARef.current = L.circleMarker(routeA[0], { radius: driveMarkerRadius, color: markerOutline, weight: 2, fillColor: driveAColor, fillOpacity: 1 }).bindTooltip("Drive 1", { permanent: false }).addTo(group);
+    markerBRef.current = L.circleMarker(routeB[0], { radius: driveMarkerRadius, color: markerOutline, weight: 2, fillColor: driveBColor, fillOpacity: 1 }).bindTooltip("Drive 2", { permanent: false }).addTo(group);
     map.fitBounds(L.latLngBounds([...routeA, ...routeB]), { padding: [40, 40], maxZoom: 16 });
     return () => { group.remove(); markerARef.current = null; markerBRef.current = null; };
   }, [segment, series, theme]);
