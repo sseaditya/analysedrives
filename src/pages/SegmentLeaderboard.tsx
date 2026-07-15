@@ -91,7 +91,7 @@ export default function SegmentLeaderboard() {
                 const selectedB = driveB === match.activity.id;
                 return (
                   <div key={match.activity.id} className={`grid gap-4 rounded-xl border bg-card p-4 transition md:grid-cols-[48px_1.5fr_repeat(5,minmax(80px,1fr))_150px] md:items-center ${selectedA || selectedB ? "border-primary shadow-sm" : ""}`}>
-                    <div className="text-center text-2xl font-black text-muted-foreground">#{index + 1}</div>
+                    <div className="text-center text-2xl font-black text-muted-foreground">#{match.rank || index + 1}</div>
                     <div className="min-w-0"><button className="truncate text-left font-bold hover:text-primary" onClick={() => navigate(`/activity/${match.activity.slug || match.activity.id}`)}>{match.activity.title}</button><div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground"><span>{match.activity.profiles?.display_name || match.activity.profiles?.full_name || "Driver"}</span>{match.activity.profiles?.car && <span className="flex items-center gap-1"><Car className="h-3 w-3" />{match.activity.profiles.car}</span>}{match.activity.public ? <Globe className="h-3 w-3" /> : <Lock className="h-3 w-3" />}</div></div>
                     <Metric label="Coverage" value={`${(match.coverage * 100).toFixed(0)}%`} />
                     <Metric label="Distance" value={`${match.matchedDistance.toFixed(1)} km`} />

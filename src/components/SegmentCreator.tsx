@@ -10,6 +10,7 @@ import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import TrackMap from "@/components/TrackMap";
 import { supabase } from "@/lib/supabase";
+import { indexSegmentEfforts } from "@/lib/segmentIndexing";
 import { cumulativeDistances, extractSegmentGeometry, privacyVisibleRange, segmentBounds } from "@/utils/segmentMatching";
 import type { GPXPoint } from "@/utils/gpxParser";
 
@@ -66,12 +67,19 @@ export default function SegmentCreator({ activityId, activityTitle, points, hide
       bounds: segmentBounds(geometry),
       created_by: (await supabase.auth.getUser()).data.user?.id,
     }).select("id").single();
-    setSaving(false);
     if (error) {
+      setSaving(false);
       console.error(error);
       toast.error("Could not publish the segment. Apply the segment database migration first if needed.");
       return;
     }
+    try {
+      await indexSegmentEfforts({ segmentId: data.id, force: true });
+    } catch (indexError) {
+      console.warn("Segment created, but its initial effort backfill did not finish", indexError);
+      toast.warning("Segment created. Existing drives will be indexed when the leaderboard opens.");
+    }
+    setSaving(false);
     toast.success("Public comparison segment created.");
     setOpen(false);
     navigate(`/segments/${data.id}`);

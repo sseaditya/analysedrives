@@ -18,7 +18,7 @@ export default function Segments() {
 
   return (
     <div className="min-h-screen bg-background">
-      <SegmentsHeader />
+      <SegmentsHeader backTo="/dashboard" />
       <main className="container mx-auto max-w-7xl space-y-6 px-4 py-8">
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
           <div><h1 className="text-3xl font-bold">Public road segments</h1><p className="mt-1 text-muted-foreground">Find a shared road and compare every qualifying drive.</p></div>

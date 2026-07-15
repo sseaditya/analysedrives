@@ -8,6 +8,7 @@ import { GPXPoint, calculateStats, generatePreviewPolyline, generateProcessedTra
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import { indexSegmentEfforts } from "@/lib/segmentIndexing";
 
 interface StravaImportProps {
     onImportComplete: () => void;
@@ -138,7 +139,7 @@ export default function StravaImport({ onImportComplete }: StravaImportProps) {
                 }
 
                 // 2. Insert into DB
-                const { error } = await supabase.from('activities').insert({
+                const { data: insertedActivity, error } = await supabase.from('activities').insert({
                     user_id: user.id,
                     title: activity.name,
                     file_path: fileName,
@@ -147,11 +148,16 @@ export default function StravaImport({ onImportComplete }: StravaImportProps) {
                         ...processedTrack.stats,
                         previewCoordinates: processedTrack.previewCoordinates
                     }
-                });
+                }).select('id').single();
 
                 if (error) {
                     console.error("DB Insert Error", error);
                 } else {
+                    try {
+                        await indexSegmentEfforts({ activityId: insertedActivity.id });
+                    } catch (indexError) {
+                        console.warn(`Strava activity imported, but segment indexing will need to be retried for ${activity.name}`, indexError);
+                    }
                     successCount++;
                 }
             }

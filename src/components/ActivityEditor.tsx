@@ -18,6 +18,7 @@ import { Slider } from "@/components/ui/slider";
 import { Loader2, Globe, Lock, Gauge, MapPin, Trash2, AlertTriangle, CloudRain, Droplet } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { indexSegmentEfforts } from "@/lib/segmentIndexing";
 
 interface ActivityData {
     id: string;
@@ -82,6 +83,12 @@ const ActivityEditor = ({ open, onOpenChange, activity, onUpdate }: ActivityEdit
                 .eq("id", activity.id);
 
             if (error) throw error;
+
+            try {
+                await indexSegmentEfforts({ activityId: activity.id });
+            } catch (indexError) {
+                console.warn("Activity saved, but segment efforts could not be refreshed", indexError);
+            }
 
             toast.success("Activity updated!");
             onOpenChange(false);

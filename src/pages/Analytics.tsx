@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { indexSegmentEfforts } from "@/lib/segmentIndexing";
 
 type TimePeriod = 'week' | 'month' | '3months' | '6months' | 'year' | 'all';
 
@@ -160,6 +161,11 @@ const Analytics = () => {
                         .eq('id', activity.id);
 
                     if (updateError) throw updateError;
+                    try {
+                        await indexSegmentEfforts({ activityId: activity.id });
+                    } catch (indexError) {
+                        console.warn(`Activity repaired, but segment efforts could not be refreshed for ${activity.id}`, indexError);
+                    }
                     successCount++;
                 } catch (err) {
                     console.error(`Failed to repair activity ${activity.id}:`, err);

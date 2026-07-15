@@ -6,6 +6,7 @@ import { MapPin, LogOut, Upload, Activity, Calendar, Clock, ArrowRight, Trending
 import FileUploader from "@/components/FileUploader";
 import { parseGPX, calculateStats, formatDistance, formatDuration, generatePreviewPolyline, calculateSpeedDistribution, SpeedBucket, generateProcessedTrack } from "@/utils/gpxParser";
 import { supabase } from "@/lib/supabase";
+import { indexSegmentEfforts } from "@/lib/segmentIndexing";
 import ActivityMiniMap from "@/components/ActivityMiniMap";
 import { cn } from "@/lib/utils";
 import StravaImport from "@/components/StravaImport";
@@ -388,7 +389,7 @@ const Dashboard = () => {
                     }
 
                     // 5. Insert Record into 'activities' table
-                    const { error: dbError } = await supabase
+                    const { data: insertedActivity, error: dbError } = await supabase
                         .from('activities')
                         .insert([
                             {
@@ -400,9 +401,16 @@ const Dashboard = () => {
                                     previewCoordinates: processedTrack.previewCoordinates
                                 },
                             }
-                        ]);
+                        ])
+                        .select('id')
+                        .single();
 
                     if (dbError) throw dbError;
+                    try {
+                        await indexSegmentEfforts({ activityId: insertedActivity.id });
+                    } catch (indexError) {
+                        console.warn(`Drive uploaded, but segment indexing will need to be retried for ${name}`, indexError);
+                    }
                     successCount++;
                 } catch (err) {
                     console.error(`Error processing ${name}:`, err);

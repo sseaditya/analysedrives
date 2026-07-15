@@ -8,7 +8,7 @@ import SegmentsHeader from "@/components/SegmentsHeader";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { useAuth } from "@/contexts/AuthContext";
-import { fetchSegment, findSegmentMatches } from "@/lib/segmentData";
+import { fetchSegment, findSegmentMatches, loadLeaderboardMatch } from "@/lib/segmentData";
 import { buildComparisonSeries } from "@/utils/segmentMatching";
 import { formatDuration } from "@/utils/gpxParser";
 
@@ -25,9 +25,19 @@ export default function SegmentCompare() {
   const cursorStartRef = useRef(0);
   const cursorRef = useRef(0);
   const segmentQuery = useQuery({ queryKey: ["segment", segmentId], queryFn: () => fetchSegment(segmentId), enabled: !!segmentId });
-  const matchesQuery = useQuery({ queryKey: ["segment-matches", segmentId, user?.id], queryFn: () => findSegmentMatches(segmentQuery.data!, user!.id), enabled: !!segmentQuery.data && !!user, staleTime: 5 * 60 * 1000 });
-  const matchA = matchesQuery.data?.matches.find((match) => match.activity.id === params.get("driveA"));
-  const matchB = matchesQuery.data?.matches.find((match) => match.activity.id === params.get("driveB"));
+  const driveIds = [params.get("driveA"), params.get("driveB")].filter((id): id is string => Boolean(id));
+  const matchesQuery = useQuery({
+    queryKey: ["segment-comparison-matches", segmentId, user?.id, ...driveIds],
+    queryFn: async () => {
+      const leaderboard = await findSegmentMatches(segmentQuery.data!, user!.id);
+      const selected = leaderboard.matches.filter((match) => driveIds.includes(match.activity.id));
+      return Promise.all(selected.map(loadLeaderboardMatch));
+    },
+    enabled: !!segmentQuery.data && !!user && driveIds.length === 2,
+    staleTime: 5 * 60 * 1000,
+  });
+  const matchA = matchesQuery.data?.find((match) => match.activity.id === params.get("driveA"));
+  const matchB = matchesQuery.data?.find((match) => match.activity.id === params.get("driveB"));
   const series = useMemo(() => segmentQuery.data && matchA && matchB && user ? buildComparisonSeries(segmentQuery.data, matchA, matchB, user.id) : null, [segmentQuery.data, matchA, matchB, user]);
 
   useEffect(() => { cursorRef.current = cursorValue; }, [cursorValue]);

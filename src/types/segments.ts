@@ -1,4 +1,4 @@
-import type { GPXPoint, GPXStats, ProcessedTrack } from "@/utils/gpxParser";
+import type { GPXPoint, GPXStats, ProcessedTrack } from "../utils/gpxParser";
 
 export interface SegmentGeometryPoint {
   lat: number;
@@ -24,6 +24,8 @@ export interface Segment {
   geometry: SegmentGeometryPoint[];
   distance_km: number;
   bounds: SegmentBounds;
+  efforts_algorithm_version?: number;
+  efforts_indexed_at?: string | null;
   created_at: string;
   profiles?: {
     display_name: string | null;
@@ -82,7 +84,10 @@ export interface SegmentMatch {
   alignment: RouteAlignment;
 }
 
-export type SegmentLeaderboardEntry = SegmentMatch;
+export type SegmentLeaderboardEntry = Omit<SegmentMatch, "loadedActivity"> & {
+  rank: number;
+  loadedActivity?: LoadedActivity;
+};
 
 export interface ComparisonPoint {
   segmentIndex: number;
