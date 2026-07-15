@@ -1,19 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
-import { XMLParser } from "fast-xml-parser";
 import type { ActivitySummary, LoadedActivity, Segment } from "../src/types/segments";
-import {
-  coarseSegmentCandidate,
-  matchActivityToSegment,
-  SEGMENT_EFFORT_ALGORITHM_VERSION,
-} from "../src/utils/segmentMatching";
-import {
-  generateProcessedTrack,
-  PROCESSED_TRACK_VERSION,
-  type GPXPoint,
-  type ProcessedTrack,
-} from "../src/utils/gpxParser";
+import type { GPXPoint, ProcessedTrack } from "../src/utils/gpxParser";
 
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
@@ -45,7 +34,8 @@ function arrayOf<T>(value: T | T[] | undefined): T[] {
   return Array.isArray(value) ? value : [value];
 }
 
-function parseServerGPX(xml: string): GPXPoint[] {
+async function parseServerGPX(xml: string): Promise<GPXPoint[]> {
+  const { XMLParser } = await import("fast-xml-parser");
   const parsed = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_" }).parse(xml);
   const tracks = arrayOf(parsed?.gpx?.trk);
   const points: GPXPoint[] = [];
@@ -70,6 +60,7 @@ function parseServerGPX(xml: string): GPXPoint[] {
 }
 
 async function loadActivity(admin: any, activity: ActivitySummary): Promise<LoadedActivity> {
+  const { generateProcessedTrack, PROCESSED_TRACK_VERSION } = await import("../src/utils/gpxParser");
   const processedPath = activity.file_path.replace(/\.gpx$/i, "") + ".processed.json";
   const { data: processedBlob, error: processedError } = await admin.storage.from("gpx-files").download(processedPath);
   if (!processedError && processedBlob) {
@@ -85,12 +76,13 @@ async function loadActivity(admin: any, activity: ActivitySummary): Promise<Load
 
   const { data: gpxBlob, error: gpxError } = await admin.storage.from("gpx-files").download(activity.file_path);
   if (gpxError || !gpxBlob) throw gpxError || new Error("Activity GPX is unavailable");
-  const points = parseServerGPX(await gpxBlob.text());
+  const points = await parseServerGPX(await gpxBlob.text());
   if (points.length < 2) throw new Error("Activity does not contain enough GPS points");
   return { activity, points, processedTrack: generateProcessedTrack(points) };
 }
 
-function effortValues(segment: Segment, loaded: LoadedActivity) {
+async function effortValues(segment: Segment, loaded: LoadedActivity) {
+  const { matchActivityToSegment, SEGMENT_EFFORT_ALGORITHM_VERSION } = await import("../src/utils/segmentMatching");
   const raw = matchActivityToSegment(segment, loaded, loaded.activity.user_id);
   if (!raw) return null;
   const publicMatch = loaded.activity.public
@@ -120,8 +112,9 @@ function effortValues(segment: Segment, loaded: LoadedActivity) {
 }
 
 async function indexPair(admin: any, segment: Segment, loaded: LoadedActivity) {
+  const { coarseSegmentCandidate } = await import("../src/utils/segmentMatching");
   const candidate = coarseSegmentCandidate(segment, loaded.activity);
-  const values = candidate ? effortValues(segment, loaded) : null;
+  const values = candidate ? await effortValues(segment, loaded) : null;
   if (!values) {
     await removePair(admin, segment.id, loaded.activity.id);
     return false;
@@ -155,6 +148,7 @@ async function indexActivity(admin: any, activity: ActivitySummary) {
 }
 
 async function indexSegment(admin: any, segment: Segment, requesterId: string) {
+  const { coarseSegmentCandidate, SEGMENT_EFFORT_ALGORITHM_VERSION } = await import("../src/utils/segmentMatching");
   const { data, error } = await admin.from("activities").select(ACTIVITY_SELECT);
   if (error) throw error;
   let matched = 0;
@@ -214,6 +208,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (authError || !authData.user) return res.status(401).json({ error: "Invalid authorization token" });
 
   try {
+    const { SEGMENT_EFFORT_ALGORITHM_VERSION } = await import("../src/utils/segmentMatching");
     const activityId = typeof req.body?.activityId === "string" ? req.body.activityId : null;
     const segmentId = typeof req.body?.segmentId === "string" ? req.body.segmentId : null;
     if ((activityId ? 1 : 0) + (segmentId ? 1 : 0) !== 1) {
