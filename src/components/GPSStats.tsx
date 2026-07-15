@@ -1008,7 +1008,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                         <span className="block text-base font-semibold tabular-nums mt-1 leading-tight">
                           {formatDuration(effort.elapsedTime)}
                         </span>
-                        <span className="block text-xs text-primary tabular-nums mt-0.5 whitespace-nowrap">
+                        <span className="block text-xs text-primary tabular-nums mt-0.5 whitespace-nowrap [text-shadow:0_1px_1px_rgba(0,0,0,0.14)]">
                           {formatSpeed(effort.averageSpeed)}
                         </span>
                       </div>

@@ -97,6 +97,18 @@ const Analytics = () => {
         fetchActivities();
     }, [fetchActivities]);
 
+    useEffect(() => {
+        const refreshWhenVisible = () => {
+            if (document.visibilityState === 'visible') fetchActivities();
+        };
+        window.addEventListener('focus', refreshWhenVisible);
+        document.addEventListener('visibilitychange', refreshWhenVisible);
+        return () => {
+            window.removeEventListener('focus', refreshWhenVisible);
+            document.removeEventListener('visibilitychange', refreshWhenVisible);
+        };
+    }, [fetchActivities]);
+
     const handleRepairData = async () => {
         if (!user || isRepairing) return;
 
@@ -618,7 +630,7 @@ const Analytics = () => {
                                             </div>
                                             <div className="flex items-center justify-between gap-2">
                                                 <span className="text-[9px] text-muted-foreground font-semibold uppercase tracking-wide">Speed</span>
-                                                <span className="text-sm font-semibold text-primary tabular-nums whitespace-nowrap rounded px-1 bg-primary/[0.07] border border-primary/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_1px_2px_rgba(0,0,0,0.10)]">
+                                                <span className="text-sm font-semibold text-primary tabular-nums whitespace-nowrap [text-shadow:0_1px_1px_rgba(0,0,0,0.14)]">
                                                     {record.effort.averageSpeed.toFixed(1)} km/h
                                                 </span>
                                             </div>

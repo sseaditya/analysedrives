@@ -186,10 +186,6 @@ const Activity = () => {
           if (user?.id === record.user_id && !Array.isArray(record.stats?.fastestDistances)) {
             try {
               const processedPath = record.file_path.replace(/\.gpx$/i, '') + '.processed.json';
-              const { error: processedUploadError } = await supabase.storage
-                .from('gpx-files')
-                .upload(processedPath, new Blob([JSON.stringify(loaded.processedTrack)], { type: 'application/json' }), { upsert: true });
-              if (processedUploadError) throw processedUploadError;
               const { error: statsUpdateError } = await supabase
                 .from('activities')
                 .update({
@@ -201,8 +197,17 @@ const Activity = () => {
                 })
                 .eq('id', record.id);
               if (statsUpdateError) throw statsUpdateError;
+
+              // The DB summary drives Analytics. Cache replacement is useful
+              // but must never prevent the durable stats update.
+              const { error: processedUploadError } = await supabase.storage
+                .from('gpx-files')
+                .upload(processedPath, new Blob([JSON.stringify(loaded.processedTrack)], { type: 'application/json' }), { upsert: true });
+              if (processedUploadError) {
+                console.warn('Fastest-distance stats were saved, but the processed file cache was not replaced', processedUploadError);
+              }
             } catch (upgradeError) {
-              console.warn('Activity loaded, but its fastest-distance cache could not be persisted', upgradeError);
+              console.warn('Activity loaded, but its fastest-distance stats could not be persisted', upgradeError);
             }
           }
 
