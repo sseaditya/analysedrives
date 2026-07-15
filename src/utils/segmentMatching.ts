@@ -7,7 +7,15 @@ import type {
   SegmentGeometryPoint,
   SegmentMatch,
 } from "@/types/segments";
-import { calculateLimitedStats, calculateStats, haversineDistance, type GPXPoint } from "@/utils/gpxParser";
+import {
+  applySpeedLimitToDistribution,
+  calculateLimitedStats,
+  calculateSpeedDistribution,
+  calculateStats,
+  haversineDistance,
+  type GPXPoint,
+  type SpeedBucket,
+} from "@/utils/gpxParser";
 
 export const SEGMENT_SAMPLE_KM = 0.1;
 export const SEGMENT_MATCH_TOLERANCE_KM = 0.25;
@@ -296,6 +304,26 @@ export function buildComparisonSeries(segment: Segment, matchA: SegmentMatch, ma
   }
   if (points.length < 2) return null;
   return { startSegmentIndex: start, endSegmentIndex: end, distance: points[points.length - 1].distance, points };
+}
+
+export function comparisonActivityPoints(series: ComparisonSeries, match: SegmentMatch): GPXPoint[] {
+  const firstSegmentIndex = series.points[0]?.segmentIndex;
+  const lastSegmentIndex = series.points.at(-1)?.segmentIndex;
+  if (firstSegmentIndex == null || lastSegmentIndex == null) return [];
+
+  const start = match.alignment.points.find((point) => point.segmentIndex === firstSegmentIndex)?.activityIndex;
+  const end = match.alignment.points.find((point) => point.segmentIndex === lastSegmentIndex)?.activityIndex;
+  if (start == null || end == null) return [];
+
+  return match.loadedActivity.points.slice(Math.min(start, end), Math.max(start, end) + 1);
+}
+
+export function comparisonSpeedDistribution(series: ComparisonSeries, match: SegmentMatch, viewerId: string): SpeedBucket[] {
+  const speedLimit = match.activity.user_id === viewerId ? null : match.activity.speed_cap;
+  return applySpeedLimitToDistribution(
+    calculateSpeedDistribution(comparisonActivityPoints(series, match), 10),
+    speedLimit,
+  );
 }
 
 export function segmentBounds(geometry: SegmentGeometryPoint[]) {

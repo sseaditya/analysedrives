@@ -9,7 +9,7 @@ import {
     ReferenceLine,
 } from "recharts";
 import { useMemo } from "react";
-import { GPXPoint, calculateSpeedDistribution, SpeedBucket } from "@/utils/gpxParser";
+import { applySpeedLimitToDistribution, GPXPoint, calculateSpeedDistribution, SpeedBucket } from "@/utils/gpxParser";
 import { calculateNiceYTicks } from "@/utils/chartUtils";
 import { chartAxisLabel, chartAxisTick } from "@/utils/chartStyles";
 
@@ -31,84 +31,7 @@ const SpeedDistributionChart = ({ points, speedLimit, buckets }: SpeedDistributi
 
         if (!points) return [];
 
-        const rawData = calculateSpeedDistribution(points, 10);
-
-        if (!speedLimit || speedLimit <= 0 || !rawData || rawData.length === 0) {
-            return rawData;
-        }
-
-        const collapsedData: SpeedBucket[] = [];
-        let overflowDist = 0;
-
-        // Find the bucket that represents the speed limit (e.g. 90-100 for limit 100)
-        // Or if limit is 95, it falls in 90-100.
-        // We want to keep buckets where minSpeed < speedLimit.
-
-        for (const bucket of rawData) {
-            if (bucket.minSpeed < speedLimit) {
-                collapsedData.push({ ...bucket });
-            } else {
-                // This bucket is entirely above or starting at the limit
-                // Accumulate its distance
-                overflowDist += bucket.distance;
-            }
-        }
-
-        // If we have overflow, simulate physics:
-        // All that distance was covered at exactly speedLimit
-        if (overflowDist > 0) {
-            const simulatedTime = (overflowDist / speedLimit) * 60; // minutes
-
-            // We need to put this into the "last" bucket, OR create a new one if it doesn't exist?
-            // The user said "showing bars till speed cap".
-            // Ideally, if limit is 100, we want the bar 90-100 to increase.
-            // minSpeed for that bucket is 90 (if step is 10).
-            // If limit is 100, the bucket starting at 100 is excluded.
-
-            // Let's find the bucket that *contains* the limit - 1 (the speed just below limit)
-            // If limit is 100, we want bucket 90.
-            // If limit is 45, we want bucket 40 (40-50).
-
-            // Actually, simpler: The last bucket in collapsedData is the one effectively "at the limit".
-
-            if (collapsedData.length > 0) {
-                const lastBucket = collapsedData[collapsedData.length - 1];
-                // Should we add to it?
-                // Only if the limit falls within it or is its upper bound.
-                // If limit is 100, last bucket is 90-100. We add to it.
-                // If limit is 40, last bucket is 30-40. We add to it.
-
-                // BUT, what if the last bucket is way below limit? (e.g. max speed was 30, limit is 100).
-                // Then overflowDist is 0 anyway.
-
-                // What if max speed was 200. Bucket 190.
-                // Collapsed includes up to 90.
-                // We add overflow to 90.
-
-                lastBucket.distance += overflowDist;
-                lastBucket.time += simulatedTime;
-
-                // Fix precision
-                lastBucket.distance = Number(lastBucket.distance.toFixed(2));
-                lastBucket.time = Number(lastBucket.time.toFixed(2));
-            } else {
-                // Limit is very low (e.g. < 10) or data is weird.
-                // Create a bucket 0-10?
-                if (collapsedData.length === 0 && rawData.length > 0) {
-                    // If limit is < 10, collapsed is empty.
-                    // Create a 0-10 bucket (clamped).
-                    collapsedData.push({
-                        range: `0-${speedLimit}`,
-                        minSpeed: 0,
-                        time: Number(simulatedTime.toFixed(2)),
-                        distance: Number(overflowDist.toFixed(2))
-                    });
-                }
-            }
-        }
-
-        // Sort buckets by speed
-        return collapsedData.sort((a, b) => a.minSpeed - b.minSpeed);
+        return applySpeedLimitToDistribution(calculateSpeedDistribution(points, 10), speedLimit);
     }, [points, speedLimit, buckets]);
 
     // Calculate max value to synchronize axes 1:1

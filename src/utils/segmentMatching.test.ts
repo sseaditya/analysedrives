@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { generateProcessedTrack, type GPXPoint } from "@/utils/gpxParser";
+import { applySpeedLimitToDistribution, calculateSpeedDistribution, generateProcessedTrack, type GPXPoint } from "@/utils/gpxParser";
 import type { ActivitySummary, LoadedActivity, Segment } from "@/types/segments";
-import { buildComparisonSeries, extractSegmentGeometry, matchActivityToSegment, privacyVisibleRange, segmentBounds } from "@/utils/segmentMatching";
+import { buildComparisonSeries, comparisonActivityPoints, comparisonSpeedDistribution, extractSegmentGeometry, matchActivityToSegment, privacyVisibleRange, segmentBounds } from "@/utils/segmentMatching";
 
 const KM_PER_LAT = 111.195;
 
@@ -126,5 +126,31 @@ describe("segment extraction and matching", () => {
     expect(comparison).not.toBeNull();
     expect(Math.max(...comparison!.points.map((point) => point.speedB))).toBeLessThanOrEqual(80);
     expect(comparison!.points.at(-1)!.elapsedB).toBeGreaterThanOrEqual(comparison!.distance / 80 * 3600 - 1);
+  });
+
+  it("uses the exact Activity-page distribution for each common segment portion", () => {
+    const segment = segmentFrom(route(0, 10));
+    const a = matchActivityToSegment(segment, loaded(route(-2, 12, 0.05, 73.5, 70), { id: "a" }), "owner")!;
+    const b = matchActivityToSegment(segment, loaded(route(-1, 11, 0.04, 73.5004, 90), { id: "b" }), "owner")!;
+    const comparison = buildComparisonSeries(segment, a, b, "owner")!;
+    const selectedActivityPoints = comparisonActivityPoints(comparison, a);
+
+    expect(comparisonSpeedDistribution(comparison, a, "owner")).toEqual(
+      calculateSpeedDistribution(selectedActivityPoints, 10),
+    );
+  });
+
+  it("applies the same public speed-cap distribution transform as Activity", () => {
+    const segment = segmentFrom(route(0, 10));
+    const a = matchActivityToSegment(segment, loaded(route(0, 10, 0.05, 73.5, 120), {
+      id: "a", user_id: "other", speed_cap: 80,
+    }), "viewer")!;
+    const b = matchActivityToSegment(segment, loaded(route(0, 10, 0.05, 73.5004, 90), { id: "b" }), "viewer")!;
+    const comparison = buildComparisonSeries(segment, a, b, "viewer")!;
+    const activityBuckets = calculateSpeedDistribution(comparisonActivityPoints(comparison, a), 10);
+
+    expect(comparisonSpeedDistribution(comparison, a, "viewer")).toEqual(
+      applySpeedLimitToDistribution(activityBuckets, 80),
+    );
   });
 });

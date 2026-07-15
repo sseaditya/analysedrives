@@ -244,6 +244,33 @@ export function calculateSpeedDistribution(points: GPXPoint[], bucketSize: numbe
   return result;
 }
 
+export function applySpeedLimitToDistribution(buckets: SpeedBucket[], speedLimit?: number | null): SpeedBucket[] {
+  if (!speedLimit || speedLimit <= 0 || buckets.length === 0) return buckets;
+
+  const limited: SpeedBucket[] = [];
+  let overflowDistance = 0;
+  for (const bucket of buckets) {
+    if (bucket.minSpeed < speedLimit) limited.push({ ...bucket });
+    else overflowDistance += bucket.distance;
+  }
+
+  if (overflowDistance <= 0) return limited;
+  const simulatedTime = overflowDistance / speedLimit * 60;
+  const lastBucket = limited.at(-1);
+  if (lastBucket) {
+    lastBucket.distance = Number((lastBucket.distance + overflowDistance).toFixed(2));
+    lastBucket.time = Number((lastBucket.time + simulatedTime).toFixed(2));
+    return limited;
+  }
+
+  return [{
+    range: `0-${speedLimit}`,
+    minSpeed: 0,
+    time: Number(simulatedTime.toFixed(2)),
+    distance: Number(overflowDistance.toFixed(2)),
+  }];
+}
+
 export function parseGPX(gpxContent: string): GPXPoint[] {
   const parser = new DOMParser();
   const xmlDoc = parser.parseFromString(gpxContent, "text/xml");
@@ -329,7 +356,7 @@ function applyAdvancedFiltering(
     lon: number;
     magnitude: number;
   }
-  let candidateEvents: CandidateEvent[] = [];
+  const candidateEvents: CandidateEvent[] = [];
 
   for (let i = 0; i < finalAccelerations.length; i++) {
     if (invalidIndices.has(i)) {
@@ -861,7 +888,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
   }
 
   // Calculate Total Time from accumulated active time (excluding pauses)
-  let totalTime = accumulatedTime;
+  const totalTime = accumulatedTime;
   // Fallback if empty (though stats would be empty too)
   if (totalTime === 0 && points.length > 1 && points[0].time && points[points.length - 1].time) {
     // Only use raw diff if we have no segments? But robustSegments check handles length < 2.
