@@ -64,4 +64,4 @@ export default function SegmentCompare() {
   </main></div>;
 }
 
-function Stat({ label, a, b }: { label: string; a: string; b?: string }) { return <div className="rounded-xl border bg-card p-4"><p className="text-xs font-semibold uppercase text-muted-foreground">{label}</p><p className="mt-2 font-bold tabular-nums text-orange-500">{a}</p>{b && <p className="mt-1 font-bold tabular-nums text-blue-500">{b}</p>}</div>; }
+function Stat({ label, a, b }: { label: string; a: string; b?: string }) { return <div className="rounded-xl border bg-card p-4"><p className="text-xs font-semibold uppercase text-muted-foreground">{label}</p><p className="mt-2 font-bold tabular-nums text-[hsl(var(--segment-drive-1))]">{a}</p>{b && <p className="mt-1 font-bold tabular-nums text-[hsl(var(--segment-drive-2))]">{b}</p>}</div>; }

@@ -48,8 +48,14 @@ describe("segment extraction and matching", () => {
 
   it("accepts GPS drift inside the road corridor", () => {
     const segment = segmentFrom(route(0, 10));
-    const drifted = route(0, 10, 0.04, 73.5012);
+    const drifted = route(0, 10, 0.04, 73.5022);
     expect(matchActivityToSegment(segment, loaded(drifted), "owner")?.coverage).toBeGreaterThan(0.98);
+  });
+
+  it("rejects GPS drift beyond the 250 metre road corridor", () => {
+    const segment = segmentFrom(route(0, 10));
+    const drifted = route(0, 10, 0.04, 73.5025);
+    expect(matchActivityToSegment(segment, loaded(drifted), "owner")).toBeNull();
   });
 
   it("rejects the reverse direction", () => {

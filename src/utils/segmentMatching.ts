@@ -10,8 +10,11 @@ import type {
 import { calculateLimitedStats, calculateStats, haversineDistance, type GPXPoint } from "@/utils/gpxParser";
 
 export const SEGMENT_SAMPLE_KM = 0.1;
-export const SEGMENT_MATCH_TOLERANCE_KM = 0.15;
+export const SEGMENT_MATCH_TOLERANCE_KM = 0.25;
 export const SEGMENT_MATCH_THRESHOLD = 0.8;
+
+const MATCH_GRID_SIZE_DEGREES = 0.002;
+const MATCH_GRID_SEARCH_RADIUS = 2;
 
 type Sample = SegmentGeometryPoint & { sourceIndex: number; time?: Date };
 
@@ -85,16 +88,16 @@ function processedMatchingPoints(loaded: LoadedActivity): GPXPoint[] {
 }
 
 function gridKey(lat: number, lon: number) {
-  const size = 0.002;
-  return `${Math.floor(lat / size)}:${Math.floor(lon / size)}`;
+  return `${Math.floor(lat / MATCH_GRID_SIZE_DEGREES)}:${Math.floor(lon / MATCH_GRID_SIZE_DEGREES)}`;
 }
 
 function nearbyKeys(lat: number, lon: number): string[] {
-  const size = 0.002;
-  const x = Math.floor(lat / size);
-  const y = Math.floor(lon / size);
+  const x = Math.floor(lat / MATCH_GRID_SIZE_DEGREES);
+  const y = Math.floor(lon / MATCH_GRID_SIZE_DEGREES);
   const keys: string[] = [];
-  for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) keys.push(`${x + dx}:${y + dy}`);
+  for (let dx = -MATCH_GRID_SEARCH_RADIUS; dx <= MATCH_GRID_SEARCH_RADIUS; dx++) {
+    for (let dy = -MATCH_GRID_SEARCH_RADIUS; dy <= MATCH_GRID_SEARCH_RADIUS; dy++) keys.push(`${x + dx}:${y + dy}`);
+  }
   return keys;
 }
 

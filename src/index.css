@@ -50,6 +50,10 @@
     --input: 60 2% 40%;
     --ring: 15 52% 58%;
 
+    /* Segment comparison series, tuned to the site's book-cloth palette. */
+    --segment-drive-1: 15 52% 58%;
+    --segment-drive-2: 190 24% 38%;
+
     --radius: 0.75rem;
   }
 
@@ -93,6 +97,9 @@
     --border: 60 2% 25%;
     --input: 60 2% 25%;
     --ring: 15 52% 58%;
+
+    --segment-drive-1: 15 52% 58%;
+    --segment-drive-2: 190 32% 62%;
   }
 }
 
