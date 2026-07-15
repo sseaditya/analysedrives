@@ -101,7 +101,7 @@ export default function SegmentCreator({ activityId, activityTitle, points, hide
           <DialogDescription>Select the shared road section. Hidden start/end privacy zones cannot be published.</DialogDescription>
         </DialogHeader>
         <div className="space-y-5">
-          <TrackMap points={points} zoomRange={range} privacyMask={{ start: visibleRange[0], end: visibleRange[1] }} />
+          <TrackMap points={points} zoomRange={range} privacyMask={{ start: visibleRange[0], end: visibleRange[1] }} preserveViewportOnRangeChange />
           <div className="space-y-3 rounded-xl border bg-muted/20 p-4">
             <div className="flex justify-between text-sm">
               <span>Selected road</span>

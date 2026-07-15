@@ -13,10 +13,11 @@ interface TrackMapProps {
   tightTurnPoints?: [number, number][];
   hairpinPoints?: [number, number][];
   privacyMask?: { start: number; end: number } | null;
+  preserveViewportOnRangeChange?: boolean;
 
 }
 
-const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints, hairpinPoints, privacyMask }: TrackMapProps) => {
+const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints, hairpinPoints, privacyMask, preserveViewportOnRangeChange = false }: TrackMapProps) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const layersRef = useRef<{
@@ -377,18 +378,19 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
 
     // Fit Bounds - ONLY if coordinates or zoom range changed
     // Determine if we should re-fit bounds
+    const rangeChanged = lastBoundsRef.current?.zoomRange?.[0] !== zoomRange?.[0] ||
+      lastBoundsRef.current?.zoomRange?.[1] !== zoomRange?.[1];
     const shouldFitBounds = !lastBoundsRef.current ||
       lastBoundsRef.current.points !== points ||
-      lastBoundsRef.current.zoomRange?.[0] !== zoomRange?.[0] ||
-      lastBoundsRef.current.zoomRange?.[1] !== zoomRange?.[1];
+      (!preserveViewportOnRangeChange && rangeChanged);
 
     if (focusCoordinates.length > 0 && shouldFitBounds) {
       const bounds = L.latLngBounds(focusCoordinates);
       map.fitBounds(bounds, { padding: [50, 50], animate: true, duration: 1, maxZoom: 16 });
-      lastBoundsRef.current = { points, zoomRange };
     }
+    lastBoundsRef.current = { points, zoomRange };
 
-  }, [points, zoomRange, stopPoints, tightTurnPoints, mode, showStops, showTurns, segments]); // Re-run when points, zoom, mode, or markers change
+  }, [points, zoomRange, stopPoints, tightTurnPoints, mode, showStops, showTurns, segments, preserveViewportOnRangeChange]); // Re-run when points, zoom, mode, or markers change
 
   // Hover Effect (Separate Effect to avoid redrawing tracks)
   useEffect(() => {
