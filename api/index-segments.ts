@@ -5,8 +5,8 @@ import type { ActivitySummary, LoadedActivity, Segment } from "../src/types/segm
 import type { GPXPoint, ProcessedTrack } from "../src/utils/gpxParser.js";
 import { generateProcessedTrack, PROCESSED_TRACK_VERSION } from "../src/utils/gpxParser.js";
 import {
-  coarseSegmentCandidate,
   matchActivityToSegment,
+  segmentActivityCandidate,
   SEGMENT_EFFORT_ALGORITHM_VERSION,
 } from "../src/utils/segmentMatching.js";
 
@@ -147,7 +147,7 @@ async function effortValues(segment: Segment, loaded: LoadedActivity) {
 }
 
 async function indexPair(admin: any, segment: Segment, loaded: LoadedActivity) {
-  const candidate = coarseSegmentCandidate(segment, loaded.activity);
+  const candidate = segmentActivityCandidate(segment, loaded.activity);
   const values = candidate ? await effortValues(segment, loaded) : null;
   if (!values) {
     await removePair(admin, segment.id, loaded.activity.id);
@@ -201,7 +201,7 @@ async function indexSegment(admin: any, segment: Segment, requesterId: string) {
   const concurrency = 4;
   for (let offset = 0; offset < activities.length; offset += concurrency) {
     const results = await Promise.allSettled(activities.slice(offset, offset + concurrency).map(async (activity) => {
-      if (!coarseSegmentCandidate(segment, activity)) {
+      if (!segmentActivityCandidate(segment, activity)) {
         await removePair(admin, segment.id, activity.id);
         return false;
       }

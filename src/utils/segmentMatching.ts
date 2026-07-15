@@ -340,3 +340,10 @@ export function coarseSegmentCandidate(segment: Segment, activity: ActivitySumma
   const expanded = 0.15;
   return preview.some(([lat, lon]) => lat >= segment.bounds.minLat - expanded && lat <= segment.bounds.maxLat + expanded && lon >= segment.bounds.minLon - expanded && lon <= segment.bounds.maxLon + expanded);
 }
+
+// The segment was cut directly from its source activity, so that activity is
+// always a candidate. In particular, do not let migrated/stale preview stats
+// silently exclude the one drive that is guaranteed to contain the segment.
+export function segmentActivityCandidate(segment: Segment, activity: ActivitySummary) {
+  return activity.id === segment.source_activity_id || coarseSegmentCandidate(segment, activity);
+}

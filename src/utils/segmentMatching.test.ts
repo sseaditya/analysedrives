@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { applySpeedLimitToDistribution, calculateSpeedDistribution, generateProcessedTrack, type GPXPoint } from "@/utils/gpxParser";
 import type { ActivitySummary, LoadedActivity, Segment } from "@/types/segments";
-import { buildComparisonSeries, comparisonActivityPoints, comparisonSpeedDistribution, extractSegmentGeometry, matchActivityToSegment, privacyVisibleRange, segmentBounds } from "@/utils/segmentMatching";
+import { buildComparisonSeries, comparisonActivityPoints, comparisonSpeedDistribution, extractSegmentGeometry, matchActivityToSegment, privacyVisibleRange, segmentActivityCandidate, segmentBounds } from "@/utils/segmentMatching";
 
 const KM_PER_LAT = 111.195;
 
@@ -39,6 +39,16 @@ function loaded(points: GPXPoint[], overrides: Partial<ActivitySummary> = {}): L
 }
 
 describe("segment extraction and matching", () => {
+  it("always keeps the origin drive as a candidate even with stale migrated preview stats", () => {
+    const segment = segmentFrom(route(0, 10));
+    const source = loaded(route(0, 10), {
+      id: "source",
+      stats: { previewCoordinates: [[0, 0], [0.1, 0.1]] },
+    }).activity;
+
+    expect(segmentActivityCandidate(segment, source)).toBe(true);
+  });
+
   it("matches a long drive with unrelated start and end points", () => {
     const segment = segmentFrom(route(10, 20));
     const match = matchActivityToSegment(segment, loaded(route(0, 30)), "owner");

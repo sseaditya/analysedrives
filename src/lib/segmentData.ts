@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabase";
-import { fetchAccessibleActivities, loadActivityTrack } from "@/lib/activityData";
+import { fetchAccessibleActivities, fetchActivitySummary, loadActivityTrack } from "@/lib/activityData";
 import { indexSegmentEfforts } from "@/lib/segmentIndexing";
-import { coarseSegmentCandidate, matchActivityToSegment, SEGMENT_EFFORT_ALGORITHM_VERSION } from "@/utils/segmentMatching";
+import { matchActivityToSegment, segmentActivityCandidate, SEGMENT_EFFORT_ALGORITHM_VERSION } from "@/utils/segmentMatching";
 import type { ActivitySummary, RouteAlignment, Segment, SegmentLeaderboardEntry, SegmentMatch } from "@/types/segments";
 
 function normalizeSegment(record: unknown): Segment {
@@ -46,7 +46,16 @@ type LeaderboardRow = {
 };
 
 async function calculateLiveMatches(segment: Segment, userId: string) {
-  const activities = (await fetchAccessibleActivities(userId)).filter((activity) => coarseSegmentCandidate(segment, activity));
+  const accessible = await fetchAccessibleActivities(userId);
+  if (segment.source_activity_id && !accessible.some((activity) => activity.id === segment.source_activity_id)) {
+    try {
+      const source = await fetchActivitySummary(segment.source_activity_id);
+      if (source.user_id === userId || source.public) accessible.unshift(source);
+    } catch (error) {
+      console.warn("Could not load the segment's source activity metadata", error);
+    }
+  }
+  const activities = accessible.filter((activity) => segmentActivityCandidate(segment, activity));
   const matches: SegmentLeaderboardEntry[] = [];
   let failures = 0;
   const concurrency = 4;
@@ -89,66 +98,45 @@ function describeError(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
+function savedMatchesAreComplete(segment: Segment, userId: string, matches: SegmentLeaderboardEntry[]) {
+  if (matches.length === 0) return false;
+  // Segment creation requires the source activity to belong to the creator.
+  // A creator's saved leaderboard without that activity is therefore known to
+  // be incomplete and must not suppress the original live matcher.
+  if (segment.created_by === userId && segment.source_activity_id) {
+    return matches.some((match) => match.activity.id === segment.source_activity_id);
+  }
+  return true;
+}
+
 export async function findSegmentMatches(segment: Segment, userId: string): Promise<{ matches: SegmentLeaderboardEntry[]; failures: number; persisted: boolean; initializationError?: string }> {
   const issues: string[] = [];
-  let indexingAttempted = false;
-  let indexingFailures = 0;
 
-  if ((segment.efforts_algorithm_version || 0) < SEGMENT_EFFORT_ALGORITHM_VERSION) {
-    indexingAttempted = true;
+  // The saved leaderboard is only an acceleration layer. Trust it when the
+  // server has completed the current algorithm; otherwise go straight to the
+  // original live matcher that predates persisted segment efforts.
+  if ((segment.efforts_algorithm_version || 0) >= SEGMENT_EFFORT_ALGORITHM_VERSION) {
     try {
-      const result = await indexSegmentEfforts({ segmentId: segment.id });
-      indexingFailures = result.failures ?? 0;
-      if (result.failureDetails?.[0]) issues.push(result.failureDetails[0]);
-    } catch (error) {
-      issues.push(describeError(error));
-      console.warn("Could not initialize saved segment efforts", error);
-    }
-  }
-
-  try {
-    const matches = await fetchPersistedMatches(segment.id);
-    if (matches.length > 0) {
-      return {
-        matches,
-        failures: indexingFailures,
-        persisted: true,
-        initializationError: issues[0],
-      };
-    }
-  } catch (error) {
-    issues.push(describeError(error));
-    console.warn("Could not read saved segment leaderboard", error);
-  }
-
-  // A previous backfill may have marked the algorithm version complete while
-  // persisting zero efforts (for example during a database/storage transfer).
-  // Retry that state once even when the segment claims to be current.
-  if (!indexingAttempted) {
-    try {
-      const result = await indexSegmentEfforts({ segmentId: segment.id, force: true });
-      indexingFailures = result.failures ?? 0;
-      if (result.failureDetails?.[0]) issues.push(result.failureDetails[0]);
       const matches = await fetchPersistedMatches(segment.id);
-      if (matches.length > 0) {
-        return {
-          matches,
-          failures: indexingFailures,
-          persisted: true,
-          initializationError: issues[0],
-        };
-      }
+      if (savedMatchesAreComplete(segment, userId, matches)) return { matches, failures: 0, persisted: true };
     } catch (error) {
       issues.push(describeError(error));
-      console.warn("Could not repair empty saved segment leaderboard", error);
+      console.warn("Could not read saved segment leaderboard", error);
     }
   }
 
-  // Preserve the original, pre-persistence implementation as the reliable
-  // fallback. An empty RPC result is not proof that no accessible drive
-  // qualifies; calculate from the user's public + owned drives before showing
-  // an empty leaderboard.
+  // This is the original implementation: fetch every accessible activity,
+  // load its track, and run the same client-side matcher used before the DB
+  // transfer. Crucially, no server backfill blocks this correctness path.
   const live = await calculateLiveMatches(segment, userId);
+
+  // Populate/repair the acceleration layer after live results are already
+  // available. Do not make the user wait for a global backfill.
+  if (live.matches.length > 0) {
+    void indexSegmentEfforts({ segmentId: segment.id, force: true }).catch((error) => {
+      console.warn("Could not refresh saved segment efforts in the background", error);
+    });
+  }
   const initializationError = issues[0]
     ?? (live.matches.length === 0 && live.failures > 0
       ? `${live.failures} accessible drive${live.failures === 1 ? "" : "s"} could not be loaded.`
