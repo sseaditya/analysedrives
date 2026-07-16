@@ -26,7 +26,7 @@ vi.mock("@/lib/segmentIndexing", () => ({
 }));
 
 vi.mock("@/utils/segmentMatching", () => ({
-  SEGMENT_EFFORT_ALGORITHM_VERSION: 6,
+  SEGMENT_EFFORT_ALGORITHM_VERSION: 7,
   SEGMENT_REJECTED_MINIMUM_COVERAGE: 0.5,
   segmentActivityCandidate: mocks.segmentActivityCandidate,
   matchActivityToSegment: mocks.matchActivityToSegment,
@@ -47,7 +47,7 @@ const segment: Segment = {
   ],
   distance_km: 1,
   bounds: { minLat: 18.5, minLon: 73.8, maxLat: 18.6, maxLon: 73.9 },
-  efforts_algorithm_version: 6,
+  efforts_algorithm_version: 7,
   created_at: "2026-07-15T00:00:00.000Z",
 };
 
@@ -176,7 +176,7 @@ describe("findSegmentMatches", () => {
   });
 
   it("recomputes and refreshes efforts saved by an older matching algorithm", async () => {
-    const staleSegment = { ...segment, efforts_algorithm_version: 4 };
+    const staleSegment = { ...segment, efforts_algorithm_version: 6 };
     const base = activity("base-drive", "owner-1", true);
     mocks.fetchAccessibleActivities.mockResolvedValue([base]);
     mocks.loadActivityTrack.mockResolvedValue({

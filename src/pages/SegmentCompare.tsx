@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchSegment, findRejectedSegmentMatches, findSegmentMatches, loadLeaderboardMatch } from "@/lib/segmentData";
-import { buildComparisonSeries } from "@/utils/segmentMatching";
+import { buildComparisonSeries, SEGMENT_EFFORT_ALGORITHM_VERSION } from "@/utils/segmentMatching";
 import { formatDuration } from "@/utils/gpxParser";
 
 export default function SegmentCompare() {
@@ -27,7 +27,7 @@ export default function SegmentCompare() {
   const segmentQuery = useQuery({ queryKey: ["segment", segmentId], queryFn: () => fetchSegment(segmentId), enabled: !!segmentId });
   const driveIds = [params.get("driveA"), params.get("driveB")].filter((id): id is string => Boolean(id));
   const matchesQuery = useQuery({
-    queryKey: ["segment-comparison-matches", segmentId, user?.id, ...driveIds],
+    queryKey: ["segment-comparison-matches", segmentId, user?.id, SEGMENT_EFFORT_ALGORITHM_VERSION, ...driveIds],
     queryFn: async () => {
       const leaderboard = await findSegmentMatches(segmentQuery.data!, user!.id);
       const selected = leaderboard.matches.filter((match) => driveIds.includes(match.activity.id));

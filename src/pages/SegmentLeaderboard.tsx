@@ -15,6 +15,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { fetchSegment, findRejectedSegmentMatches, findSegmentMatches } from "@/lib/segmentData";
 import { supabase } from "@/lib/supabase";
 import { formatDuration } from "@/utils/gpxParser";
+import { SEGMENT_EFFORT_ALGORITHM_VERSION } from "@/utils/segmentMatching";
 
 export default function SegmentLeaderboard() {
   const { segmentId = "" } = useParams();
@@ -31,14 +32,14 @@ export default function SegmentLeaderboard() {
   const [includedRejected, setIncludedRejected] = useState<Set<string>>(() => new Set());
   const segmentQuery = useQuery({ queryKey: ["segment", segmentId], queryFn: () => fetchSegment(segmentId), enabled: !!segmentId });
   const matchesQuery = useQuery({
-    queryKey: ["segment-matches", segmentId, user?.id],
+    queryKey: ["segment-matches", segmentId, user?.id, SEGMENT_EFFORT_ALGORITHM_VERSION],
     queryFn: () => findSegmentMatches(segmentQuery.data!, user!.id),
     enabled: !!segmentQuery.data && !!user,
     staleTime: 5 * 60 * 1000,
   });
   const qualifyingActivityIds = matchesQuery.data?.matches.map((match) => match.activity.id) ?? [];
   const rejectedQuery = useQuery({
-    queryKey: ["segment-rejected-matches", segmentId, user?.id],
+    queryKey: ["segment-rejected-matches", segmentId, user?.id, SEGMENT_EFFORT_ALGORITHM_VERSION],
     queryFn: () => findRejectedSegmentMatches(segmentQuery.data!, user!.id, qualifyingActivityIds),
     enabled: showRejected && !!segmentQuery.data && !!user && matchesQuery.isSuccess,
     staleTime: 5 * 60 * 1000,
