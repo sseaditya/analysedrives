@@ -224,32 +224,15 @@ export function matchActivityToSegment(segment: Segment, loaded: LoadedActivity,
     : [0, loaded.points.length - 1] as [number, number];
   if (range[1] <= range[0]) return null;
   const visiblePoints = loaded.points.slice(range[0], range[1] + 1);
-  const requiresEndpointMatch = minimumCoverage >= SEGMENT_MATCH_THRESHOLD;
-  if (requiresEndpointMatch) {
-    // Endpoint fixes use raw GPS points and a separate 200 m radius. The
-    // alignment below keeps the existing 500 m corridor for ordinary drift.
-    const startEndpoint = segment.geometry[0];
-    const endEndpoint = segment.geometry[segment.geometry.length - 1];
-    const startMatchIndex = visiblePoints.findIndex((point) => haversineDistance(point.lat, point.lon, startEndpoint.lat, startEndpoint.lon) <= SEGMENT_ENDPOINT_TOLERANCE_KM);
-    let endMatchIndex = -1;
-    for (let index = visiblePoints.length - 1; index >= 0; index--) {
-      const point = visiblePoints[index];
-      if (haversineDistance(point.lat, point.lon, endEndpoint.lat, endEndpoint.lon) <= SEGMENT_ENDPOINT_TOLERANCE_KM) {
-        endMatchIndex = index;
-        break;
-      }
-    }
-    if (startMatchIndex < 0 || endMatchIndex <= startMatchIndex) return null;
-  }
   const visibleMatchingPoints = processedMatchingPoints(loaded).slice(range[0], range[1] + 1);
   const samples = resamplePoints(visibleMatchingPoints);
   const alignment = buildAlignment(segment.geometry, samples);
   if (!alignment) return null;
 
-  // GPS corridor width is lateral matching tolerance; it must not also grant
-  // up to 500 m of untravelled road at both ends of the coverage calculation.
-  const coveredStart = Math.max(0, segment.geometry[alignment.segmentStartIndex].distance - SEGMENT_SAMPLE_KM);
-  const coveredEnd = Math.min(segment.distance_km, segment.geometry[alignment.segmentEndIndex].distance + SEGMENT_SAMPLE_KM);
+  // Keep the 500 m GPS corridor as the lateral tolerance only. Start/end
+  // coverage receives its own, smaller 200 m allowance.
+  const coveredStart = Math.max(0, segment.geometry[alignment.segmentStartIndex].distance - SEGMENT_ENDPOINT_TOLERANCE_KM);
+  const coveredEnd = Math.min(segment.distance_km, segment.geometry[alignment.segmentEndIndex].distance + SEGMENT_ENDPOINT_TOLERANCE_KM);
   const coveredDistance = Math.max(0, coveredEnd - coveredStart);
   const coverage = segment.distance_km > 0 ? coveredDistance / segment.distance_km : 0;
   if (coverage + 1e-6 < minimumCoverage) return null;

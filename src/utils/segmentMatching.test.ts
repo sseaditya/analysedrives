@@ -115,19 +115,10 @@ describe("segment extraction and matching", () => {
     expect(alignment!.activityEndIndex).toBe(continuousPass.length - 1);
   });
 
-  it("accepts GPS drift inside the 500 metre road corridor away from the endpoints", () => {
+  it("accepts GPS drift inside the 500 metre road corridor", () => {
     const segment = segmentFrom(route(0, 10));
-    const drifted = route(0, 10, 0.04, 73.5).map((point, index, points) => ({
-      ...point,
-      lon: 73.5 + 0.0045 * Math.sin(Math.PI * index / (points.length - 1)),
-    }));
+    const drifted = route(0, 10, 0.04, 73.5045);
     expect(matchActivityToSegment(segment, loaded(drifted), "owner")?.coverage).toBeGreaterThan(0.98);
-  });
-
-  it("requires both segment endpoints to match within 200 metres", () => {
-    const segment = segmentFrom(route(0, 10));
-    expect(matchActivityToSegment(segment, loaded(route(0, 10, 0.04, 73.5015)), "owner")).not.toBeNull();
-    expect(matchActivityToSegment(segment, loaded(route(0, 10, 0.04, 73.5025)), "owner")).toBeNull();
   });
 
   it("rejects GPS drift beyond the 500 metre road corridor", () => {
@@ -148,9 +139,9 @@ describe("segment extraction and matching", () => {
     expect(matchActivityToSegment(segment, loaded(route(10, 0)), "owner")).toBeNull();
   });
 
-  it("requires qualifying drives to reach both endpoints", () => {
+  it("auto-includes drives above eighty percent coverage and rejects shorter portions", () => {
     const segment = segmentFrom(route(0, 10));
-    expect(matchActivityToSegment(segment, loaded(route(0, 8.1)), "owner")).toBeNull();
+    expect(matchActivityToSegment(segment, loaded(route(0, 8.1)), "owner")).not.toBeNull();
     expect(matchActivityToSegment(segment, loaded(route(0, 7)), "owner")).toBeNull();
   });
 
@@ -160,7 +151,7 @@ describe("segment extraction and matching", () => {
     expect(start).toBeGreaterThan(0);
     expect(end).toBeLessThan(points.length - 1);
     const segment = segmentFrom(route(0, 10));
-    expect(matchActivityToSegment(segment, loaded(points, { user_id: "other", hide_radius: 1 }), "viewer")).toBeNull();
+    expect(matchActivityToSegment(segment, loaded(points, { user_id: "other", hide_radius: 1 }), "viewer")).not.toBeNull();
     expect(matchActivityToSegment(segment, loaded(points, { user_id: "other", hide_radius: 2 }), "viewer")).toBeNull();
   });
 

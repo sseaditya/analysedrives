@@ -140,7 +140,7 @@ export default function SegmentLeaderboard() {
                   {matchesQuery.data?.initializationError && <p className="mx-auto mt-2 max-w-2xl break-words text-xs text-muted-foreground">{matchesQuery.data.initializationError}</p>}
                 </div>
               ) : (
-                <div className="rounded-2xl border border-dashed p-16 text-center"><Route className="mx-auto h-10 w-10 text-muted-foreground" /><h3 className="mt-3 font-semibold">No qualifying drives yet</h3><p className="text-sm text-muted-foreground">The saved index and live matcher checked accessible drives; none met the endpoint matching requirements.</p></div>
+                <div className="rounded-2xl border border-dashed p-16 text-center"><Route className="mx-auto h-10 w-10 text-muted-foreground" /><h3 className="mt-3 font-semibold">No qualifying drives yet</h3><p className="text-sm text-muted-foreground">The saved index and live matcher checked accessible drives; none reached 80% route coverage.</p></div>
               )}
             </div>
           ) : (
@@ -182,12 +182,12 @@ export default function SegmentLeaderboard() {
         </section>
 
         {showRejected && <section className="space-y-4 rounded-2xl border bg-card p-5">
-          <div><h2 className="text-xl font-bold">Rejected accessible drives</h2><p className="text-sm text-muted-foreground">Public drives and your private drives with partial route coverage. These matches can be manually included for comparison.</p></div>
+          <div><h2 className="text-xl font-bold">Rejected accessible drives</h2><p className="text-sm text-muted-foreground">Public drives and your private drives with 50% to under 80% route coverage. These matches can be manually included for comparison.</p></div>
           {rejectedQuery.isLoading ? <div className="py-10 text-center"><Loader2 className="mx-auto h-7 w-7 animate-spin" /><p className="mt-2 text-sm text-muted-foreground">Checking rejected drives…</p></div> : rejectedQuery.isError ? <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-5 text-sm">Could not inspect rejected drives.</div> : (rejectedQuery.data?.length ?? 0) === 0 ? <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">No rejected accessible drives.</div> : <div className="space-y-3">
             {rejectedQuery.data!.map((entry) => {
               const included = includedRejected.has(entry.activity.id);
               const access = entry.activity.public ? (entry.activity.user_id === user?.id ? "Your public drive" : "Public drive") : "Your private drive";
-              const explanation = `${((entry.candidate?.coverage ?? 0) * 100).toFixed(0)}% route coverage.`;
+              const explanation = `${((entry.candidate?.coverage ?? 0) * 100).toFixed(0)}% route coverage — below the 80% automatic inclusion threshold.`;
               return <div key={entry.activity.id} className={`flex flex-col gap-4 rounded-xl border p-4 md:flex-row md:items-center md:justify-between ${included ? "border-primary bg-primary/5" : ""}`}>
                 <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><button className="truncate font-semibold hover:text-primary" onClick={() => navigate(`/activity/${entry.activity.slug || entry.activity.id}`)}>{entry.activity.title}</button><Badge variant="outline">{access}</Badge></div><p className="mt-1 break-words text-sm text-muted-foreground">{explanation}</p></div>
                 <Button className="shrink-0" variant={included ? "secondary" : "outline"} disabled={!entry.candidate} onClick={() => toggleRejected(entry.activity.id)}>{included ? <X className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}{included ? "Remove" : entry.candidate ? "Include drive" : "Cannot include"}</Button>
