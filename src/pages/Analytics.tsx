@@ -617,13 +617,10 @@ const Analytics = () => {
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
                         {fastestDistanceRecords.map(({ distanceKm, record }) => (
                             <div key={distanceKm} className="rounded-lg border border-border bg-muted/20 px-3 py-2.5 min-w-0 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+                                <div className="mb-1.5 text-sm font-semibold tabular-nums">{distanceKm} km</div>
                                 {record ? (
                                     <>
                                         <div className="space-y-1">
-                                            <div className="flex items-center justify-between gap-2">
-                                                <span className="text-[9px] text-muted-foreground font-semibold uppercase tracking-wide">Distance</span>
-                                                <span className="text-sm font-semibold tabular-nums whitespace-nowrap">{distanceKm} km</span>
-                                            </div>
                                             <div className="flex items-center justify-between gap-2">
                                                 <span className="text-[9px] text-muted-foreground font-semibold uppercase tracking-wide">Time</span>
                                                 <span className="text-sm font-semibold tabular-nums whitespace-nowrap">{formatDuration(record.effort.elapsedTime)}</span>
@@ -648,8 +645,8 @@ const Analytics = () => {
                                         </button>
                                     </>
                                 ) : (
-                                    <div className="h-12 flex items-center text-xs text-muted-foreground">
-                                        No qualifying {distanceKm} km ride yet.
+                                    <div className="h-10 flex items-center text-xs text-muted-foreground">
+                                        No qualifying ride yet.
                                     </div>
                                 )}
                             </div>

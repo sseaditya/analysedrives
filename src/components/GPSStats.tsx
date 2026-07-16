@@ -994,7 +994,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                 <div>
                   <h3 className="text-base font-semibold mb-1 flex items-center gap-2">
                     <Gauge className="w-4 h-4 text-primary" />
-                    Fastest Consecutive Distance
+                    Your Fastest Consecutive Distances
                   </h3>
                   <p className="text-xs text-muted-foreground mb-3">
                     Quickest continuous window for each distance completed by this ride.
@@ -1003,7 +1003,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                     {fastestDistanceEfforts.map((effort) => (
                       <div key={effort.distanceKm} className="bg-card border border-border rounded-lg px-3 py-2.5 shadow-sm min-w-0">
                         <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
-                          Fastest {effort.distanceKm} km
+                          {effort.distanceKm} km
                         </span>
                         <span className="block text-base font-semibold tabular-nums mt-1 leading-tight">
                           {formatDuration(effort.elapsedTime)}
