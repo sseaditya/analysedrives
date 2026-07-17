@@ -68,7 +68,7 @@ export default function SegmentCompare() {
       if (next >= maximum) { setCursorValue(maximum); setPlaying(false); return; }
       setCursorValue(next);
     };
-    playbackTimerRef.current = setInterval(advancePlayback, 500);
+    playbackTimerRef.current = setInterval(advancePlayback, 100);
     return () => {
       if (playbackTimerRef.current != null) clearInterval(playbackTimerRef.current);
       playbackTimerRef.current = null;
