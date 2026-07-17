@@ -10,4 +10,4 @@ history. New Supabase schema or policy changes must also be reflected in
 
 The original creation SQL for `public.activities`, `public.profiles`, and the
 `gpx-files` storage bucket predates the repository and is therefore listed as a
-prerequisite rather than recreated here.
+prerequisite rather than recreated here
