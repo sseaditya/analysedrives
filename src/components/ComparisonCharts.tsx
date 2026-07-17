@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -32,8 +32,6 @@ interface TimelineDataPoint {
 interface TimelineMouseState { activePayload?: Array<{ payload?: TimelineDataPoint }> }
 
 const chartMargin = { top: 10, right: 30, left: 0, bottom: 0 };
-const HOVER_UPDATE_INTERVAL_MS = 500;
-
 function ComparisonGrid({ xTicks, yTicks }: { xTicks: number[]; yTicks: number[] }) {
   return <>
     {yTicks.map((value) => <ReferenceLine key={`y-${value}`} y={value} stroke="hsl(var(--muted-foreground))" strokeWidth={0.5} strokeOpacity={0.6} />)}
@@ -143,9 +141,6 @@ export function ComparisonTimeline({
   const isMobile = useIsMobile();
   const [hoverX, setHoverX] = useState<number | null>(null);
   const [hoveredPoint, setHoveredPoint] = useState<TimelineDataPoint | null>(null);
-  const pendingHoverPointRef = useRef<TimelineDataPoint | null>(null);
-  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastHoverUpdateRef = useRef(0);
   const targetPoints = isMobile ? 200 : 500;
   const data = useMemo(() => {
     const raw = series.points;
@@ -217,38 +212,16 @@ export function ComparisonTimeline({
     const point = state?.activePayload?.[0]?.payload;
     if (typeof point?.xValue === "number") {
       setHoverX(point.xValue);
-      pendingHoverPointRef.current = point;
-      const remaining = HOVER_UPDATE_INTERVAL_MS - (performance.now() - lastHoverUpdateRef.current);
-      const updateReadout = () => {
-        const nextPoint = pendingHoverPointRef.current;
-        hoverTimerRef.current = null;
-        if (!nextPoint) return;
-        pendingHoverPointRef.current = null;
-        lastHoverUpdateRef.current = performance.now();
-        setHoveredPoint(nextPoint);
-        onCursor(nextPoint.xValue);
-      };
-      if (remaining <= 0) {
-        if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-        updateReadout();
-      } else if (!hoverTimerRef.current) {
-        hoverTimerRef.current = setTimeout(updateReadout, remaining);
-      }
+      setHoveredPoint(point);
+      onCursor(point.xValue);
     }
   };
   const formatDistanceAxis = (value: number) => Number.isInteger(value) ? `${value} km` : `${Number(value.toFixed(1))} km`;
   const xFormatter = mode === "distance" ? formatDistanceAxis : formatTimeAxis;
   const clearHover = () => {
-    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-    hoverTimerRef.current = null;
-    pendingHoverPointRef.current = null;
     setHoverX(null);
     setHoveredPoint(null);
   };
-
-  useEffect(() => () => {
-    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-  }, []);
 
   return <div className="space-y-3">
     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">

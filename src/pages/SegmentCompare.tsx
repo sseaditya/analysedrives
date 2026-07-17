@@ -22,7 +22,7 @@ export default function SegmentCompare() {
   const [cursorValue, setCursorValue] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speedInfoOpen, setSpeedInfoOpen] = useState(false);
-  const frameRef = useRef<number | null>(null);
+  const playbackTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startedRef = useRef(0);
   const cursorStartRef = useRef(0);
   const cursorRef = useRef(0);
@@ -57,7 +57,8 @@ export default function SegmentCompare() {
     if (!playing || !series) return;
     startedRef.current = performance.now();
     cursorStartRef.current = cursorRef.current;
-    const animate = (now: number) => {
+    const advancePlayback = () => {
+      const now = performance.now();
       const last = series.points[series.points.length - 1];
       const maximum = comparisonMode === "time" ? Math.max(last.elapsedA, last.elapsedB) : series.distance;
       const remaining = Math.max(0.001, maximum - cursorStartRef.current);
@@ -66,10 +67,12 @@ export default function SegmentCompare() {
       const next = cursorStartRef.current + advance;
       if (next >= maximum) { setCursorValue(maximum); setPlaying(false); return; }
       setCursorValue(next);
-      frameRef.current = requestAnimationFrame(animate);
     };
-    frameRef.current = requestAnimationFrame(animate);
-    return () => { if (frameRef.current != null) cancelAnimationFrame(frameRef.current); };
+    playbackTimerRef.current = setInterval(advancePlayback, 500);
+    return () => {
+      if (playbackTimerRef.current != null) clearInterval(playbackTimerRef.current);
+      playbackTimerRef.current = null;
+    };
   }, [comparisonMode, playing, series]);
 
   if (segmentQuery.isLoading || matchesQuery.isLoading) return <div className="flex min-h-screen items-center justify-center"><div className="text-center"><Route className="mx-auto h-8 w-8 animate-pulse text-primary" /><p className="mt-3 text-sm text-muted-foreground">Aligning selected drives…</p></div></div>;
