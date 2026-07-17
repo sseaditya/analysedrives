@@ -4,6 +4,7 @@ import "leaflet/dist/leaflet.css";
 import { GPXPoint, analyzeSegments, TrackSegment } from "@/utils/gpxParser";
 import { Layers, Activity, Zap, Maximize2, Map } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
+import { getSpeedRouteColor } from "@/utils/mapColors";
 
 interface TrackMapProps {
   points: GPXPoint[];
@@ -220,12 +221,7 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
 
           weight = 6; // Thicker for better highlight visibility
         } else if (mode === 'speed') {
-          // Fixed scale: 0 to 150 km/h
-          const ratio = Math.min(seg.speed / 150, 1);
-
-          // Lightness from 90% (slowest) to 25% (fastest)
-          const lightness = 90 - (ratio * 65);
-          color = `hsl(215, 95%, ${lightness}%)`;
+          color = getSpeedRouteColor(seg.speed);
         } else if (mode === 'acceleration') {
           const val = seg.acceleration;
 

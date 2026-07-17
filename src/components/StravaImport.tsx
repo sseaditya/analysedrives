@@ -146,7 +146,8 @@ export default function StravaImport({ onImportComplete }: StravaImportProps) {
                     slug: null, // Let DB sequence handle it (or omit if default works)
                     stats: {
                         ...processedTrack.stats,
-                        previewCoordinates: processedTrack.previewCoordinates
+                        previewCoordinates: processedTrack.previewCoordinates,
+                        previewSpeeds: processedTrack.previewSpeeds
                     }
                 }).select('id').single();
 

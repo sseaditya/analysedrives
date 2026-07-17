@@ -398,7 +398,8 @@ const Dashboard = () => {
                                 file_path: gpxFileName,
                                 stats: {
                                     ...processedTrack.stats,
-                                    previewCoordinates: processedTrack.previewCoordinates
+                                    previewCoordinates: processedTrack.previewCoordinates,
+                                    previewSpeeds: processedTrack.previewSpeeds
                                 },
                             }
                         ])
@@ -687,7 +688,11 @@ const Dashboard = () => {
                                         >
                                             {/* Mini Map */}
                                             <div className="h-40 w-full relative bg-muted/30">
-                                                <ActivityMiniMap coordinates={activity.stats?.previewCoordinates} />
+                                                <ActivityMiniMap
+                                                    coordinates={activity.stats?.previewCoordinates}
+                                                    speeds={activity.stats?.previewSpeeds}
+                                                    averageSpeed={activity.stats?.avgSpeed}
+                                                />
                                             </div>
 
                                             {/* Details */}

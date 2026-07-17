@@ -144,6 +144,7 @@ export interface ProcessedTrack {
   points: ProcessedPoint[];
   stats: GPXStats;
   previewCoordinates: [number, number][];
+  previewSpeeds?: number[];
 }
 
 // Haversine formula to calculate distance between two GPS points
@@ -1171,23 +1172,39 @@ export const formatSpeed = (kmh: number): string => {
 
 // Helper to downsample track for mini-maps (preserve shape with fewer points)
 export function generatePreviewPolyline(points: GPXPoint[], targetCount: number = 100): [number, number][] {
-  if (points.length <= targetCount) {
-    return points.map(p => [p.lat, p.lon]);
+  return getPreviewPointIndices(points.length, targetCount)
+    .map(index => [points[index].lat, points[index].lon]);
+}
+
+function getPreviewPointIndices(pointCount: number, targetCount: number): number[] {
+  if (pointCount <= 0 || targetCount <= 0) return [];
+  if (pointCount <= targetCount) return Array.from({ length: pointCount }, (_, index) => index);
+
+  const step = pointCount / targetCount;
+  const indices = Array.from(
+    { length: targetCount },
+    (_, index) => Math.min(Math.floor(index * step), pointCount - 1)
+  );
+
+  indices.push(pointCount - 1);
+  return indices;
+}
+
+function generatePreviewSpeeds(points: ProcessedPoint[], targetCount: number = 100): number[] {
+  const indices = getPreviewPointIndices(points.length, targetCount);
+  if (indices.length < 2) return [];
+
+  const cumulativeSpeeds = new Array(points.length + 1).fill(0);
+  for (let index = 0; index < points.length; index++) {
+    cumulativeSpeeds[index + 1] = cumulativeSpeeds[index] + points[index].speed;
   }
 
-  const step = points.length / targetCount;
-  const sampled: [number, number][] = [];
-
-  for (let i = 0; i < targetCount; i++) {
-    const index = Math.min(Math.floor(i * step), points.length - 1);
-    sampled.push([points[index].lat, points[index].lon]);
-  }
-
-  // Always include the last point
-  const last = points[points.length - 1];
-  sampled.push([last.lat, last.lon]);
-
-  return sampled;
+  return indices.slice(1).map((endIndex, previewIndex) => {
+    const startIndex = indices[previewIndex];
+    const segmentCount = Math.max(1, endIndex - startIndex);
+    const speedSum = cumulativeSpeeds[endIndex + 1] - cumulativeSpeeds[startIndex + 1];
+    return speedSum / segmentCount;
+  });
 }
 
 /**
@@ -1351,7 +1368,8 @@ export function generateProcessedTrack(points: GPXPoint[]): ProcessedTrack {
         elapsedTime: 0
       })),
       stats,
-      previewCoordinates
+      previewCoordinates,
+      previewSpeeds: []
     };
   }
 
@@ -1470,6 +1488,7 @@ export function generateProcessedTrack(points: GPXPoint[]): ProcessedTrack {
     version: PROCESSED_TRACK_VERSION,
     points: processedPoints,
     stats,
-    previewCoordinates
+    previewCoordinates,
+    previewSpeeds: generatePreviewSpeeds(processedPoints)
   };
 }

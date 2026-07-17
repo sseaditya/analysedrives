@@ -20,6 +20,7 @@ interface Profile {
 interface ActivityStats {
     startTime?: string;
     previewCoordinates?: [number, number][];
+    previewSpeeds?: number[];
     totalDistance?: number;
     totalTime?: number;
     avgSpeed?: number;
@@ -291,7 +292,11 @@ const Feed = () => {
                                     >
                                         {/* Map Preview with Overlay */}
                                         <div className="h-48 w-full relative bg-muted/30">
-                                            <ActivityMiniMap coordinates={activity.stats?.previewCoordinates} />
+                                            <ActivityMiniMap
+                                                coordinates={activity.stats?.previewCoordinates}
+                                                speeds={activity.stats?.previewSpeeds}
+                                                averageSpeed={activity.stats?.avgSpeed}
+                                            />
 
                                             {/* User Info Overlay */}
                                             <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 flex items-end justify-between">
