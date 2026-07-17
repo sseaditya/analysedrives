@@ -37,6 +37,11 @@ type ActivitySegmentRankRow = {
   segment_id: string;
   segment_name: string;
   rank: number | string;
+  total_rides: number | string;
+  coverage: number | string;
+  matched_distance: number | string;
+  elapsed_time: number | string;
+  avg_speed: number | string;
 };
 
 export async function fetchActivitySegmentRanks(activityId: string): Promise<ActivitySegmentRank[]> {
@@ -48,6 +53,11 @@ export async function fetchActivitySegmentRanks(activityId: string): Promise<Act
     segmentId: row.segment_id,
     segmentName: row.segment_name,
     rank: Number(row.rank),
+    totalRides: Number(row.total_rides),
+    coverage: Number(row.coverage),
+    matchedDistance: Number(row.matched_distance),
+    elapsedTime: Number(row.elapsed_time),
+    avgSpeed: Number(row.avg_speed),
   }));
 }
 

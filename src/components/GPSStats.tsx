@@ -1006,16 +1006,36 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                         key={segment.segmentId}
                         to={`/segments/${segment.segmentId}`}
                         className={cn(
-                          "flex items-center justify-between gap-4 px-4 py-3 transition-colors hover:bg-accent",
+                          "block px-4 py-4 transition-colors hover:bg-accent",
                           index > 0 && "border-t border-border"
                         )}
                       >
-                        <span className="shrink-0 text-lg font-black tabular-nums text-muted-foreground">
-                          #{segment.rank}
-                        </span>
-                        <span className="min-w-0 flex-1 truncate font-semibold text-foreground hover:text-primary">
-                          {segment.segmentName}
-                        </span>
+                        <div className="flex items-center gap-4">
+                          <span className="shrink-0 text-lg font-black tabular-nums text-muted-foreground">
+                            {segment.rank}/{segment.totalRides} <span className="text-xs font-semibold">rides</span>
+                          </span>
+                          <span className="min-w-0 flex-1 truncate font-semibold text-foreground hover:text-primary">
+                            {segment.segmentName}
+                          </span>
+                        </div>
+                        <div className="mt-3 grid grid-cols-2 gap-3 border-t border-border/60 pt-3 text-sm sm:grid-cols-4">
+                          <div>
+                            <span className="block text-xs text-muted-foreground">Coverage</span>
+                            <span className="font-semibold tabular-nums">{(segment.coverage * 100).toFixed(0)}%</span>
+                          </div>
+                          <div>
+                            <span className="block text-xs text-muted-foreground">Distance</span>
+                            <span className="font-semibold tabular-nums">{segment.matchedDistance.toFixed(1)} km</span>
+                          </div>
+                          <div>
+                            <span className="block text-xs text-muted-foreground">Time</span>
+                            <span className="font-semibold tabular-nums">{formatDuration(segment.elapsedTime)}</span>
+                          </div>
+                          <div>
+                            <span className="block text-xs text-muted-foreground">Avg speed</span>
+                            <span className="font-semibold tabular-nums">{segment.avgSpeed.toFixed(1)} km/h</span>
+                          </div>
+                        </div>
                       </Link>
                     ))}
                   </div>

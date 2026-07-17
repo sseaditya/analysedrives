@@ -282,11 +282,18 @@ $$;
 revoke all on function public.get_segment_leaderboard(uuid) from public;
 grant execute on function public.get_segment_leaderboard(uuid) to authenticated;
 
-create or replace function public.get_activity_segment_ranks(target_activity_id uuid)
+drop function if exists public.get_activity_segment_ranks(uuid);
+
+create function public.get_activity_segment_ranks(target_activity_id uuid)
 returns table (
   segment_id uuid,
   segment_name text,
-  rank bigint
+  rank bigint,
+  total_rides bigint,
+  coverage double precision,
+  matched_distance double precision,
+  elapsed_time double precision,
+  avg_speed double precision
 )
 language sql
 stable
@@ -299,6 +306,8 @@ as $$
       e.activity_id,
       e.indexed_at,
       case when a.user_id = auth.uid() then e.raw_coverage else e.public_coverage end as selected_coverage,
+      case when a.user_id = auth.uid() then e.raw_matched_distance else e.public_matched_distance end as selected_distance,
+      case when a.user_id = auth.uid() then e.raw_elapsed_time else e.public_elapsed_time end as selected_elapsed,
       case when a.user_id = auth.uid() then e.raw_avg_speed else e.public_avg_speed end as selected_avg
     from public.segment_efforts e
     join public.activities a on a.id = e.activity_id
@@ -308,13 +317,26 @@ as $$
     select
       visible_efforts.segment_id,
       visible_efforts.activity_id,
+      visible_efforts.selected_coverage,
+      visible_efforts.selected_distance,
+      visible_efforts.selected_elapsed,
+      visible_efforts.selected_avg,
       row_number() over (
         partition by visible_efforts.segment_id
         order by selected_avg desc, selected_coverage desc, indexed_at asc
-      ) as effort_rank
+      ) as effort_rank,
+      count(*) over (partition by visible_efforts.segment_id) as total_rides
     from visible_efforts
   )
-  select s.id, s.name, ranked_efforts.effort_rank
+  select
+    s.id,
+    s.name,
+    ranked_efforts.effort_rank,
+    ranked_efforts.total_rides,
+    ranked_efforts.selected_coverage,
+    ranked_efforts.selected_distance,
+    ranked_efforts.selected_elapsed,
+    ranked_efforts.selected_avg
   from ranked_efforts
   join public.segments s on s.id = ranked_efforts.segment_id
   where ranked_efforts.activity_id = target_activity_id

@@ -117,15 +117,15 @@ describe("findSegmentMatches", () => {
   it("maps an activity's segment ranks from the visibility-aware RPC", async () => {
     mocks.rpc.mockResolvedValue({
       data: [
-        { segment_id: "segment-1", segment_name: "Hill Road", rank: 2 },
-        { segment_id: "segment-2", segment_name: "Lake Loop", rank: "5" },
+        { segment_id: "segment-1", segment_name: "Hill Road", rank: 2, total_rides: 8, coverage: 0.98, matched_distance: 12.4, elapsed_time: 900, avg_speed: 49.6 },
+        { segment_id: "segment-2", segment_name: "Lake Loop", rank: "5", total_rides: "12", coverage: "0.85", matched_distance: "8.1", elapsed_time: "720", avg_speed: "40.5" },
       ],
       error: null,
     });
 
     await expect(fetchActivitySegmentRanks("drive-1")).resolves.toEqual([
-      { segmentId: "segment-1", segmentName: "Hill Road", rank: 2 },
-      { segmentId: "segment-2", segmentName: "Lake Loop", rank: 5 },
+      { segmentId: "segment-1", segmentName: "Hill Road", rank: 2, totalRides: 8, coverage: 0.98, matchedDistance: 12.4, elapsedTime: 900, avgSpeed: 49.6 },
+      { segmentId: "segment-2", segmentName: "Lake Loop", rank: 5, totalRides: 12, coverage: 0.85, matchedDistance: 8.1, elapsedTime: 720, avgSpeed: 40.5 },
     ]);
     expect(mocks.rpc).toHaveBeenCalledWith("get_activity_segment_ranks", {
       target_activity_id: "drive-1",

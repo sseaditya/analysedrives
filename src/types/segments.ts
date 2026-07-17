@@ -93,6 +93,11 @@ export interface ActivitySegmentRank {
   segmentId: string;
   segmentName: string;
   rank: number;
+  totalRides: number;
+  coverage: number;
+  matchedDistance: number;
+  elapsedTime: number;
+  avgSpeed: number;
 }
 
 export type SegmentRejectionReason = "coverage";
