@@ -14,6 +14,13 @@ import { calculateNiceTicks, calculateNiceYTicks } from "@/utils/chartUtils";
 import { useState, useMemo, useEffect, useCallback, useRef, memo } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { chartAxisLabel, chartAxisTick } from "@/utils/chartStyles";
+import {
+  axisValueFromChartPosition,
+  closestPointIndexForAxisValue,
+} from "@/utils/chartSelection";
+
+const CHART_MARGIN = { top: 10, right: 30, left: 0, bottom: 0 } as const;
+const Y_AXIS_WIDTH = 60;
 
 interface SpeedElevationChartProps {
   points: GPXPoint[];
@@ -35,6 +42,12 @@ interface ChartDataPoint {
   time: string;
   elapsedTime: number; // Elapsed time in seconds from start
   pointIndex: number;
+}
+
+interface ChartPointerState {
+  chartX?: number;
+  activeLabel?: string | number;
+  activePayload?: Array<{ payload: ChartDataPoint }>;
 }
 
 // Format elapsed time for axis display (e.g., "5:30" for 5 min 30 sec)
@@ -365,12 +378,12 @@ const SpeedElevationChart = ({
     let startVal: number | null = null;
     let endVal: number | null = null;
 
-    for (let i = 0; i < fullData.length; i++) {
-      if (startVal === null && fullData[i].pointIndex >= zoomRange[0]) {
-        startVal = xAxisMode === 'time' ? fullData[i].elapsedTime : fullData[i].distance;
+    for (let i = 0; i < processedRawData.length; i++) {
+      if (startVal === null && processedRawData[i].pointIndex >= zoomRange[0]) {
+        startVal = xAxisMode === 'time' ? processedRawData[i].elapsed : processedRawData[i].dist;
       }
-      if (endVal === null && fullData[i].pointIndex >= zoomRange[1]) {
-        endVal = xAxisMode === 'time' ? fullData[i].elapsedTime : fullData[i].distance;
+      if (endVal === null && processedRawData[i].pointIndex >= zoomRange[1]) {
+        endVal = xAxisMode === 'time' ? processedRawData[i].elapsed : processedRawData[i].dist;
         break;
       }
     }
@@ -381,7 +394,7 @@ const SpeedElevationChart = ({
       fullMinVal: fMinVal,
       fullMaxVal: fMaxVal
     };
-  }, [zoomRange, fullData, xAxisMode, fullMinTime, fullMaxTime, fullMinDistance, fullMaxDistance]);
+  }, [zoomRange, processedRawData, xAxisMode, fullMinTime, fullMaxTime, fullMinDistance, fullMaxDistance]);
 
   // Calculate strict ticks for synchro
   const xAxisTicks = useMemo(() => {
@@ -397,6 +410,25 @@ const SpeedElevationChart = ({
   const elevationXTicks = useMemo(() => {
     return calculateNiceTicks(fullXDomain[0], fullXDomain[1], xAxisMode, 8);
   }, [fullXDomain, xAxisMode]);
+
+  const getSelectionAxisValue = useCallback((event: ChartPointerState | null, chartType: 'speed' | 'elevation'): number | null => {
+    const wrappers = chartRef.current?.querySelectorAll<HTMLElement>('.recharts-wrapper');
+    const wrapper = wrappers?.[chartType === 'speed' ? 0 : wrappers.length - 1];
+    const chartWidth = wrapper?.getBoundingClientRect().width ?? 0;
+    const domain = (chartType === 'speed' ? speedXDomain : fullXDomain) as [number, number];
+    const pointerValue = axisValueFromChartPosition(
+      Number(event?.chartX),
+      chartWidth,
+      CHART_MARGIN.left + Y_AXIS_WIDTH,
+      CHART_MARGIN.right,
+      domain,
+    );
+
+    if (pointerValue !== null) return pointerValue;
+
+    const fallback = Number(event?.activeLabel);
+    return Number.isFinite(fallback) ? fallback : null;
+  }, [speedXDomain, fullXDomain]);
 
   // Edge detection threshold - 1% for better UX (Reduced from 3%)
   const EDGE_THRESHOLD = (fullMaxVal - fullMinVal) * 0.01;
@@ -446,12 +478,13 @@ const SpeedElevationChart = ({
 
     if (leftVal > rightVal) [leftVal, rightVal] = [rightVal, leftVal];
 
-    const startData = fullData.find(p => xAxisMode === 'time' ? p.elapsedTime >= leftVal : p.distance >= leftVal);
-    const endData = fullData.find(p => xAxisMode === 'time' ? p.elapsedTime >= rightVal : p.distance >= rightVal);
+    const selectionAxis = xAxisMode === 'time' ? 'time' : 'distance';
+    const resolvedStartIndex = closestPointIndexForAxisValue(processedRawData, leftVal, selectionAxis);
+    const resolvedEndIndex = closestPointIndexForAxisValue(processedRawData, rightVal, selectionAxis);
 
-    if (startData && endData) {
-      let startIndex = startData.pointIndex;
-      let endIndex = endData.pointIndex;
+    if (resolvedStartIndex !== null && resolvedEndIndex !== null) {
+      let startIndex = resolvedStartIndex;
+      let endIndex = resolvedEndIndex;
 
       // Ensure minimum points
       const MIN_POINTS = 5;
@@ -478,18 +511,19 @@ const SpeedElevationChart = ({
     setActiveChart(null);
     setInteractionMode('none');
     setDragStartDist(null);
-  }, [refAreaLeft, refAreaRight, zoomRange, onZoomChange, fullData, xAxisMode, points.length]);
+  }, [refAreaLeft, refAreaRight, zoomRange, onZoomChange, processedRawData, xAxisMode, points.length]);
 
-  const handleMouseMoveInner = useCallback((e: any, chartType: 'speed' | 'elevation') => {
+  const handleMouseMoveInner = useCallback((e: ChartPointerState | null, chartType: 'speed' | 'elevation') => {
+    const selectionValue = getSelectionAxisValue(e, chartType);
+
     // Update hover distance for sync lines
     if (e?.activeLabel) {
       setHoverDistance(parseFloat(e.activeLabel));
     }
 
     // Update cursor based on hover position (elevation chart only)
-    if (chartType === 'elevation' && e?.activeLabel && !refAreaLeft) {
-      const dist = parseFloat(e.activeLabel);
-      const mode = getInteractionMode(dist);
+    if (chartType === 'elevation' && selectionValue !== null && refAreaLeft === null) {
+      const mode = getInteractionMode(selectionValue);
       setCursorStyle(getCursorForMode(mode));
 
       // Update hover part state
@@ -502,10 +536,10 @@ const SpeedElevationChart = ({
       setHoveredPart(null);
     }
 
-    if (refAreaLeft && activeChart === chartType) {
+    if (refAreaLeft !== null && activeChart === chartType) {
       // dragging
-      if (e.activeLabel) {
-        const currentVal = parseFloat(e.activeLabel);
+      if (selectionValue !== null) {
+        const currentVal = selectionValue;
 
         if (interactionMode === 'move-window' && zoomStartVal !== null && zoomEndVal !== null && dragStartDist !== null) {
           // Move entire window
@@ -537,7 +571,7 @@ const SpeedElevationChart = ({
           setRefAreaRight(currentVal.toString());
         } else {
           // New selection
-          setRefAreaRight(e.activeLabel);
+          setRefAreaRight(currentVal.toString());
         }
       }
     }
@@ -555,10 +589,10 @@ const SpeedElevationChart = ({
     if (pointIndex !== undefined && pointIndex < points.length) {
       onHover(points[pointIndex], activeData.speed, pointIndex);
     }
-  }, [refAreaLeft, activeChart, interactionMode, zoomStartVal, zoomEndVal, dragStartDist, fullMinVal, fullMaxVal, isMobile, onHover, points, getInteractionMode, getCursorForMode]);
+  }, [refAreaLeft, activeChart, interactionMode, zoomStartVal, zoomEndVal, dragStartDist, fullMinVal, fullMaxVal, onHover, points, getInteractionMode, getCursorForMode, getSelectionAxisValue]);
 
   // Throttle mouse moves to once per animation frame for smooth 60fps interaction
-  const handleMouseMove = useCallback((e: any, chartType: 'speed' | 'elevation') => {
+  const handleMouseMove = useCallback((e: ChartPointerState | null, chartType: 'speed' | 'elevation') => {
     if (rafRef.current !== null) {
       cancelAnimationFrame(rafRef.current);
     }
@@ -568,27 +602,27 @@ const SpeedElevationChart = ({
     });
   }, [handleMouseMoveInner]);
 
-  const handleMouseDown = useCallback((e: any, chartType: 'speed' | 'elevation') => {
+  const handleMouseDown = useCallback((e: ChartPointerState | null, chartType: 'speed' | 'elevation') => {
     if (isMobile) return; // Disable selection on mobile
-    if (e && e.activeLabel) {
-      const dist = parseFloat(e.activeLabel);
+    const selectionValue = getSelectionAxisValue(e, chartType);
+    if (selectionValue !== null) {
 
       if (chartType === 'elevation') {
-        const mode = getInteractionMode(dist);
+        const mode = getInteractionMode(selectionValue);
         setInteractionMode(mode);
 
         if (mode === 'move-window') {
-          setDragStartDist(dist);
+          setDragStartDist(selectionValue);
           setRefAreaLeft(zoomStartVal?.toString() || null);
           setRefAreaRight(zoomEndVal?.toString() || null);
           setCursorStyle('grabbing');
         } else {
-          setRefAreaLeft(e.activeLabel);
+          setRefAreaLeft(selectionValue.toString());
           setRefAreaRight(null);
           setDragStartDist(null);
         }
       } else {
-        setRefAreaLeft(e.activeLabel);
+        setRefAreaLeft(selectionValue.toString());
         setRefAreaRight(null);
         setInteractionMode('new-selection');
         setDragStartDist(null);
@@ -596,7 +630,7 @@ const SpeedElevationChart = ({
 
       setActiveChart(chartType);
     }
-  }, [isMobile, getInteractionMode, zoomStartVal, zoomEndVal]);
+  }, [isMobile, getInteractionMode, zoomStartVal, zoomEndVal, getSelectionAxisValue]);
 
   const handleMouseUp = useCallback(() => {
     zoom();
@@ -676,8 +710,6 @@ const SpeedElevationChart = ({
   }, [activeChart, handleMouseUp, interactionMode, zoomStartVal, zoomEndVal, fullMinVal, fullMaxVal]);
 
   // Shared margin configuration
-  const chartMargin = { top: 10, right: 30, left: 0, bottom: 0 };
-
   // Calculate Y-axis domain for speed chart
   // ONLY speedCap affects the domain, speedLimit does NOT
   // Use original speed max to prevent rescaling when visual limit is applied
@@ -701,7 +733,7 @@ const SpeedElevationChart = ({
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart
             data={speedChartData}
-            margin={chartMargin}
+            margin={CHART_MARGIN}
             onMouseMove={(e) => handleMouseMove(e, 'speed')}
             onMouseLeave={handleMouseLeave}
             onMouseDown={(e) => handleMouseDown(e, 'speed')}
@@ -756,7 +788,7 @@ const SpeedElevationChart = ({
               axisLine={false}
               tickFormatter={(value) => Math.round(value).toString()}
               label={{ value: "Speed (km/h)", angle: -90, position: "insideLeft", ...chartAxisLabel }}
-              width={60}
+              width={Y_AXIS_WIDTH}
               domain={speedYAxisConfig.domain}
               ticks={speedYAxisConfig.ticks}
               interval={0}
@@ -818,7 +850,7 @@ const SpeedElevationChart = ({
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart
               data={fullData}
-              margin={chartMargin}
+              margin={CHART_MARGIN}
               onMouseMove={(e) => handleMouseMove(e, 'elevation')}
               onMouseLeave={handleMouseLeave}
               onMouseDown={(e) => handleMouseDown(e, 'elevation')}
@@ -873,7 +905,7 @@ const SpeedElevationChart = ({
                 tickLine={false}
                 axisLine={false}
                 tickFormatter={(value) => Math.round(value).toString()}
-                width={60}
+                width={Y_AXIS_WIDTH}
                 domain={elevationYAxisConfig.domain}
                 ticks={elevationYAxisConfig.ticks}
               />
