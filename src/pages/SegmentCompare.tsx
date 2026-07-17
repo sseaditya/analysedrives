@@ -13,6 +13,9 @@ import { fetchSegment, findRejectedSegmentMatches, findSegmentMatches, loadLeade
 import { buildComparisonSeries, SEGMENT_EFFORT_ALGORITHM_VERSION } from "@/utils/segmentMatching";
 import { formatDuration } from "@/utils/gpxParser";
 
+const AUTO_PLAYBACK_DURATION_MS = 30_000;
+const AUTO_PLAYBACK_FPS = 30;
+
 export default function SegmentCompare() {
   const { segmentId = "" } = useParams();
   const [params] = useSearchParams();
@@ -21,6 +24,7 @@ export default function SegmentCompare() {
   const [comparisonMode, setComparisonMode] = useState<"time" | "distance">("time");
   const [cursorValue, setCursorValue] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const [playbackFrameStep, setPlaybackFrameStep] = useState(0);
   const [speedInfoOpen, setSpeedInfoOpen] = useState(false);
   const playbackTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startedRef = useRef(0);
@@ -57,18 +61,19 @@ export default function SegmentCompare() {
     if (!playing || !series) return;
     startedRef.current = performance.now();
     cursorStartRef.current = cursorRef.current;
+    const last = series.points[series.points.length - 1];
+    const maximum = comparisonMode === "time" ? Math.max(last.elapsedA, last.elapsedB) : series.distance;
+    const remaining = Math.max(0.001, maximum - cursorStartRef.current);
+    setPlaybackFrameStep(remaining / (AUTO_PLAYBACK_FPS * AUTO_PLAYBACK_DURATION_MS / 1000));
     const advancePlayback = () => {
       const now = performance.now();
-      const last = series.points[series.points.length - 1];
-      const maximum = comparisonMode === "time" ? Math.max(last.elapsedA, last.elapsedB) : series.distance;
-      const remaining = Math.max(0.001, maximum - cursorStartRef.current);
-      const rawAdvance = ((now - startedRef.current) / 30_000) * remaining;
+      const rawAdvance = ((now - startedRef.current) / AUTO_PLAYBACK_DURATION_MS) * remaining;
       const advance = comparisonMode === "time" ? Math.floor(rawAdvance) : rawAdvance;
       const next = cursorStartRef.current + advance;
       if (next >= maximum) { setCursorValue(maximum); setPlaying(false); return; }
       setCursorValue(next);
     };
-    playbackTimerRef.current = setInterval(advancePlayback, 1000 / 30);
+    playbackTimerRef.current = setInterval(advancePlayback, 1000 / AUTO_PLAYBACK_FPS);
     return () => {
       if (playbackTimerRef.current != null) clearInterval(playbackTimerRef.current);
       playbackTimerRef.current = null;
@@ -101,7 +106,7 @@ export default function SegmentCompare() {
     <div><p className="text-sm font-semibold text-primary">{segmentQuery.data.name}</p><h1 className="text-3xl font-bold">{matchA.activity.title} <span className="text-muted-foreground">vs</span> {matchB.activity.title}</h1><p className="mt-1 text-muted-foreground">Only the longest road section covered by both drives is compared.</p></div>
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5"><Stat label="Common distance" a={`${series.distance.toFixed(1)} km`} /><Stat label="Elapsed time" a={formatDuration(last.elapsedA)} b={formatDuration(last.elapsedB)} /><Stat label="Average speed" a={`${avgA.toFixed(1)} km/h`} b={`${avgB.toFixed(1)} km/h`} /><Stat label="Maximum speed" a={`${maxA.toFixed(0)} km/h`} b={`${maxB.toFixed(0)} km/h`} /><Stat label="Time difference" a={formatDuration(Math.abs(last.elapsedA - last.elapsedB))} /></div>
     <section className="rounded-2xl border bg-card p-3"><ComparisonMap segment={segmentQuery.data} series={series} cursorMode={comparisonMode} cursorValue={cursorValue} driveATitle={matchA.activity.title} driveBTitle={matchB.activity.title} /><div className="mt-4 flex items-center gap-3"><Button size="icon" variant="outline" onClick={() => { setCursorValue(0); setPlaying(false); }}><RotateCcw className="h-4 w-4" /></Button><Button size="icon" onClick={() => setPlaying((value) => !value)}>{playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}</Button><TimeStrip mode={comparisonMode} duration={comparisonDuration} times={cursorTimes} value={cursorValue} onChange={(value) => { setCursorValue(value); setPlaying(false); }} /><span className="w-24 text-right text-xs tabular-nums text-muted-foreground">{comparisonMode === "time" ? formatDuration(cursorValue) : `${cursorValue.toFixed(1)} km`}</span></div></section>
-    <section className="rounded-2xl border bg-card p-4"><h2 className="mb-2 flex items-center gap-2 text-xl font-bold">Speed and elevation<Popover open={speedInfoOpen} onOpenChange={setSpeedInfoOpen}><PopoverTrigger asChild><button type="button" className="focus:outline-none" aria-label="More Information" onMouseEnter={() => setSpeedInfoOpen(true)} onMouseLeave={() => setSpeedInfoOpen(false)} onFocus={() => setSpeedInfoOpen(true)} onBlur={() => setSpeedInfoOpen(false)}><Info className="h-4 w-4 cursor-help text-muted-foreground hover:text-foreground" /></button></PopoverTrigger><PopoverContent className="max-w-xs text-xs z-[1100]"><p>Time compares both drives at the same moment; distance compares them at the same point on the route.</p></PopoverContent></Popover></h2><ComparisonTimeline series={series} matchA={matchA} matchB={matchB} mode={comparisonMode} playing={playing} cursorValue={cursorValue} onModeChange={changeMode} onCursor={(value) => { setCursorValue(value); setPlaying(false); }} /></section>
+    <section className="rounded-2xl border bg-card p-4"><h2 className="mb-2 flex items-center gap-2 text-xl font-bold">Speed and elevation<Popover open={speedInfoOpen} onOpenChange={setSpeedInfoOpen}><PopoverTrigger asChild><button type="button" className="focus:outline-none" aria-label="More Information" onMouseEnter={() => setSpeedInfoOpen(true)} onMouseLeave={() => setSpeedInfoOpen(false)} onFocus={() => setSpeedInfoOpen(true)} onBlur={() => setSpeedInfoOpen(false)}><Info className="h-4 w-4 cursor-help text-muted-foreground hover:text-foreground" /></button></PopoverTrigger><PopoverContent className="max-w-xs text-xs z-[1100]"><p>Time compares both drives at the same moment; distance compares them at the same point on the route.</p></PopoverContent></Popover></h2><ComparisonTimeline series={series} matchA={matchA} matchB={matchB} mode={comparisonMode} playing={playing} playbackFrameStep={playbackFrameStep} cursorValue={cursorValue} onModeChange={changeMode} onCursor={(value) => { setCursorValue(value); setPlaying(false); }} /></section>
     <section className="rounded-2xl border bg-card p-4"><h2 className="text-xl font-bold">Speed distribution</h2><p className="text-sm text-muted-foreground">Absolute minutes or kilometres within each speed range.</p><ComparisonDistribution series={series} matchA={matchA} matchB={matchB} viewerId={user.id} /></section>
   </main></div>;
 }

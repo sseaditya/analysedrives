@@ -32,7 +32,8 @@ interface TimelineDataPoint {
 interface TimelineMouseState { activePayload?: Array<{ payload?: TimelineDataPoint }> }
 
 const chartMargin = { top: 10, right: 30, left: 0, bottom: 0 };
-const AUTO_SPEED_AVERAGE_RADIUS = 5;
+const AUTO_SPEED_AVERAGE_FRAME_RADIUS = 3;
+const AUTO_SPEED_FRAME_STRIDE = 6;
 const DISTANCE_SPEED_AVERAGE_RADIUS = 2;
 const AUTO_READOUT_INTERVAL_MS = 200;
 
@@ -50,7 +51,7 @@ function averageSpeed(
   return total / (end - start + 1);
 }
 
-function smoothedSpeedAtTarget(
+function speedAtTarget(
   series: ComparisonSeries,
   target: number,
   side: "A" | "B",
@@ -58,8 +59,9 @@ function smoothedSpeedAtTarget(
 ) {
   const points = series.points;
   const targetKey = mode === "time" ? (side === "A" ? "elapsedA" : "elapsedB") : "distance";
-  if (target <= points[0][targetKey]) return averageSpeed(series, 0, side, AUTO_SPEED_AVERAGE_RADIUS);
-  if (target >= points.at(-1)![targetKey]) return averageSpeed(series, points.length - 1, side, AUTO_SPEED_AVERAGE_RADIUS);
+  const speedKey = side === "A" ? "speedA" : "speedB";
+  if (target <= points[0][targetKey]) return points[0][speedKey];
+  if (target >= points.at(-1)![targetKey]) return target > points.at(-1)![targetKey] ? 0 : points.at(-1)![speedKey];
   let low = 1;
   let high = points.length - 1;
   while (low < high) {
@@ -71,9 +73,28 @@ function smoothedSpeedAtTarget(
   const left = right - 1;
   const span = points[right][targetKey] - points[left][targetKey];
   const ratio = span > 0 ? (target - points[left][targetKey]) / span : 0;
-  const leftSpeed = averageSpeed(series, left, side, AUTO_SPEED_AVERAGE_RADIUS);
-  const rightSpeed = averageSpeed(series, right, side, AUTO_SPEED_AVERAGE_RADIUS);
-  return leftSpeed + (rightSpeed - leftSpeed) * ratio;
+  return points[left][speedKey] + (points[right][speedKey] - points[left][speedKey]) * ratio;
+}
+
+function frameAveragedSpeed(
+  series: ComparisonSeries,
+  target: number,
+  side: "A" | "B",
+  mode: ComparisonMode,
+  frameStep: number,
+) {
+  const maximum = mode === "distance"
+    ? series.distance
+    : Math.max(series.points.at(-1)!.elapsedA, series.points.at(-1)!.elapsedB);
+  let total = 0;
+  let count = 0;
+  for (let offset = -AUTO_SPEED_AVERAGE_FRAME_RADIUS; offset <= AUTO_SPEED_AVERAGE_FRAME_RADIUS; offset++) {
+    const sampleTarget = target + offset * frameStep;
+    if (sampleTarget < 0 || sampleTarget > maximum) continue;
+    total += speedAtTarget(series, sampleTarget, side, mode);
+    count++;
+  }
+  return count > 0 ? total / count : speedAtTarget(series, target, side, mode);
 }
 function ComparisonGrid({ xTicks, yTicks }: { xTicks: number[]; yTicks: number[] }) {
   return <>
@@ -170,6 +191,7 @@ export function ComparisonTimeline({
   matchB,
   mode,
   playing,
+  playbackFrameStep,
   cursorValue,
   onModeChange,
   onCursor,
@@ -179,6 +201,7 @@ export function ComparisonTimeline({
   matchB: SegmentMatch;
   mode: ComparisonMode;
   playing: boolean;
+  playbackFrameStep: number;
   cursorValue: number;
   onModeChange: (mode: ComparisonMode) => void;
   onCursor: (value: number) => void;
@@ -236,9 +259,9 @@ export function ComparisonTimeline({
   }, null), [cursorValue, data]);
   const smoothedPlaybackPoint = useMemo(() => playbackPoint ? {
     ...playbackPoint,
-    speedA: Number(smoothedSpeedAtTarget(series, cursorValue, "A", mode).toFixed(1)),
-    speedB: Number(smoothedSpeedAtTarget(series, cursorValue, "B", mode).toFixed(1)),
-  } : null, [cursorValue, mode, playbackPoint, series]);
+    speedA: Number(frameAveragedSpeed(series, cursorValue, "A", mode, playbackFrameStep * AUTO_SPEED_FRAME_STRIDE).toFixed(1)),
+    speedB: Number(frameAveragedSpeed(series, cursorValue, "B", mode, playbackFrameStep * AUTO_SPEED_FRAME_STRIDE).toFixed(1)),
+  } : null, [cursorValue, mode, playbackFrameStep, playbackPoint, series]);
   latestPlaybackPointRef.current = smoothedPlaybackPoint;
   const displayedPoint = hoveredPoint ?? (playing ? autoReadoutPoint ?? playbackPoint : playbackPoint);
   const xDomain = useMemo<[number, number]>(() => [0, xMaximum], [xMaximum]);
