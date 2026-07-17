@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { MapPin, LogOut, Upload, Activity, Calendar, Clock, ArrowRight, TrendingUp, Pencil, Trash2, Check, X, Search, SlidersHorizontal, ChevronDown, ChevronUp, BarChart3, ChevronLeft, ChevronRight, Route } from "lucide-react";
+import { MapPin, LogOut, Upload, Activity, Calendar, Clock, ArrowRight, TrendingUp, Pencil, Trash2, Check, X, Search, SlidersHorizontal, ChevronDown, ChevronUp, BarChart3, ChevronLeft, ChevronRight, Route, Info } from "lucide-react";
 import FileUploader from "@/components/FileUploader";
 import { parseGPX, calculateStats, formatDistance, formatDuration, generatePreviewPolyline, calculateSpeedDistribution, SpeedBucket, generateProcessedTrack } from "@/utils/gpxParser";
 import { supabase } from "@/lib/supabase";
@@ -460,6 +460,10 @@ const Dashboard = () => {
                     </div>
 
                     <div className="flex items-center gap-4 flex-shrink-0">
+                        <Button variant="ghost" size="sm" onClick={() => navigate('/about')} className="text-muted-foreground hover:text-primary gap-2">
+                            <Info className="w-4 h-4" />
+                            <span className="hidden md:inline">About Us</span>
+                        </Button>
                         <Button variant="ghost" size="sm" onClick={() => navigate('/segments')} className="text-muted-foreground hover:text-primary gap-2">
                             <Route className="w-4 h-4" />
                             <span className="hidden md:inline">Segments</span>

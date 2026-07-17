@@ -91,6 +91,28 @@ const About = () => {
                 </section>
             </main>
 
+            <footer className="border-t border-border bg-card/50">
+                <nav
+                    aria-label="Legal"
+                    className="container mx-auto max-w-4xl px-4 py-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-muted-foreground"
+                >
+                    <button
+                        type="button"
+                        onClick={() => navigate('/terms')}
+                        className="transition-colors hover:text-foreground hover:underline"
+                    >
+                        Terms of Service
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => navigate('/privacy')}
+                        className="transition-colors hover:text-foreground hover:underline"
+                    >
+                        Privacy Policy
+                    </button>
+                </nav>
+            </footer>
+
             <div className="fixed bottom-6 left-6 z-[1050]">
                 <ThemeToggle />
             </div>
