@@ -1057,7 +1057,6 @@ export interface TrackSegment {
 export function analyzeSegments(points: GPXPoint[]): TrackSegment[] {
   if (points.length < 2) return [];
 
-  const segments: TrackSegment[] = [];
   const robustSegments = calculateRobustSpeeds(points);
 
   // Filter out pauses
@@ -1125,17 +1124,18 @@ export function analyzeSegments(points: GPXPoint[]): TrackSegment[] {
   // GAP & ADVANCED FILTERING
   const { finalAccelerations } = applyAdvancedFiltering(smoothedAccelerations, timeDeltas, points, isClampedArray, segmentIndices);
 
-  // 4. Build Segments with Smoothed Data (Acceleration) but Raw/Robust Speed
+  // 4. Preserve the original point-pair alignment. Pauses remain as zero-speed
+  // segments so long GPS/time gaps render with the lowest speed color.
+  const alignedSegments = robustSegments.map<TrackSegment>(() => ({ speed: 0, acceleration: 0 }));
   for (let i = 0; i < smoothedSpeeds.length; i++) {
     const accel = finalAccelerations[i]; // Use filtered acceleration
-
-    segments.push({
+    alignedSegments[segmentIndices[i]] = {
       speed: speeds[i], // Use Robust Speed (not smoothed) as requested
       acceleration: accel
-    });
+    };
   }
 
-  return segments;
+  return alignedSegments;
 }
 
 export function formatDuration(seconds: number): string {
@@ -1174,6 +1174,43 @@ export const formatSpeed = (kmh: number): string => {
 export function generatePreviewPolyline(points: GPXPoint[], targetCount: number = 100): [number, number][] {
   return getPreviewPointIndices(points.length, targetCount)
     .map(index => [points[index].lat, points[index].lon]);
+}
+
+export function resolvePreviewSpeeds(
+  coordinates: [number, number][],
+  speeds?: number[],
+  averageSpeed?: number
+): number[] {
+  if (coordinates.length < 2) return [];
+
+  const distances = coordinates.slice(1).map((coordinate, index) => (
+    haversineDistance(
+      coordinates[index][0],
+      coordinates[index][1],
+      coordinate[0],
+      coordinate[1]
+    )
+  ));
+  const positiveDistances = distances.filter(distance => distance > 0).sort((a, b) => a - b);
+  const middle = Math.floor(positiveDistances.length / 2);
+  const medianDistance = positiveDistances.length % 2 === 0
+    ? (positiveDistances[middle - 1] + positiveDistances[middle]) / 2
+    : positiveDistances[middle];
+  const gapThreshold = positiveDistances.length >= 3 ? Math.max(2, medianDistance * 4) : Number.POSITIVE_INFINITY;
+  const gapMask = distances.map(distance => distance > gapThreshold);
+
+  if (speeds?.length === distances.length) {
+    return speeds.map((speed, index) => gapMask[index] ? 0 : Math.max(0, Number.isFinite(speed) ? speed : 0));
+  }
+
+  if (!averageSpeed || averageSpeed <= 0) return [];
+  const normalDistances = distances.filter((_, index) => !gapMask[index]);
+  const meanDistance = normalDistances.length > 0
+    ? normalDistances.reduce((sum, distance) => sum + distance, 0) / normalDistances.length
+    : 0;
+
+  if (meanDistance <= 0) return distances.map(() => averageSpeed);
+  return distances.map((distance, index) => gapMask[index] ? 0 : (distance / meanDistance) * averageSpeed);
 }
 
 function getPreviewPointIndices(pointCount: number, targetCount: number): number[] {

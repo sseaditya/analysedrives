@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useTheme } from "@/components/ThemeProvider";
-import { haversineDistance } from "@/utils/gpxParser";
+import { resolvePreviewSpeeds } from "@/utils/gpxParser";
 import { getSpeedRouteColor } from "@/utils/mapColors";
 
 interface ActivityMiniMapProps {
@@ -87,23 +87,6 @@ class SpeedRouteCanvasLayer extends L.Layer {
     };
 }
 
-function estimatePreviewSpeeds(coordinates: [number, number][], averageSpeed?: number): number[] {
-    if (!averageSpeed || averageSpeed <= 0 || coordinates.length < 2) return [];
-
-    const distances = coordinates.slice(1).map((coordinate, index) => (
-        haversineDistance(
-            coordinates[index][0],
-            coordinates[index][1],
-            coordinate[0],
-            coordinate[1]
-        )
-    ));
-    const meanDistance = distances.reduce((sum, distance) => sum + distance, 0) / distances.length;
-
-    if (meanDistance <= 0) return distances.map(() => averageSpeed);
-    return distances.map(distance => (distance / meanDistance) * averageSpeed);
-}
-
 const ActivityMiniMap = ({ coordinates, speeds, averageSpeed, className }: ActivityMiniMapProps) => {
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const mapInstanceRef = useRef<L.Map | null>(null);
@@ -153,9 +136,7 @@ const ActivityMiniMap = ({ coordinates, speeds, averageSpeed, className }: Activ
             }
         });
 
-        const routeSpeeds = speeds?.length === coordinates.length - 1
-            ? speeds
-            : estimatePreviewSpeeds(coordinates, averageSpeed);
+        const routeSpeeds = resolvePreviewSpeeds(coordinates, speeds, averageSpeed);
 
         if (routeSpeeds.length > 0) {
             new SpeedRouteCanvasLayer(coordinates, routeSpeeds).addTo(map);

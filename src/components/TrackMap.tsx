@@ -34,7 +34,7 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
   const lastBoundsRef = useRef<{ points: GPXPoint[], zoomRange?: [number, number] | null } | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
 
-  const [mode, setMode] = useState<'plain' | 'speed' | 'acceleration'>('plain');
+  const [mode, setMode] = useState<'plain' | 'speed' | 'acceleration'>('speed');
   const [showStops, setShowStops] = useState(false);
   const [showTurns, setShowTurns] = useState(false);
   const { theme } = useTheme();
@@ -277,23 +277,27 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
 
 
     // Add Markers
-    // Start Icon
+    // Compact flags keep the exact route endpoints visible.
     const startIcon = L.divIcon({
       className: "custom-marker",
-      html: `<div style="background-color: hsl(142, 76%, 36%); width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21"/></svg>
-      </div>`,
-      iconSize: [24, 24],
-      iconAnchor: [12, 12],
+      html: `<svg width="16" height="20" viewBox="0 0 16 20" aria-hidden="true" style="filter: drop-shadow(0 1px 2px rgba(0,0,0,.45)); overflow: visible;">
+        <path d="M3 19V2" stroke="white" stroke-width="3" stroke-linecap="round"/>
+        <path d="M3 19V2" stroke="hsl(142, 76%, 30%)" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M4 2H14L11 6.5 14 11H4Z" fill="hsl(142, 76%, 36%)" stroke="white" stroke-width="1" stroke-linejoin="round"/>
+      </svg>`,
+      iconSize: [16, 20],
+      iconAnchor: [3, 19],
     });
 
     const endIcon = L.divIcon({
       className: "custom-marker",
-      html: `<div style="background-color: hsl(0, 72%, 50%); width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><rect x="4" y="4" width="16" height="16"/></svg>
-      </div>`,
-      iconSize: [24, 24],
-      iconAnchor: [12, 12],
+      html: `<svg width="16" height="20" viewBox="0 0 16 20" aria-hidden="true" style="filter: drop-shadow(0 1px 2px rgba(0,0,0,.45)); overflow: visible;">
+        <path d="M3 19V2" stroke="white" stroke-width="3" stroke-linecap="round"/>
+        <path d="M3 19V2" stroke="hsl(0, 72%, 42%)" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M4 2H14L11 6.5 14 11H4Z" fill="hsl(0, 72%, 50%)" stroke="white" stroke-width="1" stroke-linejoin="round"/>
+      </svg>`,
+      iconSize: [16, 20],
+      iconAnchor: [3, 19],
     });
 
     if (focusCoordinates.length > 0) {
@@ -431,13 +435,6 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
         {/* Mode Selector */}
         <div className="flex bg-muted/40 rounded-xl p-1 gap-1">
           <button
-            onClick={() => setMode('plain')}
-            className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${mode === 'plain' ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-            title="Plain Track"
-          >
-            <Map className="w-4 h-4" /> <span className="hidden sm:inline">Plain</span>
-          </button>
-          <button
             onClick={() => setMode('speed')}
             className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${mode === 'speed' ? 'bg-background shadow text-blue-500' : 'text-muted-foreground hover:text-foreground'}`}
             title="Speed Heatmap"
@@ -450,6 +447,13 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
             title="Acceleration Heatmap"
           >
             <Activity className="w-4 h-4" /> <span className="hidden sm:inline">Accel</span>
+          </button>
+          <button
+            onClick={() => setMode('plain')}
+            className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${mode === 'plain' ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            title="Standard Track"
+          >
+            <Map className="w-4 h-4" /> <span className="hidden sm:inline">Standard</span>
           </button>
         </div>
 

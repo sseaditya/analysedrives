@@ -59,44 +59,38 @@ function formatElapsed(seconds: number) {
 
 type ComparisonMode = "distance" | "time";
 
-function ReadoutMetric({ label, value, align }: { label: string; value: string; align: "left" | "right" }) {
-  return <div className={`flex min-w-0 flex-col leading-tight sm:grid sm:items-baseline sm:gap-1 ${align === "right" ? "text-right sm:grid-cols-[minmax(0,1fr)_4.25rem]" : "text-left sm:grid-cols-[4.25rem_minmax(0,1fr)]"}`}>
-    <span className={`text-[8px] font-medium uppercase tracking-wide text-muted-foreground sm:text-[10px] ${align === "right" ? "sm:order-2" : ""}`}>{label}</span>
-    <span className={`whitespace-nowrap font-mono text-[10px] font-semibold tabular-nums sm:text-xs ${align === "right" ? "sm:order-1" : ""}`}>{value}</span>
-  </div>;
-}
-
-function DriveReadout({ point, match, side, mode }: { point: TimelineDataPoint; match: SegmentMatch; side: "A" | "B"; mode: ComparisonMode }) {
+function driveReadoutValues(point: TimelineDataPoint, side: "A" | "B", mode: ComparisonMode) {
   const isDriveA = side === "A";
-  const align = isDriveA ? "left" : "right";
   const speed = isDriveA ? point.speedA : point.speedB;
   const elevation = isDriveA ? point.elevationA : point.elevationB;
   const changingMetric = mode === "time"
     ? { label: "Distance", value: `${(isDriveA ? point.distanceA : point.distanceB).toFixed(2)} km` }
     : { label: "Time", value: formatElapsed(isDriveA ? point.elapsedA : point.elapsedB) };
 
-  return <div className={`min-w-0 ${isDriveA ? "text-left" : "text-right"}`}>
-    <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground sm:text-[10px]">Drive {isDriveA ? "1" : "2"}</p>
-    <p className={`truncate text-xs font-bold sm:text-sm ${isDriveA ? "text-[hsl(var(--segment-drive-1))]" : "text-[hsl(var(--segment-drive-2))]"}`} title={match.activity.title}>{match.activity.title}</p>
-    <div className="mt-1.5 space-y-0.5">
-      <ReadoutMetric label="Speed" value={`${speed.toFixed(1)} km/h`} align={align} />
-      <ReadoutMetric label={changingMetric.label} value={changingMetric.value} align={align} />
-      <ReadoutMetric label="Elevation" value={elevation != null ? `${elevation.toFixed(0)} m` : "—"} align={align} />
-    </div>
-  </div>;
+  return [
+    { label: "Speed", value: `${speed.toFixed(1)} km/h` },
+    changingMetric,
+    { label: "Elevation", value: elevation != null ? `${elevation.toFixed(0)} m` : "—" },
+  ];
 }
 
-function TimelineReadout({ point, matchA, matchB, mode }: { point: TimelineDataPoint; matchA: SegmentMatch; matchB: SegmentMatch; mode: ComparisonMode }) {
+function TimelineReadout({ point, mode }: { point: TimelineDataPoint; mode: ComparisonMode }) {
   const commonLabel = mode === "time" ? "Time" : "Distance";
   const commonValue = mode === "time" ? formatElapsed(point.xValue) : `${point.xValue.toFixed(2)} km`;
+  const driveAValues = driveReadoutValues(point, "A", mode);
+  const driveBValues = driveReadoutValues(point, "B", mode);
 
-  return <div data-testid="comparison-hover-readout" className="grid min-h-[5.75rem] grid-cols-[minmax(0,1fr)_4.75rem_minmax(0,1fr)] items-stretch gap-2 sm:grid-cols-[minmax(0,1fr)_6rem_minmax(0,1fr)] sm:gap-4">
-    <DriveReadout point={point} match={matchA} side="A" mode={mode} />
-    <div className="flex min-w-0 flex-col items-center justify-center border-x border-border/60 px-1 text-center">
-      <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground sm:text-[10px]">{commonLabel}</span>
-      <strong className="mt-0.5 whitespace-nowrap font-mono text-xs font-bold tabular-nums text-foreground sm:text-sm">{commonValue}</strong>
-    </div>
-    <DriveReadout point={point} match={matchB} side="B" mode={mode} />
+  return <div data-testid="comparison-hover-readout" className="w-full overflow-x-auto">
+    <table className="w-full min-w-[34rem] table-fixed border-collapse md:min-w-0">
+      <caption className="sr-only">Drive comparison at the selected {commonLabel.toLowerCase()}</caption>
+      <tbody>
+        <tr className="divide-x divide-border/60">
+          {driveAValues.map((metric) => <td key={`a-${metric.label}`} aria-label={`Drive 1 ${metric.label}`} className="whitespace-nowrap px-2 py-2 text-center font-mono text-xs font-semibold tabular-nums text-[hsl(var(--segment-drive-1))] sm:text-sm">{metric.value}</td>)}
+          <td aria-label={commonLabel} className="whitespace-nowrap px-2 py-2 text-center font-mono text-xs font-bold tabular-nums text-foreground sm:text-sm">{commonValue}</td>
+          {driveBValues.map((metric) => <td key={`b-${metric.label}`} aria-label={`Drive 2 ${metric.label}`} className="whitespace-nowrap px-2 py-2 text-center font-mono text-xs font-semibold tabular-nums text-[hsl(var(--segment-drive-2))] sm:text-sm">{metric.value}</td>)}
+        </tr>
+      </tbody>
+    </table>
   </div>;
 }
 
@@ -258,8 +252,8 @@ export function ComparisonTimeline({
 
   return <div className="space-y-3">
     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-      <div className="min-h-[7rem] flex-1 rounded-lg border border-border/50 bg-muted/30 px-3 py-2 text-sm">
-        {displayedPoint ? <TimelineReadout point={displayedPoint} matchA={matchA} matchB={matchB} mode={mode} /> : <div className="flex min-h-[5.75rem] items-center justify-center text-center text-muted-foreground">{mode === "time" ? "Hover to compare different positions at the same time." : "Hover to compare different times at the same route distance."}</div>}
+      <div className="min-w-0 flex-1 rounded-lg border border-border/50 bg-muted/30 px-2 py-1 text-sm">
+        {displayedPoint ? <TimelineReadout point={displayedPoint} mode={mode} /> : <div className="flex min-h-10 items-center justify-center text-center text-muted-foreground">{mode === "time" ? "Hover to compare different positions at the same time." : "Hover to compare different times at the same route distance."}</div>}
       </div>
       <div className="flex items-center gap-2 self-end rounded-full border border-border/50 bg-muted/50 px-2.5 py-1">
         <button onClick={() => onModeChange("time")} className={`rounded-md px-2 py-0.5 text-xs font-semibold transition-colors ${mode === "time" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>Time</button>
