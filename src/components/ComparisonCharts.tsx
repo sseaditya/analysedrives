@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -32,6 +32,49 @@ interface TimelineDataPoint {
 interface TimelineMouseState { activePayload?: Array<{ payload?: TimelineDataPoint }> }
 
 const chartMargin = { top: 10, right: 30, left: 0, bottom: 0 };
+const AUTO_SPEED_AVERAGE_RADIUS = 5;
+const DISTANCE_SPEED_AVERAGE_RADIUS = 2;
+const AUTO_READOUT_INTERVAL_MS = 200;
+
+function averageSpeed(
+  series: ComparisonSeries,
+  center: number,
+  side: "A" | "B",
+  radius: number,
+) {
+  const speedKey = side === "A" ? "speedA" : "speedB";
+  const start = Math.max(0, center - radius);
+  const end = Math.min(series.points.length - 1, center + radius);
+  let total = 0;
+  for (let index = start; index <= end; index++) total += series.points[index][speedKey];
+  return total / (end - start + 1);
+}
+
+function smoothedSpeedAtTarget(
+  series: ComparisonSeries,
+  target: number,
+  side: "A" | "B",
+  mode: ComparisonMode,
+) {
+  const points = series.points;
+  const targetKey = mode === "time" ? (side === "A" ? "elapsedA" : "elapsedB") : "distance";
+  if (target <= points[0][targetKey]) return averageSpeed(series, 0, side, AUTO_SPEED_AVERAGE_RADIUS);
+  if (target >= points.at(-1)![targetKey]) return averageSpeed(series, points.length - 1, side, AUTO_SPEED_AVERAGE_RADIUS);
+  let low = 1;
+  let high = points.length - 1;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (points[middle][targetKey] < target) low = middle + 1;
+    else high = middle;
+  }
+  const right = low;
+  const left = right - 1;
+  const span = points[right][targetKey] - points[left][targetKey];
+  const ratio = span > 0 ? (target - points[left][targetKey]) / span : 0;
+  const leftSpeed = averageSpeed(series, left, side, AUTO_SPEED_AVERAGE_RADIUS);
+  const rightSpeed = averageSpeed(series, right, side, AUTO_SPEED_AVERAGE_RADIUS);
+  return leftSpeed + (rightSpeed - leftSpeed) * ratio;
+}
 function ComparisonGrid({ xTicks, yTicks }: { xTicks: number[]; yTicks: number[] }) {
   return <>
     {yTicks.map((value) => <ReferenceLine key={`y-${value}`} y={value} stroke="hsl(var(--muted-foreground))" strokeWidth={0.5} strokeOpacity={0.6} />)}
@@ -62,7 +105,7 @@ function driveReadoutValues(point: TimelineDataPoint, side: "A" | "B", mode: Com
   const speed = isDriveA ? point.speedA : point.speedB;
   const elevation = isDriveA ? point.elevationA : point.elevationB;
   const changingMetric = mode === "time"
-    ? { label: "Distance", value: `${(isDriveA ? point.distanceA : point.distanceB).toFixed(2)} km` }
+    ? { label: "Distance", value: `${(isDriveA ? point.distanceA : point.distanceB).toFixed(1)} km` }
     : { label: "Time", value: formatElapsed(isDriveA ? point.elapsedA : point.elapsedB) };
 
   return [
@@ -74,7 +117,7 @@ function driveReadoutValues(point: TimelineDataPoint, side: "A" | "B", mode: Com
 
 function TimelineReadout({ point, mode }: { point: TimelineDataPoint; mode: ComparisonMode }) {
   const commonLabel = mode === "time" ? "Time" : "Distance";
-  const commonValue = mode === "time" ? formatElapsed(point.xValue) : `${point.xValue.toFixed(2)} km`;
+  const commonValue = mode === "time" ? formatElapsed(point.xValue) : `${point.xValue.toFixed(1)} km`;
   const driveAValues = driveReadoutValues(point, "A", mode);
   const driveBValues = driveReadoutValues(point, "B", mode);
 
@@ -109,9 +152,9 @@ function interpolatePoint(series: ComparisonSeries, target: number, side: "A" | 
   const left = right - 1;
   const span = points[right][key] - points[left][key];
   const ratio = span > 0 ? (target - points[left][key]) / span : 0;
-  const speedKey = side === "A" ? "speedA" : "speedB";
   const leftElevation = points[left].elevation;
   const rightElevation = points[right].elevation;
+  const speedKey = side === "A" ? "speedA" : "speedB";
   return {
     distance: points[left].distance + (points[right].distance - points[left].distance) * ratio,
     speed: points[left][speedKey] + (points[right][speedKey] - points[left][speedKey]) * ratio,
@@ -126,6 +169,7 @@ export function ComparisonTimeline({
   matchA,
   matchB,
   mode,
+  playing,
   cursorValue,
   onModeChange,
   onCursor,
@@ -134,6 +178,7 @@ export function ComparisonTimeline({
   matchA: SegmentMatch;
   matchB: SegmentMatch;
   mode: ComparisonMode;
+  playing: boolean;
   cursorValue: number;
   onModeChange: (mode: ComparisonMode) => void;
   onCursor: (value: number) => void;
@@ -141,6 +186,8 @@ export function ComparisonTimeline({
   const isMobile = useIsMobile();
   const [hoverX, setHoverX] = useState<number | null>(null);
   const [hoveredPoint, setHoveredPoint] = useState<TimelineDataPoint | null>(null);
+  const [autoReadoutPoint, setAutoReadoutPoint] = useState<TimelineDataPoint | null>(null);
+  const latestPlaybackPointRef = useRef<TimelineDataPoint | null>(null);
   const targetPoints = isMobile ? 200 : 500;
   const data = useMemo(() => {
     const raw = series.points;
@@ -168,15 +215,6 @@ export function ComparisonTimeline({
     const count = Math.min(raw.length, targetPoints);
     return Array.from({ length: count }, (_, position) => {
       const index = count === 1 ? 0 : Math.round(position * (raw.length - 1) / (count - 1));
-      const windowStart = Math.max(0, index - 2);
-      const windowEnd = Math.min(raw.length - 1, index + 2);
-      let speedA = 0;
-      let speedB = 0;
-      for (let sample = windowStart; sample <= windowEnd; sample++) {
-        speedA += raw[sample].speedA;
-        speedB += raw[sample].speedB;
-      }
-      const sampleCount = windowEnd - windowStart + 1;
       return {
         xValue: raw[index].distance,
         distanceA: raw[index].distance,
@@ -185,8 +223,8 @@ export function ComparisonTimeline({
         elapsedB: raw[index].elapsedB,
         elevationA: raw[index].elevation,
         elevationB: raw[index].elevation,
-        speedA: Number((speedA / sampleCount).toFixed(1)),
-        speedB: Number((speedB / sampleCount).toFixed(1)),
+        speedA: Number(averageSpeed(series, index, "A", DISTANCE_SPEED_AVERAGE_RADIUS).toFixed(1)),
+        speedB: Number(averageSpeed(series, index, "B", DISTANCE_SPEED_AVERAGE_RADIUS).toFixed(1)),
       };
     });
   }, [mode, series, targetPoints]);
@@ -196,7 +234,13 @@ export function ComparisonTimeline({
     if (!closest) return point;
     return Math.abs(point.xValue - cursorValue) < Math.abs(closest.xValue - cursorValue) ? point : closest;
   }, null), [cursorValue, data]);
-  const displayedPoint = hoveredPoint ?? playbackPoint;
+  const smoothedPlaybackPoint = useMemo(() => playbackPoint ? {
+    ...playbackPoint,
+    speedA: Number(smoothedSpeedAtTarget(series, cursorValue, "A", mode).toFixed(1)),
+    speedB: Number(smoothedSpeedAtTarget(series, cursorValue, "B", mode).toFixed(1)),
+  } : null, [cursorValue, mode, playbackPoint, series]);
+  latestPlaybackPointRef.current = smoothedPlaybackPoint;
+  const displayedPoint = hoveredPoint ?? (playing ? autoReadoutPoint ?? playbackPoint : playbackPoint);
   const xDomain = useMemo<[number, number]>(() => [0, xMaximum], [xMaximum]);
   const xTicks = useMemo(() => calculateNiceTicks(0, xMaximum, mode, 8), [xMaximum, mode]);
   const speedConfig = useMemo(() => calculateNiceYTicks(0, Math.max(1, ...data.flatMap((point) => [point.speedA, point.speedB])), 7), [data]);
@@ -222,6 +266,18 @@ export function ComparisonTimeline({
     setHoverX(null);
     setHoveredPoint(null);
   };
+
+  useEffect(() => {
+    if (!playing) {
+      setAutoReadoutPoint(null);
+      return;
+    }
+    setAutoReadoutPoint(latestPlaybackPointRef.current);
+    const timer = setInterval(() => {
+      setAutoReadoutPoint(latestPlaybackPointRef.current);
+    }, AUTO_READOUT_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [playing]);
 
   return <div className="space-y-3">
     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
