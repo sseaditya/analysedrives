@@ -277,27 +277,30 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
 
 
     // Add Markers
-    // Compact flags keep the exact route endpoints visible.
+    // Keep the dots just above the route endpoints so they do not cover the data.
     const startIcon = L.divIcon({
       className: "custom-marker",
-      html: `<svg width="16" height="20" viewBox="0 0 16 20" aria-hidden="true" style="filter: drop-shadow(0 1px 2px rgba(0,0,0,.45)); overflow: visible;">
-        <path d="M3 19V2" stroke="white" stroke-width="3" stroke-linecap="round"/>
-        <path d="M3 19V2" stroke="hsl(142, 76%, 30%)" stroke-width="1.5" stroke-linecap="round"/>
-        <path d="M4 2H14L11 6.5 14 11H4Z" fill="hsl(142, 76%, 36%)" stroke="white" stroke-width="1" stroke-linejoin="round"/>
+      html: `<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" style="filter: drop-shadow(0 1px 2px rgba(0,0,0,.45)); overflow: visible;">
+        <circle cx="6" cy="5" r="5" fill="hsl(142, 76%, 36%)" stroke="white" stroke-width="1"/>
       </svg>`,
-      iconSize: [16, 20],
-      iconAnchor: [3, 19],
+      iconSize: [12, 12],
+      iconAnchor: [6, 11],
     });
 
     const endIcon = L.divIcon({
       className: "custom-marker",
-      html: `<svg width="16" height="20" viewBox="0 0 16 20" aria-hidden="true" style="filter: drop-shadow(0 1px 2px rgba(0,0,0,.45)); overflow: visible;">
-        <path d="M3 19V2" stroke="white" stroke-width="3" stroke-linecap="round"/>
-        <path d="M3 19V2" stroke="hsl(0, 72%, 42%)" stroke-width="1.5" stroke-linecap="round"/>
-        <path d="M4 2H14L11 6.5 14 11H4Z" fill="hsl(0, 72%, 50%)" stroke="white" stroke-width="1" stroke-linejoin="round"/>
+      html: `<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" style="filter: drop-shadow(0 1px 2px rgba(0,0,0,.45)); overflow: visible;">
+        <defs>
+          <clipPath id="finish-dot-clip"><circle cx="6" cy="5" r="4.5"/></clipPath>
+        </defs>
+        <g clip-path="url(#finish-dot-clip)">
+          <rect x="1.5" y="0.5" width="9" height="9" fill="white"/>
+          <path d="M1.5.5h3v3h-3zm6 0h3v3h-3zm-3 3h3v3h-3zm-3 3h3v3h-3zm6 0h3v3h-3z" fill="hsl(0, 0%, 10%)"/>
+        </g>
+        <circle cx="6" cy="5" r="5" fill="none" stroke="white" stroke-width="1"/>
       </svg>`,
-      iconSize: [16, 20],
-      iconAnchor: [3, 19],
+      iconSize: [12, 12],
+      iconAnchor: [6, 11],
     });
 
     if (focusCoordinates.length > 0) {
