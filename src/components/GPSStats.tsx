@@ -209,6 +209,23 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
     });
   }, [stats.fastestDistances, isOwner, speedCap]);
 
+  const terrainDistances = useMemo(() => {
+    if (Number.isFinite(stats.descendingDistance) && Number.isFinite(stats.levelDistance)) {
+      return {
+        uphill: stats.climbDistance,
+        downhill: stats.descendingDistance!,
+        flat: stats.levelDistance!,
+      };
+    }
+
+    const recalculated = calculateStats(initialPoints);
+    return {
+      uphill: recalculated.climbDistance,
+      downhill: recalculated.descendingDistance ?? 0,
+      flat: recalculated.levelDistance ?? 0,
+    };
+  }, [initialPoints, stats.climbDistance, stats.descendingDistance, stats.levelDistance]);
+
   // Calculate stats for the selected zoom range
   const { filteredPoints, subsetStats } = useMemo(() => {
     if (!zoomRange || !points.length) {
@@ -1000,44 +1017,38 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                     <Trophy className="w-6 h-6 text-amber-500" />
                     Segments
                   </h3>
-                  <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-                    {segmentRanks.map((segment, index) => (
-                      <Link
-                        key={segment.segmentId}
-                        to={`/segments/${segment.segmentId}`}
-                        className={cn(
-                          "block px-4 py-4 transition-colors hover:bg-accent",
-                          index > 0 && "border-t border-border"
-                        )}
-                      >
-                        <div className="flex items-center gap-4">
-                          <span className="shrink-0 text-lg font-black tabular-nums text-muted-foreground">
-                            {segment.rank}/{segment.totalRides} <span className="text-xs font-semibold">rides</span>
+                  <div className="overflow-x-auto rounded-2xl border border-border bg-card shadow-sm">
+                    <div className="min-w-[760px]">
+                      {segmentRanks.map((segment, index) => (
+                        <Link
+                          key={segment.segmentId}
+                          to={`/segments/${segment.segmentId}`}
+                          className={cn(
+                            "grid grid-cols-[7rem_minmax(12rem,1fr)_8rem_7rem_8rem_9rem] items-center gap-4 whitespace-nowrap px-4 py-3 transition-colors hover:bg-accent",
+                            index > 0 && "border-t border-border"
+                          )}
+                        >
+                          <span className="text-lg font-black tabular-nums text-muted-foreground">
+                            {segment.rank}/{segment.totalRides} <span className="text-xs font-semibold">drives</span>
                           </span>
-                          <span className="min-w-0 flex-1 truncate font-semibold text-foreground hover:text-primary">
+                          <span className="truncate font-semibold text-foreground hover:text-primary">
                             {segment.segmentName}
                           </span>
-                        </div>
-                        <div className="mt-3 grid grid-cols-2 gap-3 border-t border-border/60 pt-3 text-sm sm:grid-cols-4">
-                          <div>
-                            <span className="block text-xs text-muted-foreground">Coverage</span>
-                            <span className="font-semibold tabular-nums">{(segment.coverage * 100).toFixed(0)}%</span>
-                          </div>
-                          <div>
-                            <span className="block text-xs text-muted-foreground">Distance</span>
-                            <span className="font-semibold tabular-nums">{segment.matchedDistance.toFixed(1)} km</span>
-                          </div>
-                          <div>
-                            <span className="block text-xs text-muted-foreground">Time</span>
-                            <span className="font-semibold tabular-nums">{formatDuration(segment.elapsedTime)}</span>
-                          </div>
-                          <div>
-                            <span className="block text-xs text-muted-foreground">Avg speed</span>
-                            <span className="font-semibold tabular-nums">{segment.avgSpeed.toFixed(1)} km/h</span>
-                          </div>
-                        </div>
-                      </Link>
-                    ))}
+                          <span className="text-sm font-medium tabular-nums text-muted-foreground">
+                            {(segment.coverage * 100).toFixed(0)}% coverage
+                          </span>
+                          <span className="text-sm font-medium tabular-nums text-muted-foreground">
+                            {segment.matchedDistance.toFixed(1)} km
+                          </span>
+                          <span className="text-sm font-medium tabular-nums text-muted-foreground">
+                            {formatDuration(segment.elapsedTime)}
+                          </span>
+                          <span className="text-sm font-medium tabular-nums text-muted-foreground">
+                            {segment.avgSpeed.toFixed(1)} km/h
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}
@@ -1118,16 +1129,16 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
               </div>
 
               {/* SECTION 2: PROFILES (Geometry + Terrain) */}
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-stretch">
                 {/* Straight vs Curvy Profile */}
-                <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
-                  <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
+                <div className="h-full bg-card border border-border rounded-2xl p-4 shadow-sm">
+                  <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
                     <Spline className="w-5 h-5 text-primary" />
                     Geometry Profile
                   </h3>
-                  <div className="space-y-6">
+                  <div className="space-y-3">
                     {/* Visual Stacked Bar */}
-                    <div className="h-4 w-full bg-muted rounded-full overflow-hidden flex shadow-inner">
+                    <div className="h-2.5 w-full bg-muted rounded-full overflow-hidden flex shadow-inner">
                       {[
                         { dist: stats.totalDistance * (stats.percentStraight / 100), color: "bg-primary" },
                         { dist: stats.totalDistance * ((100 - stats.percentStraight) / 100), color: "bg-foreground/80" }, // Curves -> Dark/Blackish
@@ -1144,25 +1155,17 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                       })}
                     </div>
 
-                    <div className="space-y-4">
+                    <div className="flex items-center gap-8 overflow-x-auto whitespace-nowrap text-sm">
                       {[
-                        { label: "Straight Sections", dist: stats.totalDistance * (stats.percentStraight / 100), color: "bg-primary", desc: "Sustained heading" },
-                        { label: "Corners & Curves", dist: stats.totalDistance * ((100 - stats.percentStraight) / 100), color: "bg-foreground/80", desc: "Frequent turns" },
-                      ].map((item, idx) => {
+                        { label: "Straights", dist: stats.totalDistance * (stats.percentStraight / 100), color: "bg-primary" },
+                        { label: "Curves", dist: stats.totalDistance * ((100 - stats.percentStraight) / 100), color: "bg-foreground/80" },
+                      ].map((item) => {
                         const percentage = (item.dist / (stats.totalDistance || 1)) * 100;
                         return (
-                          <div key={item.label} className="flex items-center gap-4">
-                            <div className={cn("w-1 h-8 rounded-full", item.color)} />
-                            <div className="flex-1">
-                              <div className="flex justify-between text-sm mb-1">
-                                <span className="font-bold">{item.label}</span>
-                                <span className="font-mono text-muted-foreground">{formatDistance(item.dist)}</span>
-                              </div>
-                              <div className="flex justify-between items-end">
-                                <span className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">{item.desc}</span>
-                                <span className="text-xs font-bold text-foreground">{percentage.toFixed(1)}%</span>
-                              </div>
-                            </div>
+                          <div key={item.label} className="flex items-center gap-2 whitespace-nowrap">
+                            <span className={cn("h-2.5 w-2.5 rounded-full", item.color)} />
+                            <span className="font-bold">{item.label}</span>
+                            <span className="font-mono tabular-nums text-muted-foreground">{formatDistance(item.dist)} ({percentage.toFixed(1)}%)</span>
                           </div>
                         );
                       })}
@@ -1171,20 +1174,20 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                 </div>
 
                 {/* Terrain Profile */}
-                <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
-                  <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
+                <div className="h-full bg-card border border-border rounded-2xl p-4 shadow-sm">
+                  <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
                     <TrendingUp className="w-5 h-5 text-primary" />
-                    Terrain Time Profile
+                    Terrain Profile
                   </h3>
-                  <div className="space-y-6">
+                  <div className="space-y-3">
                     {/* Visual Stacked Bar */}
-                    <div className="h-4 w-full bg-muted rounded-full overflow-hidden flex shadow-inner">
+                    <div className="h-2.5 w-full bg-muted rounded-full overflow-hidden flex shadow-inner">
                       {[
-                        { seconds: stats.timeClimbing, color: "bg-primary" },
-                        { seconds: stats.timeDescending, color: "bg-foreground/80" },
-                        { seconds: stats.timeLevel, color: "bg-muted-foreground/30" },
+                        { distance: terrainDistances.uphill, color: "bg-primary" },
+                        { distance: terrainDistances.downhill, color: "bg-foreground/80" },
+                        { distance: terrainDistances.flat, color: "bg-muted-foreground/30" },
                       ].map((item, idx) => {
-                        const width = (item.seconds / (stats.totalTime || 1)) * 100;
+                        const width = (item.distance / (stats.totalDistance || 1)) * 100;
                         if (width <= 0) return null;
                         return (
                           <div
@@ -1196,26 +1199,18 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                       })}
                     </div>
 
-                    <div className="space-y-4">
+                    <div className="flex items-center gap-6 overflow-x-auto whitespace-nowrap text-sm">
                       {[
-                        { label: "Climbing", seconds: stats.timeClimbing, color: "bg-primary", desc: "Uphill battle" },
-                        { label: "Descending", seconds: stats.timeDescending, color: "bg-foreground/80", desc: "Gravity assisted" },
-                        { label: "Level Flight", seconds: stats.timeLevel, color: "bg-muted-foreground/30", desc: "Flat terrain" },
-                      ].map((item, idx) => {
-                        const percentage = (item.seconds / (stats.totalTime || 1)) * 100;
+                        { label: "Uphill", distance: terrainDistances.uphill, color: "bg-primary" },
+                        { label: "Downhill", distance: terrainDistances.downhill, color: "bg-foreground/80" },
+                        { label: "Flat", distance: terrainDistances.flat, color: "bg-muted-foreground/30" },
+                      ].map((item) => {
+                        const percentage = (item.distance / (stats.totalDistance || 1)) * 100;
                         return (
-                          <div key={item.label} className="flex items-center gap-4">
-                            <div className={cn("w-1 h-8 rounded-full", item.color)} />
-                            <div className="flex-1">
-                              <div className="flex justify-between text-sm mb-1">
-                                <span className="font-bold">{item.label}</span>
-                                <span className="font-mono text-muted-foreground">{formatDuration(item.seconds)}</span>
-                              </div>
-                              <div className="flex justify-between items-end">
-                                <span className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">{item.desc}</span>
-                                <span className="text-xs font-bold text-foreground">{percentage.toFixed(1)}%</span>
-                              </div>
-                            </div>
+                          <div key={item.label} className="flex items-center gap-2 whitespace-nowrap">
+                            <span className={cn("h-2.5 w-2.5 rounded-full", item.color)} />
+                            <span className="font-bold">{item.label}</span>
+                            <span className="font-mono tabular-nums text-muted-foreground">{formatDistance(item.distance)} ({percentage.toFixed(1)}%)</span>
                           </div>
                         );
                       })}

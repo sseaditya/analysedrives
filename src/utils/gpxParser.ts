@@ -83,6 +83,8 @@ export interface GPXStats {
   timeLevel: number; // seconds
   hillinessScore: number;
   climbDistance: number; // km
+  descendingDistance?: number; // km (optional for older processed tracks)
+  levelDistance?: number; // km (optional for older processed tracks)
   // Geometry Metrics
   totalHeadingChange: number;
   tightTurnsCount: number;
@@ -594,6 +596,8 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
     timeLevel: 0,
     hillinessScore: 0,
     climbDistance: 0,
+    descendingDistance: 0,
+    levelDistance: 0,
     totalHeadingChange: 0,
     tightTurnsCount: 0,
     hairpinCount: 0,
@@ -616,6 +620,8 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
   let timeDescending = 0;
   let timeLevel = 0;
   let climbDistance = 0;
+  let descendingDistance = 0;
+  let levelDistance = 0;
   let maxSpeed = 0;
   let lastBearing: number | null = null;
   let totalHeadingChange = 0;
@@ -917,10 +923,10 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
   for (let i = 0; i < smoothedGradients.length; i++) {
     const grade = smoothedGradients[i];
     const t = timeDeltas[i];
-    const d = robustSegments[i].distance;
+    const d = robustSegments[segmentIndices[i]].distance;
     if (grade > CLIMBING_GRADE) { timeClimbing += t; climbDistance += d; }
-    else if (grade < DESCENDING_GRADE) { timeDescending += t; }
-    else { timeLevel += t; }
+    else if (grade < DESCENDING_GRADE) { timeDescending += t; descendingDistance += d; }
+    else { timeLevel += t; levelDistance += d; }
   }
 
   if (currentStraightDist > MIN_STRAIGHT_SECTION) {
@@ -1032,7 +1038,7 @@ export function calculateStats(points: GPXPoint[]): GPXStats {
     elevationLoss, maxElevation, minElevation, steepestClimb, steepestDescent,
     timeClimbing, timeDescending, timeLevel,
     hillinessScore: totalDistance > 0 ? elevationGain / totalDistance : 0,
-    climbDistance,
+    climbDistance, descendingDistance, levelDistance,
     totalHeadingChange, tightTurnsCount, hairpinCount, twistinessScore,
     longestStraightSection, medianStraightLength, percentStraight,
     tightTurnPoints, hairpinPoints, hardAccelPoints, hardBrakePoints,
