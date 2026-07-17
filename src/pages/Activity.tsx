@@ -16,7 +16,8 @@ import { toast } from "sonner";
 import { useTheme } from "@/components/ThemeProvider";
 import SegmentCreator from "@/components/SegmentCreator";
 import { loadActivityTrack } from "@/lib/activityData";
-import type { ActivitySummary } from "@/types/segments";
+import { fetchActivitySegmentRanks } from "@/lib/segmentData";
+import type { ActivitySegmentRank, ActivitySummary } from "@/types/segments";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -77,6 +78,7 @@ const Activity = () => {
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isVideoOpen, setIsVideoOpen] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const [segmentRanks, setSegmentRanks] = useState<ActivitySegmentRank[]>([]);
 
   // Determine ownership
   const isOwner = user && metadata ? user.id === metadata.user_id : false;
@@ -232,6 +234,27 @@ const Activity = () => {
       navigate("/", { replace: true });
     }
   }, [id, data, navigate, user, authLoading]);
+
+  useEffect(() => {
+    if (!metadata?.id || !user) {
+      setSegmentRanks([]);
+      return;
+    }
+
+    let cancelled = false;
+    fetchActivitySegmentRanks(metadata.id)
+      .then((ranks) => {
+        if (!cancelled) setSegmentRanks(ranks);
+      })
+      .catch((error) => {
+        console.warn("Could not load this activity's segment ranks", error);
+        if (!cancelled) setSegmentRanks([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [metadata?.id, user]);
 
   // Calculate effective speed cap for display
   const effectiveSpeedCap = !isOwner && metadata?.public && metadata?.speed_cap
@@ -493,6 +516,7 @@ const Activity = () => {
             fuel={metadata?.fuel ?? null}
             ownerProfile={ownerProfile}
             onEdit={() => setIsEditorOpen(true)}
+            segmentRanks={segmentRanks}
           />
         </div>
       </main>

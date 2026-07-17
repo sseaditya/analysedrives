@@ -89,6 +89,12 @@ export type SegmentLeaderboardEntry = Omit<SegmentMatch, "loadedActivity"> & {
   loadedActivity?: LoadedActivity;
 };
 
+export interface ActivitySegmentRank {
+  segmentId: string;
+  segmentName: string;
+  rank: number;
+}
+
 export type SegmentRejectionReason = "coverage";
 
 export interface SegmentRejectedEntry {

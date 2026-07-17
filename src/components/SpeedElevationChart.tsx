@@ -740,7 +740,7 @@ const SpeedElevationChart = ({
               dataKey={xAxisDataKey}
               type="number"
               domain={speedXDomain}
-              stroke="#ffffff"
+              stroke="hsl(var(--foreground))"
               tick={chartAxisTick}
               tickLine={false}
               axisLine={false}
@@ -750,7 +750,7 @@ const SpeedElevationChart = ({
               allowDataOverflow
             />
             <YAxis
-              stroke="#ffffff"
+              stroke="hsl(var(--foreground))"
               tick={chartAxisTick}
               tickLine={false}
               axisLine={false}
@@ -858,7 +858,7 @@ const SpeedElevationChart = ({
                 dataKey={xAxisDataKey}
                 type="number"
                 domain={fullXDomain} // Elevation chart acts as a brush (full view)
-                stroke="#ffffff"
+                stroke="hsl(var(--foreground))"
                 tick={chartAxisTick}
                 tickLine={false}
                 axisLine={false}
@@ -868,7 +868,7 @@ const SpeedElevationChart = ({
                 allowDataOverflow
               />
               <YAxis
-                stroke="#ffffff"
+                stroke="hsl(var(--foreground))"
                 tick={chartAxisTick}
                 tickLine={false}
                 axisLine={false}

@@ -120,7 +120,7 @@ const ChartRangeSlider: React.FC<ChartRangeSliderProps> = ({
                         domain={[0, maxDistance]}
                         ticks={ticks}
                         axisLine={false}
-                        tickLine={{ stroke: '#ffffff', height: 4 }}
+                        tickLine={{ stroke: 'hsl(var(--foreground))', height: 4 }}
                         tickFormatter={(val) => `${Math.round(val)} km`}
                         interval={0} // Force all ticks to show
                         tick={{ ...chartAxisTick, fontSize: 12 }}

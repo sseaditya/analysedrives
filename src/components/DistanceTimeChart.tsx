@@ -221,7 +221,7 @@ const DistanceTimeChart = ({
                     dataKey="elapsedTime"
                     type="number"
                     domain={[minTime, maxTime]}
-                    stroke="#ffffff"
+                    stroke="hsl(var(--foreground))"
                     tick={chartAxisTick}
                     tickLine={false}
                     axisLine={false}
@@ -231,7 +231,7 @@ const DistanceTimeChart = ({
                     allowDataOverflow
                 />
                 <YAxis
-                    stroke="#ffffff"
+                    stroke="hsl(var(--foreground))"
                     tick={chartAxisTick}
                     tickLine={false}
                     axisLine={false}
@@ -248,8 +248,11 @@ const DistanceTimeChart = ({
                         borderColor: 'hsl(var(--border))',
                         borderRadius: '16px',
                         fontSize: '12px',
+                        color: 'hsl(var(--foreground))',
                         boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)'
                     }}
+                    labelStyle={{ color: 'hsl(var(--foreground))' }}
+                    itemStyle={{ color: 'hsl(var(--foreground))' }}
                     formatter={(value: number, name: string) => {
                         if (name === "distance") return [`${value.toFixed(2)} km`, "Distance"];
                         return [value, name];

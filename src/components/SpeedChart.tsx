@@ -122,7 +122,7 @@ const SpeedChart = ({ points, onHover }: SpeedChartProps) => {
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(23, 5%, 82%)" opacity={0.5} />
             <XAxis
               dataKey="distance"
-              stroke="#ffffff"
+              stroke="hsl(var(--foreground))"
               tick={chartAxisTick}
               tickLine={false}
               axisLine={false}
@@ -130,7 +130,7 @@ const SpeedChart = ({ points, onHover }: SpeedChartProps) => {
               minTickGap={12}
             />
             <YAxis
-              stroke="#ffffff"
+              stroke="hsl(var(--foreground))"
               tick={chartAxisTick}
               tickLine={false}
               axisLine={false}
@@ -139,11 +139,14 @@ const SpeedChart = ({ points, onHover }: SpeedChartProps) => {
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: "hsl(60, 9%, 97%)",
-                border: "1px solid hsl(23, 5%, 82%)",
+                backgroundColor: "hsl(var(--card))",
+                border: "1px solid hsl(var(--border))",
+                color: "hsl(var(--foreground))",
                 borderRadius: "12px",
                 boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
               }}
+              labelStyle={{ color: "hsl(var(--foreground))" }}
+              itemStyle={{ color: "hsl(var(--foreground))" }}
               formatter={(value: number) => [`${value} km/h`, "Speed"]}
               labelFormatter={(label) => `Distance: ${label} km`}
             />

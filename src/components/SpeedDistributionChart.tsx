@@ -84,7 +84,7 @@ const SpeedDistributionChart = ({ points, speedLimit, buckets }: SpeedDistributi
                 ))}
                 <XAxis
                     dataKey="range"
-                    stroke="#ffffff"
+                    stroke="hsl(var(--foreground))"
                     tickLine={false}
                     axisLine={false}
                     tick={{ ...chartAxisTick, dy: 10 }}
@@ -93,7 +93,7 @@ const SpeedDistributionChart = ({ points, speedLimit, buckets }: SpeedDistributi
                 />
                 <YAxis
                     yAxisId="left"
-                    stroke="#ffffff"
+                    stroke="hsl(var(--foreground))"
                     tick={chartAxisTick}
                     tickLine={false}
                     axisLine={false}
@@ -105,7 +105,7 @@ const SpeedDistributionChart = ({ points, speedLimit, buckets }: SpeedDistributi
                 <YAxis
                     yAxisId="right"
                     orientation="right"
-                    stroke="#ffffff"
+                    stroke="hsl(var(--foreground))"
                     tick={chartAxisTick}
                     tickLine={false}
                     axisLine={false}
@@ -120,8 +120,11 @@ const SpeedDistributionChart = ({ points, speedLimit, buckets }: SpeedDistributi
                         borderColor: 'hsl(var(--border))',
                         borderRadius: '16px',
                         fontSize: '12px',
+                        color: 'hsl(var(--foreground))',
                         boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)'
                     }}
+                    labelStyle={{ color: 'hsl(var(--foreground))' }}
+                    itemStyle={{ color: 'hsl(var(--foreground))' }}
                     cursor={{ fill: 'hsl(var(--muted)/0.2)' }}
                     formatter={(value: number, name: string) => {
                         if (name === "Time (min)") return [`${value.toFixed(1)} min`, name];

@@ -87,3 +87,29 @@ $$;
 
 revoke all on function public.get_segment_leaderboard(uuid) from public;
 grant execute on function public.get_segment_leaderboard(uuid) to authenticated;
+
+create or replace function public.get_activity_segment_ranks(target_activity_id uuid)
+returns table (segment_id uuid, segment_name text, rank bigint)
+language sql stable security definer set search_path = public
+as $$
+  with visible_efforts as (
+    select e.segment_id, e.activity_id, e.indexed_at,
+      case when a.user_id = auth.uid() then e.raw_coverage else e.public_coverage end selected_coverage,
+      case when a.user_id = auth.uid() then e.raw_avg_speed else e.public_avg_speed end selected_avg
+    from public.segment_efforts e
+    join public.activities a on a.id = e.activity_id
+    where a.user_id = auth.uid() or (a.public = true and e.public_coverage is not null)
+  ), ranked_efforts as (
+    select visible_efforts.segment_id, visible_efforts.activity_id,
+      row_number() over (partition by visible_efforts.segment_id order by selected_avg desc, selected_coverage desc, indexed_at asc) effort_rank
+    from visible_efforts
+  )
+  select s.id, s.name, ranked_efforts.effort_rank
+  from ranked_efforts
+  join public.segments s on s.id = ranked_efforts.segment_id
+  where ranked_efforts.activity_id = target_activity_id
+  order by s.name asc;
+$$;
+
+revoke all on function public.get_activity_segment_ranks(uuid) from public;
+grant execute on function public.get_activity_segment_ranks(uuid) to authenticated;

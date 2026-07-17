@@ -2,7 +2,7 @@ import { supabase } from "@/lib/supabase";
 import { fetchAccessibleActivities, fetchActivitySummary, loadActivityTrack } from "@/lib/activityData";
 import { indexSegmentEfforts } from "@/lib/segmentIndexing";
 import { matchActivityToSegment, segmentActivityCandidate, SEGMENT_EFFORT_ALGORITHM_VERSION, SEGMENT_REJECTED_MINIMUM_COVERAGE } from "@/utils/segmentMatching";
-import type { ActivitySummary, RouteAlignment, Segment, SegmentLeaderboardEntry, SegmentMatch, SegmentRejectedEntry } from "@/types/segments";
+import type { ActivitySegmentRank, ActivitySummary, RouteAlignment, Segment, SegmentLeaderboardEntry, SegmentMatch, SegmentRejectedEntry } from "@/types/segments";
 
 function normalizeSegment(record: unknown): Segment {
   const row = record as Segment;
@@ -31,6 +31,24 @@ export async function fetchSegment(id: string): Promise<Segment> {
   const { data, error } = await supabase.from("segments").select("*").eq("id", id).single();
   if (error) throw error;
   return (await attachCreators([normalizeSegment(data)]))[0];
+}
+
+type ActivitySegmentRankRow = {
+  segment_id: string;
+  segment_name: string;
+  rank: number | string;
+};
+
+export async function fetchActivitySegmentRanks(activityId: string): Promise<ActivitySegmentRank[]> {
+  const { data, error } = await supabase.rpc("get_activity_segment_ranks", {
+    target_activity_id: activityId,
+  });
+  if (error) throw error;
+  return ((data ?? []) as ActivitySegmentRankRow[]).map((row) => ({
+    segmentId: row.segment_id,
+    segmentName: row.segment_name,
+    rank: Number(row.rank),
+  }));
 }
 
 type LeaderboardRow = {

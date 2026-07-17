@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { Link } from "react-router-dom";
 import {
   Activity,
   Clock,
@@ -26,7 +27,8 @@ import {
   AlertTriangle,
   Globe,
   Lock,
-  Pencil
+  Pencil,
+  Trophy
 } from "lucide-react";
 
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -56,6 +58,7 @@ import {
   calculateStats,
   PAUSE_THRESHOLD
 } from "@/utils/gpxParser";
+import type { ActivitySegmentRank } from "@/types/segments";
 
 interface OwnerProfile {
   display_name: string | null;
@@ -77,9 +80,10 @@ interface GPSStatsProps {
   ownerProfile?: OwnerProfile | null;
   onEdit?: () => void;
   fuel?: number | null;
+  segmentRanks?: ActivitySegmentRank[];
 }
 
-const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedCap, displaySpeedCap, isOwner = true, isPublic = false, description, hideRadius = 0, ownerProfile, onEdit, fuel }: GPSStatsProps) => {
+const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedCap, displaySpeedCap, isOwner = true, isPublic = false, description, hideRadius = 0, ownerProfile, onEdit, fuel, segmentRanks = [] }: GPSStatsProps) => {
   const [hoveredPoint, setHoveredPoint] = useState<GPXPoint | null>(null);
   const [hoveredSpeed, setHoveredSpeed] = useState<number | null>(null);
   const [hoveredIndex, setHoveredIndex] = useState<number>(-1);
@@ -989,6 +993,34 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
           {/* ROUTE STRUCTURE TAB (Consolidated & Refined) */}
           {activeTab === "structure" && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+
+              {segmentRanks.length > 0 && (
+                <div>
+                  <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                    <Trophy className="w-6 h-6 text-amber-500" />
+                    Segments
+                  </h3>
+                  <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+                    {segmentRanks.map((segment, index) => (
+                      <Link
+                        key={segment.segmentId}
+                        to={`/segments/${segment.segmentId}`}
+                        className={cn(
+                          "flex items-center justify-between gap-4 px-4 py-3 transition-colors hover:bg-accent",
+                          index > 0 && "border-t border-border"
+                        )}
+                      >
+                        <span className="shrink-0 text-lg font-black tabular-nums text-muted-foreground">
+                          #{segment.rank}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate font-semibold text-foreground hover:text-primary">
+                          {segment.segmentName}
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {fastestDistanceEfforts.length > 0 && (
                 <div>

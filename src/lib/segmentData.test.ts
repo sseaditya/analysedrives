@@ -32,7 +32,7 @@ vi.mock("@/utils/segmentMatching", () => ({
   matchActivityToSegment: mocks.matchActivityToSegment,
 }));
 
-import { findRejectedSegmentMatches, findSegmentMatches } from "@/lib/segmentData";
+import { fetchActivitySegmentRanks, findRejectedSegmentMatches, findSegmentMatches } from "@/lib/segmentData";
 
 const segment: Segment = {
   id: "segment-1",
@@ -112,6 +112,24 @@ describe("findSegmentMatches", () => {
     mocks.fetchAccessibleActivities.mockResolvedValue([]);
     mocks.fetchActivitySummary.mockRejectedValue(new Error("not found"));
     mocks.indexSegmentEfforts.mockResolvedValue({ ok: true, checked: 0, matched: 0, failures: 0 });
+  });
+
+  it("maps an activity's segment ranks from the visibility-aware RPC", async () => {
+    mocks.rpc.mockResolvedValue({
+      data: [
+        { segment_id: "segment-1", segment_name: "Hill Road", rank: 2 },
+        { segment_id: "segment-2", segment_name: "Lake Loop", rank: "5" },
+      ],
+      error: null,
+    });
+
+    await expect(fetchActivitySegmentRanks("drive-1")).resolves.toEqual([
+      { segmentId: "segment-1", segmentName: "Hill Road", rank: 2 },
+      { segmentId: "segment-2", segmentName: "Lake Loop", rank: 5 },
+    ]);
+    expect(mocks.rpc).toHaveBeenCalledWith("get_activity_segment_ranks", {
+      target_activity_id: "drive-1",
+    });
   });
 
   it("only reports rejected drives with at least fifty percent same-direction coverage", async () => {
