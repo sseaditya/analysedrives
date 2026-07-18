@@ -19,9 +19,20 @@ interface SegmentCreatorProps {
   activityTitle: string;
   points: GPXPoint[];
   hideRadius: number;
+  stopPoints?: [number, number][];
+  tightTurnPoints?: [number, number][];
+  hairpinPoints?: [number, number][];
 }
 
-export default function SegmentCreator({ activityId, activityTitle, points, hideRadius }: SegmentCreatorProps) {
+export default function SegmentCreator({
+  activityId,
+  activityTitle,
+  points,
+  hideRadius,
+  stopPoints,
+  tightTurnPoints,
+  hairpinPoints,
+}: SegmentCreatorProps) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -101,7 +112,15 @@ export default function SegmentCreator({ activityId, activityTitle, points, hide
           <DialogDescription>Select the shared road section. Hidden start/end privacy zones cannot be published.</DialogDescription>
         </DialogHeader>
         <div className="space-y-5">
-          <TrackMap points={points} zoomRange={range} privacyMask={{ start: visibleRange[0], end: visibleRange[1] }} preserveViewportOnRangeChange />
+          <TrackMap
+            points={points}
+            zoomRange={range}
+            stopPoints={stopPoints}
+            tightTurnPoints={tightTurnPoints}
+            hairpinPoints={hairpinPoints}
+            privacyMask={{ start: visibleRange[0], end: visibleRange[1] }}
+            preserveViewportOnRangeChange
+          />
           <div className="space-y-3 rounded-xl border bg-muted/20 p-4">
             <div className="flex justify-between text-sm">
               <span>Selected road</span>

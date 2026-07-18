@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Slider } from "@/components/ui/slider";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchSegment, findRejectedSegmentMatches, findSegmentMatches, loadLeaderboardMatch } from "@/lib/segmentData";
-import { buildComparisonSeries, SEGMENT_EFFORT_ALGORITHM_VERSION } from "@/utils/segmentMatching";
+import { buildComparisonSeries, comparisonAverageSpeed, SEGMENT_EFFORT_ALGORITHM_VERSION } from "@/utils/segmentMatching";
 import { formatDuration } from "@/utils/gpxParser";
 
 const AUTO_PLAYBACK_DURATION_MS = 30_000;
@@ -83,8 +83,10 @@ export default function SegmentCompare() {
   if (segmentQuery.isLoading || matchesQuery.isLoading) return <div className="flex min-h-screen items-center justify-center"><div className="text-center"><Route className="mx-auto h-8 w-8 animate-pulse text-primary" /><p className="mt-3 text-sm text-muted-foreground">Aligning selected drives…</p></div></div>;
   if (!segmentQuery.data || !matchA || !matchB || !series) return <div className="flex min-h-screen items-center justify-center text-center"><div><h1 className="text-xl font-bold">Comparison unavailable</h1><p className="mt-2 text-sm text-muted-foreground">Choose two accessible qualifying drives from the leaderboard.</p><Button className="mt-4" onClick={() => navigate(`/segments/${segmentId}`)}>Back to leaderboard</Button></div></div>;
   const last = series.points[series.points.length - 1];
-  const avgA = last.elapsedA > 0 ? series.distance / (last.elapsedA / 3600) : 0;
-  const avgB = last.elapsedB > 0 ? series.distance / (last.elapsedB / 3600) : 0;
+  // Average speed is derived from the original elapsed time, then hidden at
+  // the public cap. The cap must not manufacture a slower comparison time.
+  const avgA = comparisonAverageSpeed(series.distance, last.elapsedA, matchA, user.id);
+  const avgB = comparisonAverageSpeed(series.distance, last.elapsedB, matchB, user.id);
   const maxA = Math.max(...series.points.map((point) => point.speedA));
   const maxB = Math.max(...series.points.map((point) => point.speedB));
   const comparisonDuration = Math.max(last.elapsedA, last.elapsedB);

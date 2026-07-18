@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { applySpeedLimitToDistribution, calculateSpeedDistribution, generateProcessedTrack, type GPXPoint } from "@/utils/gpxParser";
+import { calculateSpeedDistribution, generateProcessedTrack, type GPXPoint } from "@/utils/gpxParser";
 import type { ActivitySummary, LoadedActivity, Segment } from "@/types/segments";
-import { buildAlignment, buildComparisonSeries, comparisonActivityPoints, comparisonSpeedDistribution, extractSegmentGeometry, matchActivityToSegment, privacyVisibleRange, segmentActivityCandidate, segmentBounds } from "@/utils/segmentMatching";
+import { buildAlignment, buildComparisonSeries, comparisonActivityPoints, comparisonAverageSpeed, comparisonSpeedDistribution, extractSegmentGeometry, matchActivityToSegment, privacyVisibleRange, segmentActivityCandidate, segmentBounds } from "@/utils/segmentMatching";
 
 const KM_PER_LAT = 111.195;
 
@@ -188,20 +188,26 @@ describe("segment extraction and matching", () => {
     expect(comparison!.points.some((point) => point.speedB > point.speedA)).toBe(true);
   });
 
-  it("uses processed speeds and capped elapsed time in public comparisons", () => {
+  it("caps public speeds while preserving original comparison time and movement", () => {
     const points = route(0, 10, 0.05, 73.5, 120);
     const segment = segmentFrom(points);
     const a = matchActivityToSegment(segment, loaded(points, { id: "a" }), "viewer")!;
     const b = matchActivityToSegment(segment, loaded(points, {
       id: "b",
       user_id: "other",
-      speed_cap: 100,
-      stats: { maxSpeed: 80 },
+      speed_cap: 80,
     }), "viewer")!;
     const comparison = buildComparisonSeries(segment, a, b, "viewer");
     expect(comparison).not.toBeNull();
     expect(Math.max(...comparison!.points.map((point) => point.speedB))).toBeLessThanOrEqual(80);
-    expect(comparison!.points.at(-1)!.elapsedB).toBeGreaterThanOrEqual(comparison!.distance / 80 * 3600 - 1);
+    expect(comparison!.points.at(-1)!.elapsedB).toBeCloseTo(comparison!.points.at(-1)!.elapsedA, 5);
+    expect(comparison!.points.at(-1)!.elapsedB).toBeLessThan(comparison!.distance / 80 * 3600 - 1);
+    expect(comparisonAverageSpeed(
+      comparison!.distance,
+      comparison!.points.at(-1)!.elapsedB,
+      b,
+      "viewer",
+    )).toBe(80);
   });
 
   it("uses the exact Activity-page distribution for each common segment portion", () => {
@@ -216,7 +222,7 @@ describe("segment extraction and matching", () => {
     );
   });
 
-  it("applies the same public speed-cap distribution transform as Activity", () => {
+  it("caps the public speed distribution without changing its original time", () => {
     const segment = segmentFrom(route(0, 10));
     const a = matchActivityToSegment(segment, loaded(route(0, 10, 0.05, 73.5, 120), {
       id: "a", user_id: "other", speed_cap: 80,
@@ -227,8 +233,15 @@ describe("segment extraction and matching", () => {
     const comparison = buildComparisonSeries(segment, a, b, "viewer")!;
     const activityBuckets = calculateSpeedDistribution(comparisonActivityPoints(comparison, a), 10);
 
-    expect(comparisonSpeedDistribution(comparison, a, "viewer")).toEqual(
-      applySpeedLimitToDistribution(activityBuckets, 80),
+    const visibleBuckets = comparisonSpeedDistribution(comparison, a, "viewer");
+    expect(Math.max(...visibleBuckets.map((bucket) => bucket.minSpeed))).toBeLessThan(80);
+    expect(visibleBuckets.reduce((total, bucket) => total + bucket.time, 0)).toBeCloseTo(
+      activityBuckets.reduce((total, bucket) => total + bucket.time, 0),
+      2,
+    );
+    expect(visibleBuckets.reduce((total, bucket) => total + bucket.distance, 0)).toBeCloseTo(
+      activityBuckets.reduce((total, bucket) => total + bucket.distance, 0),
+      2,
     );
   });
 });

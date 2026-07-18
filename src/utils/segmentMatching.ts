@@ -8,7 +8,6 @@ import type {
   SegmentMatch,
 } from "../types/segments.js";
 import {
-  applySpeedLimitToDistribution,
   calculateLimitedStats,
   calculateSpeedDistribution,
   calculateStats,
@@ -272,7 +271,7 @@ function speedAt(loaded: LoadedActivity, index: number, cap: number | null) {
   return Math.min(cap ?? Infinity, speed);
 }
 
-function processedElapsedBetween(loaded: LoadedActivity, startIndex: number, endIndex: number, cap: number | null) {
+function processedElapsedBetween(loaded: LoadedActivity, startIndex: number, endIndex: number) {
   let elapsed = 0;
   const start = Math.max(0, Math.min(startIndex, endIndex));
   const end = Math.min(loaded.processedTrack.points.length - 1, Math.max(startIndex, endIndex));
@@ -280,10 +279,8 @@ function processedElapsedBetween(loaded: LoadedActivity, startIndex: number, end
     const previous = loaded.processedTrack.points[index - 1];
     const point = loaded.processedTrack.points[index];
     const seconds = point.elapsedTime - previous.elapsedTime;
-    const distance = point.distance - previous.distance;
-    if (seconds <= 0 || distance < 0) continue;
-    const rawSpeed = distance / (seconds / 3600);
-    elapsed += cap && rawSpeed > cap ? distance / cap * 3600 : seconds;
+    if (seconds <= 0) continue;
+    elapsed += seconds;
   }
   return elapsed;
 }
@@ -311,8 +308,10 @@ export function buildComparisonSeries(segment: Segment, matchA: SegmentMatch, ma
     const speedA = speedAt(matchA.loadedActivity, indexA, capA);
     const speedB = speedAt(matchB.loadedActivity, indexB, capB);
     if (points.length) {
-      elapsedA += processedElapsedBetween(matchA.loadedActivity, previousIndexA!, indexA, capA);
-      elapsedB += processedElapsedBetween(matchB.loadedActivity, previousIndexB!, indexB, capB);
+      // A public speed cap only hides speed. Timeline time and map movement must
+      // continue to use the recorded activity timing.
+      elapsedA += processedElapsedBetween(matchA.loadedActivity, previousIndexA!, indexA);
+      elapsedB += processedElapsedBetween(matchB.loadedActivity, previousIndexB!, indexB);
     }
     points.push({
       segmentIndex,
@@ -345,11 +344,42 @@ export function comparisonActivityPoints(series: ComparisonSeries, match: Segmen
 }
 
 export function comparisonSpeedDistribution(series: ComparisonSeries, match: SegmentMatch, viewerId: string): SpeedBucket[] {
-  const speedLimit = match.activity.user_id === viewerId ? null : match.activity.speed_cap;
-  return applySpeedLimitToDistribution(
-    calculateSpeedDistribution(comparisonActivityPoints(series, match), 10),
-    speedLimit,
-  );
+  const buckets = calculateSpeedDistribution(comparisonActivityPoints(series, match), 10);
+  const speedLimit = publicSpeedLimit(match.loadedActivity, viewerId);
+  if (!speedLimit || buckets.length === 0) return buckets;
+
+  const visible: SpeedBucket[] = [];
+  let cappedTime = 0;
+  let cappedDistance = 0;
+  for (const bucket of buckets) {
+    if (bucket.minSpeed < speedLimit) visible.push({ ...bucket });
+    else {
+      // Move hidden speeds into the capped range without simulating extra time.
+      // The comparison must retain the ride's original timing and movement.
+      cappedTime += bucket.time;
+      cappedDistance += bucket.distance;
+    }
+  }
+  if (cappedTime <= 0 && cappedDistance <= 0) return visible;
+
+  const cappedBucket = visible.at(-1);
+  if (cappedBucket) {
+    cappedBucket.time = Number((cappedBucket.time + cappedTime).toFixed(2));
+    cappedBucket.distance = Number((cappedBucket.distance + cappedDistance).toFixed(2));
+    return visible;
+  }
+
+  return [{
+    range: `0-${speedLimit}`,
+    minSpeed: 0,
+    time: Number(cappedTime.toFixed(2)),
+    distance: Number(cappedDistance.toFixed(2)),
+  }];
+}
+
+export function comparisonAverageSpeed(distance: number, elapsed: number, match: SegmentMatch, viewerId: string): number {
+  const originalAverage = elapsed > 0 ? distance / (elapsed / 3600) : 0;
+  return Math.min(originalAverage, publicSpeedLimit(match.loadedActivity, viewerId) ?? Infinity);
 }
 
 export function segmentBounds(geometry: SegmentGeometryPoint[]) {

@@ -403,6 +403,9 @@ const Activity = () => {
                     activityTitle={metadata.title}
                     points={data.points}
                     hideRadius={metadata.hide_radius ?? 0}
+                    stopPoints={data.stats.stopPoints}
+                    tightTurnPoints={data.stats.tightTurnPoints}
+                    hairpinPoints={data.stats.hairpinPoints}
                   />
                 )}
                 <Button
