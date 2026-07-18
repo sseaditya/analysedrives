@@ -146,12 +146,18 @@
   }
 }
 
+/* Keep Leaflet's animated marker repaint isolated from the raster tile grid. */
+.leaflet-container {
+  contain: paint;
+}
+
 /*
- * Leaflet positions 256px raster tiles with fractional transforms while
- * zooming and on high-DPI displays. Let adjacent tiles overlap by one pixel
- * so the map cannot expose vertical/horizontal seams between them.
+ * Leaflet 1.9.4 uses `plus-lighter` blending to mask Chromium tile gaps.
+ * That blending makes the one-pixel overlaps visible on CARTO's dark tiles.
+ * Use a normal overlap instead so fractional/high-DPI tile edges cannot show.
  */
 .leaflet-container .leaflet-tile {
   width: 257px !important;
   height: 257px !important;
+  mix-blend-mode: normal !important;
 }
