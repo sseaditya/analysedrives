@@ -14,7 +14,7 @@ import { buildComparisonSeries, comparisonAverageSpeed, SEGMENT_EFFORT_ALGORITHM
 import { formatDuration } from "@/utils/gpxParser";
 
 const AUTO_PLAYBACK_DURATION_MS = 30_000;
-const AUTO_PLAYBACK_FPS = 30;
+const AUTO_PLAYBACK_FPS = 60;
 
 export default function SegmentCompare() {
   const { segmentId = "" } = useParams();
@@ -26,7 +26,7 @@ export default function SegmentCompare() {
   const [playing, setPlaying] = useState(false);
   const [playbackFrameStep, setPlaybackFrameStep] = useState(0);
   const [speedInfoOpen, setSpeedInfoOpen] = useState(false);
-  const playbackTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const playbackFrameRef = useRef<number | null>(null);
   const startedRef = useRef(0);
   const cursorStartRef = useRef(0);
   const cursorRef = useRef(0);
@@ -68,15 +68,15 @@ export default function SegmentCompare() {
     const advancePlayback = () => {
       const now = performance.now();
       const rawAdvance = ((now - startedRef.current) / AUTO_PLAYBACK_DURATION_MS) * remaining;
-      const advance = comparisonMode === "time" ? Math.floor(rawAdvance) : rawAdvance;
-      const next = cursorStartRef.current + advance;
+      const next = cursorStartRef.current + rawAdvance;
       if (next >= maximum) { setCursorValue(maximum); setPlaying(false); return; }
       setCursorValue(next);
+      playbackFrameRef.current = requestAnimationFrame(advancePlayback);
     };
-    playbackTimerRef.current = setInterval(advancePlayback, 1000 / AUTO_PLAYBACK_FPS);
+    playbackFrameRef.current = requestAnimationFrame(advancePlayback);
     return () => {
-      if (playbackTimerRef.current != null) clearInterval(playbackTimerRef.current);
-      playbackTimerRef.current = null;
+      if (playbackFrameRef.current != null) cancelAnimationFrame(playbackFrameRef.current);
+      playbackFrameRef.current = null;
     };
   }, [comparisonMode, playing, series]);
 

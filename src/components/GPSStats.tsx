@@ -28,7 +28,9 @@ import {
   Globe,
   Lock,
   Pencil,
-  Trophy
+  Trophy,
+  Play,
+  Pause
 } from "lucide-react";
 
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -83,6 +85,9 @@ interface GPSStatsProps {
   segmentRanks?: ActivitySegmentRank[];
 }
 
+const PROFILE_PLAYBACK_DURATION_MS = 30_000;
+const READOUT_INTERVAL_MS = 200;
+
 function InfoPopover({ children, contentClassName }: { children: ReactNode; contentClassName?: string }) {
   const [open, setOpen] = useState(false);
 
@@ -110,16 +115,23 @@ function InfoPopover({ children, contentClassName }: { children: ReactNode; cont
 
 const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedCap, displaySpeedCap, isOwner = true, isPublic = false, description, hideRadius = 0, ownerProfile, onEdit, fuel, segmentRanks = [] }: GPSStatsProps) => {
   const [hoveredPoint, setHoveredPoint] = useState<GPXPoint | null>(null);
-  const [hoveredSpeed, setHoveredSpeed] = useState<number | null>(null);
-  const [hoveredIndex, setHoveredIndex] = useState<number>(-1);
+  const [readoutPoint, setReadoutPoint] = useState<GPXPoint | null>(null);
+  const [readoutSpeed, setReadoutSpeed] = useState<number | null>(null);
+  const [readoutIndex, setReadoutIndex] = useState<number>(-1);
   const [zoomRange, setZoomRange] = useState<[number, number] | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
+  const [isProfilePlaying, setIsProfilePlaying] = useState(false);
+  const [playbackElapsedTime, setPlaybackElapsedTime] = useState<number | null>(null);
   const hoverRafRef = useRef<number | null>(null);
+  const playbackRafRef = useRef<number | null>(null);
+  const playbackElapsedRef = useRef(0);
+  const lastReadoutUpdateRef = useRef(Number.NEGATIVE_INFINITY);
 
   // Cleanup hover rAF on unmount
   useEffect(() => {
     return () => {
       if (hoverRafRef.current !== null) cancelAnimationFrame(hoverRafRef.current);
+      if (playbackRafRef.current !== null) cancelAnimationFrame(playbackRafRef.current);
     };
   }, []);
 
@@ -363,6 +375,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
   const cumulativeData = useMemo(() => {
     const cumDist = new Float64Array(points.length);
     const cumTime = new Float64Array(points.length);
+    const speeds = new Float64Array(points.length);
     cumDist[0] = 0;
     cumTime[0] = 0;
     for (let i = 1; i < points.length; i++) {
@@ -370,15 +383,36 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
       const curr = points[i];
       const timeDiff = (curr.time && prev.time) ? (curr.time.getTime() - prev.time.getTime()) / 1000 : 0;
       if (timeDiff <= PAUSE_THRESHOLD) {
-        cumDist[i] = cumDist[i - 1] + haversineDistance(prev.lat, prev.lon, curr.lat, curr.lon);
+        const distance = haversineDistance(prev.lat, prev.lon, curr.lat, curr.lon);
+        cumDist[i] = cumDist[i - 1] + distance;
         cumTime[i] = cumTime[i - 1] + timeDiff;
+        speeds[i] = timeDiff > 0 ? Math.min(350, distance / (timeDiff / 3600)) : 0;
       } else {
         cumDist[i] = cumDist[i - 1];
         cumTime[i] = cumTime[i - 1];
+        speeds[i] = 0;
       }
     }
-    return { cumDist, cumTime };
+    return { cumDist, cumTime, speeds };
   }, [points]);
+
+  const updateReadout = useCallback((point: GPXPoint, speed: number | null, index: number, force = false) => {
+    const now = performance.now();
+    if (!force && now - lastReadoutUpdateRef.current < READOUT_INTERVAL_MS) return;
+    lastReadoutUpdateRef.current = now;
+    setReadoutPoint(point);
+    setReadoutSpeed(speed);
+    setReadoutIndex(index);
+  }, []);
+
+  const privacySafeCursor = useCallback((point: GPXPoint, index: number) => {
+    if (isOwner || mapPoints.length === 0) return { point, index: Math.round(index) };
+    const safeStartIndex = mapPointsStartIndex;
+    const safeEndIndex = mapPointsStartIndex + mapPoints.length - 1;
+    if (index < safeStartIndex) return { point: mapPoints[0], index: -1 };
+    if (index > safeEndIndex) return { point: mapPoints[mapPoints.length - 1], index: -1 };
+    return { point, index: Math.round(index) };
+  }, [isOwner, mapPoints, mapPointsStartIndex]);
 
   // Handle chart hover with privacy clamping (throttled via rAF)
   const handleHoverPoint = useCallback((point: GPXPoint | null, speed?: number, pointIndex?: number) => {
@@ -387,57 +421,99 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
 
     if (!point) {
       // Clear immediately on leave
+      lastReadoutUpdateRef.current = Number.NEGATIVE_INFINITY;
       setHoveredPoint(null);
-      setHoveredSpeed(null);
-      setHoveredIndex(-1);
+      setReadoutPoint(null);
+      setReadoutSpeed(null);
+      setReadoutIndex(-1);
       return;
     }
+
+    setIsProfilePlaying(false);
 
     // Throttle hover updates to rAF
     hoverRafRef.current = requestAnimationFrame(() => {
       hoverRafRef.current = null;
       const idx = pointIndex ?? -1;
-
-      if (isOwner) {
-        setHoveredPoint(point);
-        setHoveredSpeed(speed ?? null);
-        setHoveredIndex(idx);
-        return;
-      }
-
-      // Privacy Logic for Public Viewers
-      if (!mapPoints || mapPoints.length === 0) {
+      if (!isOwner && mapPoints.length === 0) {
+        lastReadoutUpdateRef.current = Number.NEGATIVE_INFINITY;
         setHoveredPoint(null);
-        setHoveredIndex(-1);
+        setReadoutPoint(null);
+        setReadoutIndex(-1);
         return;
       }
-
-      const safeStart = mapPoints[0];
-      const safeEnd = mapPoints[mapPoints.length - 1];
-
-      if (!point.time || !safeStart.time || !safeEnd.time) {
-        setHoveredPoint(point);
-        setHoveredIndex(idx);
-        return;
-      }
-
-      const pTime = point.time.getTime();
-      const startTime = safeStart.time.getTime();
-      const endTime = safeEnd.time.getTime();
-
-      if (pTime < startTime) {
-        setHoveredPoint(safeStart);
-        setHoveredIndex(-1);
-      } else if (pTime > endTime) {
-        setHoveredPoint(safeEnd);
-        setHoveredIndex(-1);
-      } else {
-        setHoveredPoint(point);
-        setHoveredSpeed(speed ?? null);
-        setHoveredIndex(idx);
-      }
+      const safeCursor = privacySafeCursor(point, idx);
+      setHoveredPoint(safeCursor.point);
+      updateReadout(safeCursor.point, speed ?? null, safeCursor.index);
     });
-  }, [isOwner, mapPoints]);
+  }, [isOwner, mapPoints.length, privacySafeCursor, updateReadout]);
+
+  useEffect(() => {
+    if (!isProfilePlaying || points.length < 2) return;
+    const maximum = cumulativeData.cumTime[cumulativeData.cumTime.length - 1] ?? 0;
+    if (maximum <= 0) {
+      setIsProfilePlaying(false);
+      return;
+    }
+
+    let startElapsed = Math.min(playbackElapsedRef.current, maximum);
+    if (startElapsed >= maximum) {
+      startElapsed = 0;
+      playbackElapsedRef.current = 0;
+      setPlaybackElapsedTime(0);
+    }
+    const remaining = maximum - startElapsed;
+    const remainingDuration = PROFILE_PLAYBACK_DURATION_MS * (remaining / maximum);
+    const startedAt = performance.now();
+
+    const renderFrame = (now: number) => {
+      const progress = Math.min(1, (now - startedAt) / Math.max(1, remainingDuration));
+      const elapsed = startElapsed + remaining * progress;
+      let low = 1;
+      let high = cumulativeData.cumTime.length - 1;
+      while (low < high) {
+        const middle = Math.floor((low + high) / 2);
+        if (cumulativeData.cumTime[middle] < elapsed) low = middle + 1;
+        else high = middle;
+      }
+      const right = low;
+      const left = Math.max(0, right - 1);
+      const timeSpan = cumulativeData.cumTime[right] - cumulativeData.cumTime[left];
+      const ratio = timeSpan > 0 ? (elapsed - cumulativeData.cumTime[left]) / timeSpan : 1;
+      const leftPoint = points[left];
+      const rightPoint = points[right];
+      const interpolatedPoint: GPXPoint = {
+        ...rightPoint,
+        lat: leftPoint.lat + (rightPoint.lat - leftPoint.lat) * ratio,
+        lon: leftPoint.lon + (rightPoint.lon - leftPoint.lon) * ratio,
+        ele: leftPoint.ele != null && rightPoint.ele != null
+          ? leftPoint.ele + (rightPoint.ele - leftPoint.ele) * ratio
+          : rightPoint.ele ?? leftPoint.ele,
+      };
+      const safeCursor = privacySafeCursor(interpolatedPoint, left + ratio);
+      let speed = cumulativeData.speeds[right];
+      if (!isOwner && speedCap) speed = Math.min(speed, speedCap);
+      if (showLimiter) speed = Math.min(speed, speedLimit);
+
+      playbackElapsedRef.current = elapsed;
+      setPlaybackElapsedTime(elapsed);
+      setHoveredPoint(safeCursor.point);
+      updateReadout(safeCursor.point, speed, safeCursor.index, progress === 1);
+
+      if (progress === 1) {
+        playbackRafRef.current = null;
+        setIsProfilePlaying(false);
+        return;
+      }
+      playbackRafRef.current = requestAnimationFrame(renderFrame);
+    };
+
+    playbackRafRef.current = requestAnimationFrame(renderFrame);
+    return () => {
+      if (playbackRafRef.current !== null) cancelAnimationFrame(playbackRafRef.current);
+      playbackRafRef.current = null;
+    };
+  }, [cumulativeData, isOwner, isProfilePlaying, points, privacySafeCursor, showLimiter, speedCap, speedLimit, updateReadout]);
 
   const totalDistance = stats.totalDistance;
   const movingTime = stats.movingTime;
@@ -677,10 +753,26 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
 
                     {/* Right: Controls (Toggle + Reset) */}
                     <div className="flex items-center gap-3 flex-shrink-0 order-2 md:order-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setXAxisMode('time');
+                          setIsProfilePlaying((playing) => !playing);
+                        }}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/50 bg-primary text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        aria-label={isProfilePlaying ? "Pause drive profile" : "Play drive profile"}
+                        title={isProfilePlaying ? "Pause drive profile" : "Play drive profile"}
+                      >
+                        {isProfilePlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                      </button>
+
                       {/* Distance/Time Toggle */}
                       <div className="flex items-center gap-2 bg-muted/50 px-2.5 py-1 rounded-full border border-border/50">
                         <button
-                          onClick={() => setXAxisMode('distance')}
+                          onClick={() => {
+                            setIsProfilePlaying(false);
+                            setXAxisMode('distance');
+                          }}
                           className={cn(
                             "text-xs font-semibold px-2 py-0.5 rounded-md transition-colors",
                             xAxisMode === 'distance' ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
@@ -868,10 +960,10 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                     </div>
 
                     {/* Hover Data Display - Desktop: inline on same row */}
-                    {!isMobile && hoveredPoint && (() => {
-                      const cd = hoveredIndex >= 0 ? cumulativeData.cumDist[hoveredIndex] : 0;
-                      const ct = hoveredIndex >= 0 ? cumulativeData.cumTime[hoveredIndex] : 0;
-                      const finalDisplaySpeed = hoveredSpeed ?? 0;
+                    {!isMobile && readoutPoint && (() => {
+                      const cd = readoutIndex >= 0 ? cumulativeData.cumDist[readoutIndex] : 0;
+                      const ct = readoutIndex >= 0 ? cumulativeData.cumTime[readoutIndex] : 0;
+                      const finalDisplaySpeed = readoutSpeed ?? 0;
                       const h = Math.floor(ct / 3600);
                       const m = Math.floor((ct % 3600) / 60);
                       const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
@@ -883,10 +975,10 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                           <span className="text-lg font-normal tabular-nums">{formatDistance(cd)}</span>
                           <span className="text-muted-foreground">|</span>
                           <span className="text-lg font-normal tabular-nums">{formatSpeed(finalDisplaySpeed)}</span>
-                          {hoveredPoint.ele !== undefined && (
+                          {readoutPoint.ele !== undefined && (
                             <>
                               <span className="text-muted-foreground">|</span>
-                              <span className="text-lg font-normal tabular-nums">{hoveredPoint.ele.toFixed(0)}m</span>
+                              <span className="text-lg font-normal tabular-nums">{readoutPoint.ele.toFixed(0)}m</span>
                             </>
                           )}
                         </div>
@@ -896,10 +988,10 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                 </div>
 
                 {/* Hover Data Display - Mobile: own row below */}
-                {isMobile && hoveredPoint && (() => {
-                  const cd = hoveredIndex >= 0 ? cumulativeData.cumDist[hoveredIndex] : 0;
-                  const ct = hoveredIndex >= 0 ? cumulativeData.cumTime[hoveredIndex] : 0;
-                  const finalDisplaySpeed = hoveredSpeed ?? 0;
+                {isMobile && readoutPoint && (() => {
+                  const cd = readoutIndex >= 0 ? cumulativeData.cumDist[readoutIndex] : 0;
+                  const ct = readoutIndex >= 0 ? cumulativeData.cumTime[readoutIndex] : 0;
+                  const finalDisplaySpeed = readoutSpeed ?? 0;
                   const h = Math.floor(ct / 3600);
                   const m = Math.floor((ct % 3600) / 60);
                   const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
@@ -909,8 +1001,8 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                       <span className="text-sm font-mono font-semibold tabular-nums">{timeStr}</span>
                       <span className="text-sm font-mono font-semibold tabular-nums">{formatDistance(cd)}</span>
                       <span className="text-sm font-mono font-semibold tabular-nums">{formatSpeed(finalDisplaySpeed)}</span>
-                      {hoveredPoint.ele !== undefined && (
-                        <span className="text-sm font-mono font-semibold tabular-nums">{hoveredPoint.ele.toFixed(0)}m</span>
+                      {readoutPoint.ele !== undefined && (
+                        <span className="text-sm font-mono font-semibold tabular-nums">{readoutPoint.ele.toFixed(0)}m</span>
                       )}
                     </div>
                   );
@@ -927,6 +1019,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                     visualLimit={showLimiter ? speedLimit : undefined}
                     xAxisMode={xAxisMode}
                     maxSpeed={stats.maxSpeed}
+                    playbackElapsedTime={playbackElapsedTime}
                   />
                 </div>
               </div>

@@ -397,15 +397,17 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
 
   // Hover Effect (Separate Effect to avoid redrawing tracks)
   useEffect(() => {
-    // ... (Keep existing hover logic)
     if (!mapInstanceRef.current) return;
 
-    if (hoverMarkerRef.current) {
-      mapInstanceRef.current.removeLayer(hoverMarkerRef.current);
-      hoverMarkerRef.current = null;
+    if (!hoveredPoint) {
+      if (hoverMarkerRef.current) {
+        mapInstanceRef.current.removeLayer(hoverMarkerRef.current);
+        hoverMarkerRef.current = null;
+      }
+      return;
     }
 
-    if (hoveredPoint) {
+    if (!hoverMarkerRef.current) {
       const hoverIcon = L.divIcon({
         className: "custom-marker-hover",
         html: `<div style="background-color: hsl(16, 65%, 57%); width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center;">
@@ -419,13 +421,17 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
         icon: hoverIcon,
         zIndexOffset: 1000,
       });
-
-      if (hoveredPoint.time) {
-        marker.bindPopup(hoveredPoint.time.toLocaleTimeString());
-      }
-
       marker.addTo(mapInstanceRef.current);
       hoverMarkerRef.current = marker;
+    } else {
+      hoverMarkerRef.current.setLatLng([hoveredPoint.lat, hoveredPoint.lon]);
+    }
+
+    if (hoveredPoint.time) {
+      const popupText = hoveredPoint.time.toLocaleTimeString();
+      const popup = hoverMarkerRef.current.getPopup();
+      if (popup) popup.setContent(popupText);
+      else hoverMarkerRef.current.bindPopup(popupText);
     }
   }, [hoveredPoint]);
 
