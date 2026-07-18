@@ -145,3 +145,13 @@
     opacity: 0.9;
   }
 }
+
+/*
+ * Leaflet positions 256px raster tiles with fractional transforms while
+ * zooming and on high-DPI displays. Let adjacent tiles overlap by one pixel
+ * so the map cannot expose vertical/horizontal seams between them.
+ */
+.leaflet-container .leaflet-tile {
+  width: 257px !important;
+  height: 257px !important;
+}

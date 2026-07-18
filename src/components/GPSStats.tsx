@@ -87,6 +87,7 @@ interface GPSStatsProps {
 
 const PROFILE_PLAYBACK_DURATION_MS = 30_000;
 const PROFILE_PLAYBACK_FPS = 60;
+const PROFILE_CURSOR_FPS = 20;
 const AUTO_SPEED_AVERAGE_FRAME_RADIUS = 3;
 const AUTO_SPEED_FRAME_STRIDE = 6;
 const READOUT_INTERVAL_MS = 200;
@@ -156,9 +157,11 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
   const [zoomRange, setZoomRange] = useState<[number, number] | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
   const [isProfilePlaying, setIsProfilePlaying] = useState(false);
+  const [playbackElapsedTime, setPlaybackElapsedTime] = useState<number | null>(null);
   const hoverRafRef = useRef<number | null>(null);
   const playbackRafRef = useRef<number | null>(null);
   const playbackElapsedRef = useRef(0);
+  const lastPlaybackCursorUpdateRef = useRef(Number.NEGATIVE_INFINITY);
   const lastReadoutUpdateRef = useRef(Number.NEGATIVE_INFINITY);
 
   // Cleanup hover rAF on unmount
@@ -468,12 +471,15 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
       playbackRafRef.current = null;
     }
     setIsProfilePlaying(false);
+    setPlaybackElapsedTime(null);
 
     // Throttle hover updates to rAF
     hoverRafRef.current = requestAnimationFrame(() => {
       hoverRafRef.current = null;
       const idx = pointIndex ?? -1;
-      if (idx >= 0) playbackElapsedRef.current = cumulativeData.cumTime[idx];
+      if (idx >= 0) {
+        playbackElapsedRef.current = cumulativeData.cumTime[idx];
+      }
       if (!isOwner && mapPoints.length === 0) {
         lastReadoutUpdateRef.current = Number.NEGATIVE_INFINITY;
         setHoveredPoint(null);
@@ -502,6 +508,8 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
       startElapsed = 0;
       playbackElapsedRef.current = 0;
     }
+    setPlaybackElapsedTime(startElapsed);
+    lastPlaybackCursorUpdateRef.current = Number.NEGATIVE_INFINITY;
     const remaining = maximum - startElapsed;
     const remainingDuration = PROFILE_PLAYBACK_DURATION_MS * (remaining / maximum);
     const playbackFrameStep = maximum / (PROFILE_PLAYBACK_FPS * PROFILE_PLAYBACK_DURATION_MS / 1000);
@@ -537,6 +545,13 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
       if (showLimiter) speed = Math.min(speed, speedLimit);
 
       playbackElapsedRef.current = elapsed;
+      if (
+        progress === 1 ||
+        now - lastPlaybackCursorUpdateRef.current >= 1000 / PROFILE_CURSOR_FPS
+      ) {
+        lastPlaybackCursorUpdateRef.current = now;
+        setPlaybackElapsedTime(elapsed);
+      }
       setHoveredPoint(safeCursor.point);
       updateReadout(safeCursor.point, speed, safeCursor.index, progress === 1);
 
@@ -797,6 +812,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                         type="button"
                         onClick={() => {
                           setXAxisMode('time');
+                          if (!isProfilePlaying) setZoomRange(null);
                           setIsProfilePlaying((playing) => !playing);
                         }}
                         className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border/50 bg-primary text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -1059,6 +1075,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                     visualLimit={showLimiter ? speedLimit : undefined}
                     xAxisMode={xAxisMode}
                     maxSpeed={stats.maxSpeed}
+                    playbackElapsedTime={playbackElapsedTime}
                   />
                 </div>
               </div>
