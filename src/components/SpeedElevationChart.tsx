@@ -32,7 +32,6 @@ interface SpeedElevationChartProps {
   visualLimit?: number;
   xAxisMode?: 'distance' | 'time';
   maxSpeed?: number;
-  playbackElapsedTime?: number | null;
 }
 
 interface ChartDataPoint {
@@ -81,7 +80,6 @@ const SpeedElevationChart = ({
   visualLimit,
   xAxisMode = 'distance',
   maxSpeed: maxSpeedProp = 0,
-  playbackElapsedTime = null,
 }: SpeedElevationChartProps) => {
   const [refAreaLeft, setRefAreaLeft] = useState<string | null>(null);
   const [refAreaRight, setRefAreaRight] = useState<string | null>(null);
@@ -728,8 +726,6 @@ const SpeedElevationChart = ({
     );
   }
 
-  const synchronizedCursor = hoverDistance ?? (xAxisMode === 'time' ? playbackElapsedTime : null);
-
   return (
     <div ref={chartRef} className="h-full w-full rounded-2xl border border-border bg-card p-3 select-none flex flex-col cursor-crosshair">
       {/* Speed Chart (Main - 70% height) */}
@@ -818,9 +814,9 @@ const SpeedElevationChart = ({
             )}
 
             {/* Synchronized Hover Line */}
-            {synchronizedCursor !== null && (
+            {hoverDistance !== null && (
               <ReferenceLine
-                x={synchronizedCursor}
+                x={hoverDistance}
                 stroke="hsl(var(--foreground))"
                 strokeOpacity={1}
                 isFront={true}
@@ -924,9 +920,9 @@ const SpeedElevationChart = ({
               />
 
               {/* Synchronized Hover Line */}
-              {synchronizedCursor !== null && (
+              {hoverDistance !== null && (
                 <ReferenceLine
-                  x={synchronizedCursor}
+                  x={hoverDistance}
                   stroke="hsl(var(--foreground))"
                   strokeOpacity={1}
                   isFront={true}

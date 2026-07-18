@@ -86,7 +86,42 @@ interface GPSStatsProps {
 }
 
 const PROFILE_PLAYBACK_DURATION_MS = 30_000;
+const PROFILE_PLAYBACK_FPS = 60;
+const AUTO_SPEED_AVERAGE_FRAME_RADIUS = 3;
+const AUTO_SPEED_FRAME_STRIDE = 6;
 const READOUT_INTERVAL_MS = 200;
+
+function speedAtElapsed(cumulativeTime: Float64Array, speeds: Float64Array, elapsed: number) {
+  if (cumulativeTime.length === 0 || elapsed <= 0) return speeds[0] ?? 0;
+  const lastIndex = cumulativeTime.length - 1;
+  if (elapsed >= cumulativeTime[lastIndex]) return speeds[lastIndex] ?? 0;
+
+  let low = 1;
+  let high = lastIndex;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (cumulativeTime[middle] < elapsed) low = middle + 1;
+    else high = middle;
+  }
+  const right = low;
+  const left = right - 1;
+  const span = cumulativeTime[right] - cumulativeTime[left];
+  const ratio = span > 0 ? (elapsed - cumulativeTime[left]) / span : 1;
+  return speeds[left] + (speeds[right] - speeds[left]) * ratio;
+}
+
+function frameAveragedSpeed(cumulativeTime: Float64Array, speeds: Float64Array, elapsed: number, frameStep: number) {
+  const maximum = cumulativeTime[cumulativeTime.length - 1] ?? 0;
+  let total = 0;
+  let count = 0;
+  for (let offset = -AUTO_SPEED_AVERAGE_FRAME_RADIUS; offset <= AUTO_SPEED_AVERAGE_FRAME_RADIUS; offset++) {
+    const sampleElapsed = elapsed + offset * frameStep * AUTO_SPEED_FRAME_STRIDE;
+    if (sampleElapsed < 0 || sampleElapsed > maximum) continue;
+    total += speedAtElapsed(cumulativeTime, speeds, sampleElapsed);
+    count++;
+  }
+  return count > 0 ? total / count : speedAtElapsed(cumulativeTime, speeds, elapsed);
+}
 
 function InfoPopover({ children, contentClassName }: { children: ReactNode; contentClassName?: string }) {
   const [open, setOpen] = useState(false);
@@ -121,7 +156,6 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
   const [zoomRange, setZoomRange] = useState<[number, number] | null>(null);
   const [activeTab, setActiveTab] = useState("overview");
   const [isProfilePlaying, setIsProfilePlaying] = useState(false);
-  const [playbackElapsedTime, setPlaybackElapsedTime] = useState<number | null>(null);
   const hoverRafRef = useRef<number | null>(null);
   const playbackRafRef = useRef<number | null>(null);
   const playbackElapsedRef = useRef(0);
@@ -429,12 +463,17 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
       return;
     }
 
+    if (playbackRafRef.current !== null) {
+      cancelAnimationFrame(playbackRafRef.current);
+      playbackRafRef.current = null;
+    }
     setIsProfilePlaying(false);
 
     // Throttle hover updates to rAF
     hoverRafRef.current = requestAnimationFrame(() => {
       hoverRafRef.current = null;
       const idx = pointIndex ?? -1;
+      if (idx >= 0) playbackElapsedRef.current = cumulativeData.cumTime[idx];
       if (!isOwner && mapPoints.length === 0) {
         lastReadoutUpdateRef.current = Number.NEGATIVE_INFINITY;
         setHoveredPoint(null);
@@ -444,9 +483,11 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
       }
       const safeCursor = privacySafeCursor(point, idx);
       setHoveredPoint(safeCursor.point);
-      updateReadout(safeCursor.point, speed ?? null, safeCursor.index);
+      // Manual hover follows the animation frame so both the marker and its
+      // readout stay fully responsive. Only autoplay uses the 5 fps throttle.
+      updateReadout(safeCursor.point, speed ?? null, safeCursor.index, true);
     });
-  }, [isOwner, mapPoints.length, privacySafeCursor, updateReadout]);
+  }, [cumulativeData.cumTime, isOwner, mapPoints.length, privacySafeCursor, updateReadout]);
 
   useEffect(() => {
     if (!isProfilePlaying || points.length < 2) return;
@@ -460,10 +501,10 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
     if (startElapsed >= maximum) {
       startElapsed = 0;
       playbackElapsedRef.current = 0;
-      setPlaybackElapsedTime(0);
     }
     const remaining = maximum - startElapsed;
     const remainingDuration = PROFILE_PLAYBACK_DURATION_MS * (remaining / maximum);
+    const playbackFrameStep = maximum / (PROFILE_PLAYBACK_FPS * PROFILE_PLAYBACK_DURATION_MS / 1000);
     const startedAt = performance.now();
 
     const renderFrame = (now: number) => {
@@ -491,12 +532,11 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
           : rightPoint.ele ?? leftPoint.ele,
       };
       const safeCursor = privacySafeCursor(interpolatedPoint, left + ratio);
-      let speed = cumulativeData.speeds[right];
+      let speed = frameAveragedSpeed(cumulativeData.cumTime, cumulativeData.speeds, elapsed, playbackFrameStep);
       if (!isOwner && speedCap) speed = Math.min(speed, speedCap);
       if (showLimiter) speed = Math.min(speed, speedLimit);
 
       playbackElapsedRef.current = elapsed;
-      setPlaybackElapsedTime(elapsed);
       setHoveredPoint(safeCursor.point);
       updateReadout(safeCursor.point, speed, safeCursor.index, progress === 1);
 
@@ -1019,7 +1059,6 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                     visualLimit={showLimiter ? speedLimit : undefined}
                     xAxisMode={xAxisMode}
                     maxSpeed={stats.maxSpeed}
-                    playbackElapsedTime={playbackElapsedTime}
                   />
                 </div>
               </div>
