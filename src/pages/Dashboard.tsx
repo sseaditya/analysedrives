@@ -665,6 +665,18 @@ const Dashboard = () => {
                                             </Button>
                                         </p>
                                         <Button onClick={() => setShowUpload(true)}>Upload your first drive</Button>
+                                        <div className="mx-auto mt-8 w-full max-w-3xl overflow-hidden rounded-xl border border-border bg-black shadow-lg">
+                                            <div className="aspect-video">
+                                                <iframe
+                                                    className="h-full w-full"
+                                                    src="https://www.youtube-nocookie.com/embed/udWQB3cW9KM"
+                                                    title="How to get your GPX files and upload your first drive"
+                                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                                    referrerPolicy="strict-origin-when-cross-origin"
+                                                    allowFullScreen
+                                                />
+                                            </div>
+                                        </div>
                                     </>
                                 ) : (
                                     <>
