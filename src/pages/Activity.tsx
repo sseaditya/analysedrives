@@ -18,7 +18,11 @@ import SegmentCreator from "@/components/SegmentCreator";
 import { loadActivityTrack } from "@/lib/activityData";
 import { fetchActivitySegmentRanks } from "@/lib/segmentData";
 import type { ActivitySegmentRank, ActivitySummary } from "@/types/segments";
-import { isPublicProcessedTrack } from "@/utils/publicActivity";
+import {
+  isLegacyPublicProcessedTrack,
+  isPublicProcessedTrack,
+  type PublicProfilePoint,
+} from "@/utils/publicActivity";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,6 +37,8 @@ interface ActivityState {
   points: GPXPoint[];
   fileName: string;
   usesPublicArtifact?: boolean;
+  profilePoints?: PublicProfilePoint[];
+  profilePointOffset?: number;
 }
 
 interface ActivityMetadata {
@@ -215,11 +221,20 @@ const Activity = () => {
             }
           }
 
+          const publicTrack = isPublicProcessedTrack(loaded.processedTrack)
+            ? loaded.processedTrack
+            : null;
+          const usesPublicArtifact = publicTrack !== null
+            || isLegacyPublicProcessedTrack(loaded.processedTrack);
           setData({
             stats: loaded.processedTrack.stats,
             points: loaded.points,
             fileName: record.title,
-            usesPublicArtifact: isPublicProcessedTrack(loaded.processedTrack),
+            usesPublicArtifact,
+            profilePoints: publicTrack?.profilePoints,
+            profilePointOffset: publicTrack && publicTrack.visibleStartPointIndex >= 0
+              ? publicTrack.visibleStartPointIndex
+              : 0,
           });
 
         } catch (err: unknown) {
@@ -514,6 +529,8 @@ const Activity = () => {
             stats={data.stats}
             fileName={data.fileName}
             points={data.points}
+            profilePoints={data.profilePoints}
+            profilePointOffset={data.profilePointOffset}
             speedCap={effectiveSpeedCap}
             displaySpeedCap={metadata?.speed_cap}
             isOwner={isOwner}

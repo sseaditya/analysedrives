@@ -10,6 +10,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import { GPXPoint, haversineDistance, PAUSE_THRESHOLD } from "@/utils/gpxParser";
+import type { PublicProfilePoint } from "@/utils/publicActivity";
 import { calculateNiceTicks, calculateNiceYTicks } from "@/utils/chartUtils";
 import { useState, useMemo, useEffect, useCallback, useRef, memo } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -24,6 +25,8 @@ const Y_AXIS_WIDTH = 60;
 
 interface SpeedElevationChartProps {
   points: GPXPoint[];
+  profilePoints?: PublicProfilePoint[];
+  profilePointOffset?: number;
   onHover?: (point: GPXPoint | null, speed?: number, pointIndex?: number) => void;
   onZoomChange: (range: [number, number] | null) => void;
   zoomRange: [number, number] | null;
@@ -73,6 +76,8 @@ type InteractionMode = 'none' | 'new-selection' | 'resize-left' | 'resize-right'
 
 const SpeedElevationChart = ({
   points,
+  profilePoints,
+  profilePointOffset = 0,
   onHover,
   onZoomChange,
   zoomRange,
@@ -107,6 +112,17 @@ const SpeedElevationChart = ({
   // Step 1: Process ALL raw points (speed calculations) — cached once when points change
   const processedRawData = useMemo(() => {
     const rawData: { dist: number; speed: number; ele: number | null; time: Date | undefined; elapsed: number; pointIndex: number }[] = [];
+
+    if (profilePoints?.length) {
+      return profilePoints.map((point, pointIndex) => ({
+        dist: point.distance,
+        speed: point.speed,
+        ele: point.ele ?? null,
+        time: undefined,
+        elapsed: point.elapsedTime,
+        pointIndex,
+      }));
+    }
 
     let cumulativeActiveTime = 0;
     let cumulativeDistance = 0;
@@ -177,7 +193,9 @@ const SpeedElevationChart = ({
     }
 
     return rawData;
-  }, [points]);
+  }, [points, profilePoints]);
+
+  const dataPointCount = profilePoints?.length ?? points.length;
 
   // Step 2: Sample + smooth helper — takes raw data and produces chart-ready points
   const sampleAndSmooth = useCallback((rawData: typeof processedRawData, targetPoints: number): ChartDataPoint[] => {
@@ -495,11 +513,11 @@ const SpeedElevationChart = ({
       if (diff < MIN_POINTS) {
         const padding = Math.ceil((MIN_POINTS - diff) / 2);
         startIndex = Math.max(0, startIndex - padding);
-        endIndex = Math.min(points.length - 1, endIndex + padding);
+        endIndex = Math.min(dataPointCount - 1, endIndex + padding);
 
         if (endIndex - startIndex < MIN_POINTS) {
-          if (startIndex === 0) endIndex = Math.min(points.length - 1, startIndex + MIN_POINTS);
-          if (endIndex === points.length - 1) startIndex = Math.max(0, endIndex - MIN_POINTS);
+          if (startIndex === 0) endIndex = Math.min(dataPointCount - 1, startIndex + MIN_POINTS);
+          if (endIndex === dataPointCount - 1) startIndex = Math.max(0, endIndex - MIN_POINTS);
         }
       }
 
@@ -513,7 +531,7 @@ const SpeedElevationChart = ({
     setActiveChart(null);
     setInteractionMode('none');
     setDragStartDist(null);
-  }, [refAreaLeft, refAreaRight, zoomRange, onZoomChange, processedRawData, xAxisMode, points.length]);
+  }, [refAreaLeft, refAreaRight, zoomRange, onZoomChange, processedRawData, xAxisMode, dataPointCount]);
 
   const handleMouseMoveInner = useCallback((e: ChartPointerState | null, chartType: 'speed' | 'elevation') => {
     const selectionValue = getSelectionAxisValue(e, chartType);
@@ -588,10 +606,16 @@ const SpeedElevationChart = ({
     const activeData = e.activePayload[0].payload as ChartDataPoint;
     const pointIndex = activeData.pointIndex;
 
-    if (pointIndex !== undefined && pointIndex < points.length) {
-      onHover(points[pointIndex], activeData.speed, pointIndex);
+    if (pointIndex !== undefined && points.length > 0) {
+      const coordinateIndex = pointIndex - profilePointOffset;
+      const safeCoordinateIndex = Math.max(0, Math.min(points.length - 1, coordinateIndex));
+      const coordinatePoint = points[safeCoordinateIndex];
+      onHover({
+        ...coordinatePoint,
+        ele: activeData.elevation ?? undefined,
+      }, activeData.speed, pointIndex);
     }
-  }, [refAreaLeft, activeChart, interactionMode, zoomStartVal, zoomEndVal, dragStartDist, fullMinVal, fullMaxVal, onHover, points, getInteractionMode, getCursorForMode, getSelectionAxisValue]);
+  }, [refAreaLeft, activeChart, interactionMode, zoomStartVal, zoomEndVal, dragStartDist, fullMinVal, fullMaxVal, onHover, points, profilePointOffset, getInteractionMode, getCursorForMode, getSelectionAxisValue]);
 
   // Throttle mouse moves to once per animation frame for smooth 60fps interaction
   const handleMouseMove = useCallback((e: ChartPointerState | null, chartType: 'speed' | 'elevation') => {

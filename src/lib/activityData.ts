@@ -9,6 +9,7 @@ import {
 import type { ActivitySummary, LoadedActivity } from "@/types/segments";
 import {
   getPublicProcessedPath,
+  isLegacyPublicProcessedTrack,
   isPublicProcessedTrack,
 } from "@/utils/publicActivity";
 
@@ -80,7 +81,13 @@ export async function loadActivityTrack(
 
     if (!publicError && publicBlob) {
       const loaded = await hydrateDownloadedTrack(activity, publicBlob);
-      if (loaded && isPublicProcessedTrack(loaded.processedTrack)) {
+      if (
+        loaded
+        && (
+          isPublicProcessedTrack(loaded.processedTrack)
+          || isLegacyPublicProcessedTrack(loaded.processedTrack)
+        )
+      ) {
         return {
           ...loaded,
           activity: { ...activity, hide_radius: 0 },

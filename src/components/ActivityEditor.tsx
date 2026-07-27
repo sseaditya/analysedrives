@@ -73,6 +73,8 @@ const ActivityEditor = ({ open, onOpenChange, activity, points, onUpdate }: Acti
         }
 
         setSaving(true);
+        let publicArtifactUpdated = false;
+        let databaseSaved = false;
         try {
             // Upload first so a newly-public activity never points at a stale
             // cap or privacy radius. The legacy files remain available as the
@@ -84,6 +86,7 @@ const ActivityEditor = ({ open, onOpenChange, activity, points, onUpdate }: Acti
                     speedCap,
                     hideRadius,
                 );
+                publicArtifactUpdated = true;
             }
 
             const { error } = await supabase
@@ -99,6 +102,7 @@ const ActivityEditor = ({ open, onOpenChange, activity, points, onUpdate }: Acti
                 .eq("id", activity.id);
 
             if (error) throw error;
+            databaseSaved = true;
 
             try {
                 await indexSegmentEfforts({ activityId: activity.id });
@@ -122,6 +126,24 @@ const ActivityEditor = ({ open, onOpenChange, activity, points, onUpdate }: Acti
             }
         } catch (err) {
             console.error("Error saving activity:", err);
+            if (
+                publicArtifactUpdated
+                && !databaseSaved
+                && activity.file_path
+                && points
+                && points.length >= 2
+            ) {
+                try {
+                    await uploadPublicProcessedArtifact(
+                        activity.file_path,
+                        points,
+                        activity.speed_cap,
+                        activity.hide_radius,
+                    );
+                } catch (rollbackError) {
+                    console.error("Could not restore the previous public artifact after the database update failed", rollbackError);
+                }
+            }
             toast.error("Failed to save changes");
         } finally {
             setSaving(false);

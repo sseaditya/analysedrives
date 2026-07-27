@@ -7,14 +7,24 @@ import {
   type ProcessedTrack,
 } from "@/utils/gpxParser";
 
-export const PUBLIC_PROCESSED_TRACK_VERSION = 2;
+export const PUBLIC_PROCESSED_TRACK_VERSION = 3;
 export const DEFAULT_PUBLIC_SPEED_CAP = 120;
 export const DEFAULT_PUBLIC_HIDE_RADIUS = 5;
+
+export interface PublicProfilePoint {
+  distance: number;
+  elapsedTime: number;
+  speed: number;
+  ele?: number;
+}
 
 export interface PublicProcessedTrack extends ProcessedTrack {
   publicArtifactVersion: number;
   speedCap: number;
   hideRadius: number;
+  profilePoints: PublicProfilePoint[];
+  visibleStartPointIndex: number;
+  visibleEndPointIndex: number;
 }
 
 export function getPublicProcessedPath(gpxPath: string) {
@@ -27,12 +37,29 @@ export function isPublicProcessedTrack(value: unknown): value is PublicProcessed
   return track.version === PROCESSED_TRACK_VERSION
     && track.publicArtifactVersion === PUBLIC_PROCESSED_TRACK_VERSION
     && Array.isArray(track.points)
-    && track.points.length >= 2;
+    && Array.isArray(track.profilePoints)
+    && track.profilePoints.length >= 2
+    && Number.isInteger(track.visibleStartPointIndex)
+    && Number.isInteger(track.visibleEndPointIndex);
 }
 
-export function clipPublicActivityPoints(points: GPXPoint[], hideRadiusKm: number): GPXPoint[] {
+export function isLegacyPublicProcessedTrack(
+  value: unknown,
+): value is ProcessedTrack & { publicArtifactVersion: 2 } {
+  if (!value || typeof value !== "object") return false;
+  const track = value as Partial<ProcessedTrack> & { publicArtifactVersion?: number };
+  return track.version === PROCESSED_TRACK_VERSION
+    && track.publicArtifactVersion === 2
+    && Array.isArray(track.points);
+}
+
+function publicActivityVisibleRange(
+  points: GPXPoint[],
+  hideRadiusKm: number,
+): [number, number] | null {
+  if (points.length === 0) return null;
   if (!Number.isFinite(hideRadiusKm) || hideRadiusKm <= 0 || points.length < 2) {
-    return points.slice();
+    return [0, points.length - 1];
   }
 
   let distance = 0;
@@ -70,8 +97,13 @@ export function clipPublicActivityPoints(points: GPXPoint[], hideRadiusKm: numbe
   }
 
   return foundStart && foundEnd && startIndex < endIndex
-    ? points.slice(startIndex, endIndex + 1)
-    : [];
+    ? [startIndex, endIndex]
+    : null;
+}
+
+export function clipPublicActivityPoints(points: GPXPoint[], hideRadiusKm: number): GPXPoint[] {
+  const range = publicActivityVisibleRange(points, hideRadiusKm);
+  return range ? points.slice(range[0], range[1] + 1) : [];
 }
 
 function cappedSpeedDistribution(
@@ -112,8 +144,12 @@ export function generatePublicProcessedTrack(
   const hideRadius = configuredHideRadius != null && configuredHideRadius >= 0
     ? configuredHideRadius
     : DEFAULT_PUBLIC_HIDE_RADIUS;
-  const clipped = clipPublicActivityPoints(sourcePoints, hideRadius);
+  const visibleRange = publicActivityVisibleRange(sourcePoints, hideRadius);
+  const clipped = visibleRange
+    ? sourcePoints.slice(visibleRange[0], visibleRange[1] + 1)
+    : [];
   const sourceStats = calculateStats(sourcePoints);
+  const fullProcessed = generateProcessedTrack(sourcePoints);
   const processed = generateProcessedTrack(clipped);
 
   const totalTime = sourceStats.avgSpeed > speedCap
@@ -151,5 +187,13 @@ export function generatePublicProcessedTrack(
     publicArtifactVersion: PUBLIC_PROCESSED_TRACK_VERSION,
     speedCap,
     hideRadius,
+    profilePoints: fullProcessed.points.map((point) => ({
+      distance: point.distance,
+      elapsedTime: point.elapsedTime,
+      speed: Math.min(speedCap, Math.max(0, point.speed)),
+      ...(point.ele === undefined ? {} : { ele: point.ele }),
+    })),
+    visibleStartPointIndex: visibleRange?.[0] ?? -1,
+    visibleEndPointIndex: visibleRange?.[1] ?? -1,
   };
 }

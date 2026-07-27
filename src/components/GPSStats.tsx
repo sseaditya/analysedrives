@@ -60,6 +60,7 @@ import {
   calculateStats,
   PAUSE_THRESHOLD
 } from "@/utils/gpxParser";
+import type { PublicProfilePoint } from "@/utils/publicActivity";
 import type { ActivitySegmentRank } from "@/types/segments";
 
 interface OwnerProfile {
@@ -73,6 +74,8 @@ interface GPSStatsProps {
   stats: GPXStats;
   fileName: string;
   points: GPXPoint[];
+  profilePoints?: PublicProfilePoint[];
+  profilePointOffset?: number;
   speedCap?: number | null;
   displaySpeedCap?: number | null;
   isOwner?: boolean;
@@ -149,7 +152,7 @@ function InfoPopover({ children, contentClassName }: { children: ReactNode; cont
   );
 }
 
-const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedCap, displaySpeedCap, isOwner = true, isPublic = false, description, hideRadius = 0, ownerProfile, onEdit, fuel, segmentRanks = [] }: GPSStatsProps) => {
+const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, profilePoints, profilePointOffset = 0, speedCap, displaySpeedCap, isOwner = true, isPublic = false, description, hideRadius = 0, ownerProfile, onEdit, fuel, segmentRanks = [] }: GPSStatsProps) => {
   const [hoveredPoint, setHoveredPoint] = useState<GPXPoint | null>(null);
   const [readoutPoint, setReadoutPoint] = useState<GPXPoint | null>(null);
   const [readoutSpeed, setReadoutSpeed] = useState<number | null>(null);
@@ -174,6 +177,16 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
 
   // Filter points based on privacy radius
   const { points, stats, privacyMask, mapPoints, mapPointsStartIndex } = useMemo(() => {
+    if (profilePoints?.length) {
+      return {
+        points: initialPoints,
+        stats: initialStats,
+        privacyMask: null,
+        mapPoints: initialPoints,
+        mapPointsStartIndex: profilePointOffset,
+      };
+    }
+
     if ((!hideRadius || hideRadius <= 0) && isOwner) {
       return {
         points: initialPoints,
@@ -251,7 +264,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
         mapPointsStartIndex: 0
       };
     }
-  }, [initialPoints, initialStats, hideRadius, isOwner]);
+  }, [initialPoints, initialStats, hideRadius, isOwner, profilePoints, profilePointOffset]);
 
   // Calculate safe initial speed limit
   const initialSpeedLimit = useMemo(() => {
@@ -302,6 +315,44 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
 
   // Calculate stats for the selected zoom range
   const { filteredPoints, subsetStats } = useMemo(() => {
+    if (profilePoints?.length && zoomRange) {
+      const start = Math.max(0, Math.min(profilePoints.length - 1, zoomRange[0]));
+      const end = Math.max(start, Math.min(profilePoints.length - 1, zoomRange[1]));
+      const selected = profilePoints.slice(start, end + 1);
+      const distance = Math.max(0, (selected.at(-1)?.distance ?? 0) - (selected[0]?.distance ?? 0));
+      let elapsed = Math.max(0, (selected.at(-1)?.elapsedTime ?? 0) - (selected[0]?.elapsedTime ?? 0));
+      const rawAverageSpeed = elapsed > 0 ? distance / (elapsed / 3600) : 0;
+      const averageSpeed = speedCap ? Math.min(speedCap, rawAverageSpeed) : rawAverageSpeed;
+      if (speedCap && rawAverageSpeed > speedCap) elapsed = distance / speedCap * 3600;
+
+      let elevationGain = 0;
+      let elevationLoss = 0;
+      for (let index = 1; index < selected.length; index++) {
+        const previous = selected[index - 1].ele;
+        const current = selected[index].ele;
+        if (previous == null || current == null) continue;
+        const difference = current - previous;
+        if (difference > 0) elevationGain += difference;
+        else elevationLoss += Math.abs(difference);
+      }
+
+      return {
+        filteredPoints: points,
+        subsetStats: {
+          ...stats,
+          totalDistance: distance,
+          totalTime: elapsed,
+          movingTime: elapsed,
+          stoppedTime: 0,
+          avgSpeed: averageSpeed,
+          movingAvgSpeed: averageSpeed,
+          maxSpeed: selected.reduce((maximum, point) => Math.max(maximum, point.speed), 0),
+          elevationGain,
+          elevationLoss,
+        },
+      };
+    }
+
     if (!zoomRange || !points.length) {
       return { filteredPoints: points, subsetStats: null };
     }
@@ -331,7 +382,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
       filteredPoints: subset,
       subsetStats: calculated
     };
-  }, [points, zoomRange, speedCap, isOwner]);
+  }, [points, profilePoints, zoomRange, speedCap, isOwner, stats]);
 
 
   // Calculate speed limited stats (for owner's speed limiter tool)
@@ -395,8 +446,15 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
   // TrackMap's heavy track-rendering useEffect (25k+ L.polyline calls)
   const adjustedMapZoomRange = useMemo(() => {
     if (!zoomRange) return null;
-    return [zoomRange[0] - mapPointsStartIndex, zoomRange[1] - mapPointsStartIndex] as [number, number];
-  }, [zoomRange, mapPointsStartIndex]);
+    const visibleEndIndex = mapPointsStartIndex + mapPoints.length - 1;
+    if (mapPoints.length === 0 || zoomRange[1] < mapPointsStartIndex || zoomRange[0] > visibleEndIndex) {
+      return null;
+    }
+    return [
+      Math.max(zoomRange[0], mapPointsStartIndex) - mapPointsStartIndex,
+      Math.min(zoomRange[1], visibleEndIndex) - mapPointsStartIndex,
+    ] as [number, number];
+  }, [zoomRange, mapPointsStartIndex, mapPoints.length]);
 
   // Effective speed limit for charts (owner's limiter or public speed cap)
   // Effective speed limit for charts
@@ -410,9 +468,18 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
   // Precompute cumulative distance and time arrays for O(1) hover lookups
   // This replaces the O(n) haversine loop that ran on every mouse move
   const cumulativeData = useMemo(() => {
-    const cumDist = new Float64Array(points.length);
-    const cumTime = new Float64Array(points.length);
-    const speeds = new Float64Array(points.length);
+    const pointCount = profilePoints?.length ?? points.length;
+    const cumDist = new Float64Array(pointCount);
+    const cumTime = new Float64Array(pointCount);
+    const speeds = new Float64Array(pointCount);
+    if (profilePoints?.length) {
+      for (let index = 0; index < profilePoints.length; index++) {
+        cumDist[index] = profilePoints[index].distance;
+        cumTime[index] = profilePoints[index].elapsedTime;
+        speeds[index] = profilePoints[index].speed;
+      }
+      return { cumDist, cumTime, speeds };
+    }
     cumDist[0] = 0;
     cumTime[0] = 0;
     for (let i = 1; i < points.length; i++) {
@@ -431,7 +498,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
       }
     }
     return { cumDist, cumTime, speeds };
-  }, [points]);
+  }, [points, profilePoints]);
 
   const updateReadout = useCallback((point: GPXPoint, speed: number | null, index: number, force = false) => {
     const now = performance.now();
@@ -496,7 +563,12 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
   }, [cumulativeData.cumTime, isOwner, mapPoints.length, privacySafeCursor, updateReadout]);
 
   useEffect(() => {
-    if (!isProfilePlaying || points.length < 2) return;
+    const profileLength = profilePoints?.length ?? points.length;
+    if (!isProfilePlaying || profileLength < 2) return;
+    if (!isOwner && mapPoints.length === 0) {
+      setIsProfilePlaying(false);
+      return;
+    }
     const maximum = cumulativeData.cumTime[cumulativeData.cumTime.length - 1] ?? 0;
     if (maximum <= 0) {
       setIsProfilePlaying(false);
@@ -529,15 +601,27 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
       const left = Math.max(0, right - 1);
       const timeSpan = cumulativeData.cumTime[right] - cumulativeData.cumTime[left];
       const ratio = timeSpan > 0 ? (elapsed - cumulativeData.cumTime[left]) / timeSpan : 1;
-      const leftPoint = points[left];
-      const rightPoint = points[right];
+      const pointForProfileIndex = (index: number) => {
+        if (!profilePoints?.length) return points[index];
+        const coordinateIndex = Math.max(0, Math.min(points.length - 1, index - profilePointOffset));
+        return points[coordinateIndex];
+      };
+      const leftPoint = pointForProfileIndex(left);
+      const rightPoint = pointForProfileIndex(right);
+      if (!leftPoint || !rightPoint) {
+        playbackRafRef.current = null;
+        setIsProfilePlaying(false);
+        return;
+      }
+      const leftElevation = profilePoints?.[left]?.ele ?? leftPoint.ele;
+      const rightElevation = profilePoints?.[right]?.ele ?? rightPoint.ele;
       const interpolatedPoint: GPXPoint = {
         ...rightPoint,
         lat: leftPoint.lat + (rightPoint.lat - leftPoint.lat) * ratio,
         lon: leftPoint.lon + (rightPoint.lon - leftPoint.lon) * ratio,
-        ele: leftPoint.ele != null && rightPoint.ele != null
-          ? leftPoint.ele + (rightPoint.ele - leftPoint.ele) * ratio
-          : rightPoint.ele ?? leftPoint.ele,
+        ele: leftElevation != null && rightElevation != null
+          ? leftElevation + (rightElevation - leftElevation) * ratio
+          : rightElevation ?? leftElevation,
       };
       const safeCursor = privacySafeCursor(interpolatedPoint, left + ratio);
       let speed = frameAveragedSpeed(cumulativeData.cumTime, cumulativeData.speeds, elapsed, playbackFrameStep);
@@ -568,7 +652,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
       if (playbackRafRef.current !== null) cancelAnimationFrame(playbackRafRef.current);
       playbackRafRef.current = null;
     };
-  }, [cumulativeData, isOwner, isProfilePlaying, points, privacySafeCursor, showLimiter, speedCap, speedLimit, updateReadout]);
+  }, [cumulativeData, isOwner, isProfilePlaying, mapPoints.length, points, privacySafeCursor, profilePointOffset, profilePoints, showLimiter, speedCap, speedLimit, updateReadout]);
 
   const totalDistance = stats.totalDistance;
   const movingTime = stats.movingTime;
@@ -1067,6 +1151,8 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, speedC
                 <div className="relative h-[300px] w-full cursor-crosshair">
                   <SpeedElevationChart
                     points={points}
+                    profilePoints={profilePoints}
+                    profilePointOffset={profilePointOffset}
                     onHover={handleHoverPoint}
                     onZoomChange={setZoomRange}
                     zoomRange={zoomRange}
