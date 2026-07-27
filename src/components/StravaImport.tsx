@@ -9,6 +9,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { indexSegmentEfforts } from "@/lib/segmentIndexing";
+import { uploadPublicProcessedArtifact } from "@/lib/publicActivityArtifacts";
 
 interface StravaImportProps {
     onImportComplete: () => void;
@@ -132,6 +133,7 @@ export default function StravaImport({ onImportComplete }: StravaImportProps) {
                     await supabase.storage
                         .from('gpx-files')
                         .upload(processedFileName, new Blob([JSON.stringify(processedTrack)], { type: 'application/json' }));
+                    await uploadPublicProcessedArtifact(fileName, points);
 
                 } catch (err) {
                     console.error("Error creating/uploading GPX", err);

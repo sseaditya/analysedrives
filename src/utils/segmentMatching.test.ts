@@ -188,7 +188,7 @@ describe("segment extraction and matching", () => {
     expect(comparison!.points.some((point) => point.speedB > point.speedA)).toBe(true);
   });
 
-  it("caps public speeds while preserving original comparison time and movement", () => {
+  it("caps public comparison time only when the common-section average exceeds the cap", () => {
     const points = route(0, 10, 0.05, 73.5, 120);
     const segment = segmentFrom(points);
     const a = matchActivityToSegment(segment, loaded(points, { id: "a" }), "viewer")!;
@@ -200,14 +200,27 @@ describe("segment extraction and matching", () => {
     const comparison = buildComparisonSeries(segment, a, b, "viewer");
     expect(comparison).not.toBeNull();
     expect(Math.max(...comparison!.points.map((point) => point.speedB))).toBeLessThanOrEqual(80);
-    expect(comparison!.points.at(-1)!.elapsedB).toBeCloseTo(comparison!.points.at(-1)!.elapsedA, 5);
-    expect(comparison!.points.at(-1)!.elapsedB).toBeLessThan(comparison!.distance / 80 * 3600 - 1);
+    expect(comparison!.points.at(-1)!.elapsedB).toBeCloseTo(comparison!.distance / 80 * 3600, 5);
+    expect(comparison!.points.at(-1)!.elapsedB).toBeGreaterThan(comparison!.points.at(-1)!.elapsedA);
     expect(comparisonAverageSpeed(
       comparison!.distance,
       comparison!.points.at(-1)!.elapsedB,
       b,
       "viewer",
     )).toBe(80);
+  });
+
+  it("preserves public comparison time when the common-section average is below the cap", () => {
+    const points = route(0, 10, 0.05, 73.5, 60);
+    const segment = segmentFrom(points);
+    const owner = matchActivityToSegment(segment, loaded(points, { id: "owner-drive" }), "owner")!;
+    const publicDrive = matchActivityToSegment(segment, loaded(points, {
+      id: "public-drive",
+      user_id: "other",
+      speed_cap: 80,
+    }), "viewer")!;
+    const comparison = buildComparisonSeries(segment, owner, publicDrive, "viewer")!;
+    expect(comparison.points.at(-1)!.elapsedB).toBeCloseTo(comparison.points.at(-1)!.elapsedA, 5);
   });
 
   it("uses the exact Activity-page distribution for each common segment portion", () => {

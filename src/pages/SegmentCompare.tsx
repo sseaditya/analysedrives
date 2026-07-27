@@ -46,7 +46,7 @@ export default function SegmentCompare() {
         );
         selected.push(...rejected.flatMap((entry) => entry.candidate ? [entry.candidate] : []));
       }
-      return Promise.all(selected.map(loadLeaderboardMatch));
+      return Promise.all(selected.map((entry) => loadLeaderboardMatch(entry, user!.id)));
     },
     enabled: !!segmentQuery.data && !!user && driveIds.length === 2,
     staleTime: 5 * 60 * 1000,

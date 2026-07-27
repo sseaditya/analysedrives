@@ -14,6 +14,8 @@ import ProfileEditor from "@/components/ProfileEditor";
 import { Slider } from "@/components/ui/slider";
 import SpeedDistributionChart from "@/components/SpeedDistributionChart";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { uploadPublicProcessedArtifact } from "@/lib/publicActivityArtifacts";
+import { getPublicProcessedPath } from "@/utils/publicActivity";
 
 interface Profile {
     id: string;
@@ -131,7 +133,11 @@ const Dashboard = () => {
             // 1. Delete file from Storage
             const { error: storageError } = await supabase.storage
                 .from('gpx-files')
-                .remove([filePath]);
+                .remove([
+                    filePath,
+                    filePath.replace(/\.gpx$/i, '.processed.json'),
+                    getPublicProcessedPath(filePath),
+                ]);
 
             if (storageError) {
                 console.error("Storage delete error:", storageError);
@@ -388,7 +394,15 @@ const Dashboard = () => {
                         console.warn(`Warning: Could not cache processed data for ${name}`);
                     }
 
-                    // 5. Insert Record into 'activities' table
+                    // 5. Pre-generate the sanitized artifact. It remains private
+                    // until the activity itself is made public.
+                    try {
+                        await uploadPublicProcessedArtifact(gpxFileName, parsedPoints);
+                    } catch (publicArtifactError) {
+                        console.warn(`Warning: Could not create public processed data for ${name}`, publicArtifactError);
+                    }
+
+                    // 6. Insert Record into 'activities' table
                     const { data: insertedActivity, error: dbError } = await supabase
                         .from('activities')
                         .insert([

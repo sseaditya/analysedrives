@@ -18,6 +18,7 @@ import SegmentCreator from "@/components/SegmentCreator";
 import { loadActivityTrack } from "@/lib/activityData";
 import { fetchActivitySegmentRanks } from "@/lib/segmentData";
 import type { ActivitySegmentRank, ActivitySummary } from "@/types/segments";
+import { isPublicProcessedTrack } from "@/utils/publicActivity";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +32,7 @@ interface ActivityState {
   stats: GPXStats;
   points: GPXPoint[];
   fileName: string;
+  usesPublicArtifact?: boolean;
 }
 
 interface ActivityMetadata {
@@ -181,7 +183,7 @@ const Activity = () => {
             speed_cap: record.speed_cap,
             hide_radius: record.hide_radius,
             stats: record.stats,
-          } as ActivitySummary);
+          } as ActivitySummary, user?.id ?? null);
 
           // Older rides are upgraded once when their owner opens them. The
           // versioned processed file and DB summary then serve future views.
@@ -216,7 +218,8 @@ const Activity = () => {
           setData({
             stats: loaded.processedTrack.stats,
             points: loaded.points,
-            fileName: record.title
+            fileName: record.title,
+            usesPublicArtifact: isPublicProcessedTrack(loaded.processedTrack),
           });
 
         } catch (err: unknown) {
@@ -429,6 +432,7 @@ const Activity = () => {
                     file_path: metadata.file_path,
                     fuel: metadata.fuel
                   }}
+                  points={data.points}
                   onUpdate={(updated) => setMetadata({ ...metadata, ...updated })}
                 />
               </>
@@ -515,7 +519,7 @@ const Activity = () => {
             isOwner={isOwner}
             isPublic={metadata?.public || false}
             description={metadata?.description || null}
-            hideRadius={metadata?.hide_radius ?? 5}
+            hideRadius={data.usesPublicArtifact ? 0 : (metadata?.hide_radius ?? 5)}
             fuel={metadata?.fuel ?? null}
             ownerProfile={ownerProfile}
             onEdit={() => setIsEditorOpen(true)}

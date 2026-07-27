@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { indexSegmentEfforts } from "@/lib/segmentIndexing";
+import { uploadPublicProcessedArtifact } from "@/lib/publicActivityArtifacts";
 
 type TimePeriod = 'week' | 'month' | '3months' | '6months' | 'year' | 'all';
 
@@ -35,6 +36,7 @@ interface ActivityRecord {
     title: string;
     file_path: string;
     hide_radius: number | null;
+    speed_cap: number | null;
     public: boolean;
     stats: {
         previewCoordinates?: [number, number][];
@@ -163,7 +165,16 @@ const Analytics = () => {
                         // We continue, as DB update is more critical for listing, but this is suboptimal.
                     }
 
-                    // 4. Update DB
+                    // 4. Create/repair the sanitized public artifact for every
+                    // drive, including currently-private drives.
+                    await uploadPublicProcessedArtifact(
+                        gpxPath,
+                        points,
+                        activity.speed_cap,
+                        activity.hide_radius,
+                    );
+
+                    // 5. Update DB
                     const finalStats = {
                         ...processedTrack.stats,
                         previewCoordinates: processedTrack.previewCoordinates

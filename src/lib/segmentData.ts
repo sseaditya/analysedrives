@@ -93,7 +93,7 @@ async function calculateLiveMatches(segment: Segment, userId: string) {
   const concurrency = 4;
   for (let offset = 0; offset < activities.length; offset += concurrency) {
     const results = await Promise.allSettled(activities.slice(offset, offset + concurrency).map(async (activity) => {
-      const loaded = await loadActivityTrack(activity);
+      const loaded = await loadActivityTrack(activity, userId);
       return matchActivityToSegment(segment, loaded, userId);
     }));
     for (const result of results) {
@@ -126,7 +126,7 @@ export async function findRejectedSegmentMatches(
   for (let offset = 0; offset < activities.length; offset += concurrency) {
     const inspected = await Promise.all(activities.slice(offset, offset + concurrency).map(async (activity): Promise<SegmentRejectedEntry | null> => {
       try {
-        const loaded = await loadActivityTrack(activity);
+        const loaded = await loadActivityTrack(activity, userId);
         if (matchActivityToSegment(segment, loaded, userId)) return null;
         const candidate = matchActivityToSegment(segment, loaded, userId, SEGMENT_REJECTED_MINIMUM_COVERAGE);
         return candidate ? { activity, reason: "coverage", candidate: { ...candidate, rank: 0 } } : null;
@@ -209,7 +209,7 @@ export async function findSegmentMatches(segment: Segment, userId: string): Prom
   };
 }
 
-export async function loadLeaderboardMatch(entry: SegmentLeaderboardEntry): Promise<SegmentMatch> {
-  const loadedActivity = entry.loadedActivity ?? await loadActivityTrack(entry.activity);
+export async function loadLeaderboardMatch(entry: SegmentLeaderboardEntry, viewerId?: string | null): Promise<SegmentMatch> {
+  const loadedActivity = entry.loadedActivity ?? await loadActivityTrack(entry.activity, viewerId);
   return { ...entry, loadedActivity };
 }

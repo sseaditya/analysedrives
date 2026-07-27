@@ -149,6 +149,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 return [
                     activity.file_path,
                     activity.file_path.replace(/\.gpx$/i, '.processed.json'),
+                    activity.file_path.replace(/\.gpx$/i, '.public.processed.json'),
                 ];
             }),
         );

@@ -29,8 +29,23 @@ using (
         and (
           public.activities.file_path = storage.objects.name
           or replace(public.activities.file_path, '.gpx', '.processed.json') = storage.objects.name
+          or replace(public.activities.file_path, '.gpx', '.public.processed.json') = storage.objects.name
         )
     )
+  )
+);
+
+drop policy if exists "Public Access to Public Processed Files" on storage.objects;
+create policy "Public Access to Public Processed Files"
+on storage.objects for select
+using (
+  bucket_id = 'gpx-files'
+  and storage.objects.name like '%.public.processed.json'
+  and exists (
+    select 1
+    from public.activities
+    where public.activities.public = true
+      and replace(public.activities.file_path, '.gpx', '.public.processed.json') = storage.objects.name
   )
 );
 

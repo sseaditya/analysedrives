@@ -8,7 +8,6 @@ import type {
   SegmentMatch,
 } from "../types/segments.js";
 import {
-  calculateLimitedStats,
   calculateSpeedDistribution,
   calculateStats,
   haversineDistance,
@@ -21,7 +20,7 @@ export const SEGMENT_MATCH_TOLERANCE_KM = 0.5;
 export const SEGMENT_ENDPOINT_TOLERANCE_KM = 0.2;
 export const SEGMENT_MATCH_THRESHOLD = 0.8;
 export const SEGMENT_REJECTED_MINIMUM_COVERAGE = 0.5;
-export const SEGMENT_EFFORT_ALGORITHM_VERSION = 7;
+export const SEGMENT_EFFORT_ALGORITHM_VERSION = 8;
 
 const MATCH_GRID_SIZE_DEGREES = 0.002;
 const MATCH_GRID_SEARCH_RADIUS = 3;
@@ -207,11 +206,11 @@ function displayedMetrics(points: GPXPoint[], speedLimit: number | null) {
   if (!speedLimit) {
     return { distance: stats.totalDistance, elapsed: stats.totalTime, avgSpeed: stats.avgSpeed, maxSpeed: stats.maxSpeed };
   }
-  const limited = calculateLimitedStats(points, speedLimit);
+  const averageExceedsCap = stats.avgSpeed > speedLimit;
   return {
     distance: stats.totalDistance,
-    elapsed: limited?.simulatedTime ?? stats.totalTime,
-    avgSpeed: Math.min(limited?.newAvgSpeed ?? stats.avgSpeed, speedLimit),
+    elapsed: averageExceedsCap ? (stats.totalDistance / speedLimit) * 3600 : stats.totalTime,
+    avgSpeed: Math.min(stats.avgSpeed, speedLimit),
     maxSpeed: Math.min(stats.maxSpeed, speedLimit),
   };
 }
@@ -328,6 +327,19 @@ export function buildComparisonSeries(segment: Segment, matchA: SegmentMatch, ma
     previousIndexB = indexB;
   }
   if (points.length < 2) return null;
+  const commonDistance = points[points.length - 1].distance;
+  const capElapsed = (key: "elapsedA" | "elapsedB", cap: number | null) => {
+    if (!cap || commonDistance <= 0) return;
+    const originalElapsed = points[points.length - 1][key];
+    if (originalElapsed <= 0 || commonDistance / (originalElapsed / 3600) <= cap) return;
+    const cappedElapsed = (commonDistance / cap) * 3600;
+    const scale = cappedElapsed / originalElapsed;
+    points.forEach((point) => {
+      point[key] *= scale;
+    });
+  };
+  capElapsed("elapsedA", capA);
+  capElapsed("elapsedB", capB);
   return { startSegmentIndex: start, endSegmentIndex: end, distance: points[points.length - 1].distance, points };
 }
 

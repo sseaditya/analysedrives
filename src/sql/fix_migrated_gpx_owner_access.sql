@@ -16,6 +16,7 @@ using (
         and (
           public.activities.file_path = storage.objects.name
           or replace(public.activities.file_path, '.gpx', '.processed.json') = storage.objects.name
+          or replace(public.activities.file_path, '.gpx', '.public.processed.json') = storage.objects.name
         )
     )
   )

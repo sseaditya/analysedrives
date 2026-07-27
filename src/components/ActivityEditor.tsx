@@ -19,6 +19,9 @@ import { Loader2, Globe, Lock, Gauge, MapPin, Trash2, AlertTriangle, CloudRain, 
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { indexSegmentEfforts } from "@/lib/segmentIndexing";
+import type { GPXPoint } from "@/utils/gpxParser";
+import { uploadPublicProcessedArtifact } from "@/lib/publicActivityArtifacts";
+import { getPublicProcessedPath } from "@/utils/publicActivity";
 
 interface ActivityData {
     id: string;
@@ -35,10 +38,11 @@ interface ActivityEditorProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     activity: ActivityData;
+    points?: GPXPoint[];
     onUpdate?: (updated: ActivityData) => void;
 }
 
-const ActivityEditor = ({ open, onOpenChange, activity, onUpdate }: ActivityEditorProps) => {
+const ActivityEditor = ({ open, onOpenChange, activity, points, onUpdate }: ActivityEditorProps) => {
     const navigate = useNavigate();
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
@@ -70,6 +74,18 @@ const ActivityEditor = ({ open, onOpenChange, activity, onUpdate }: ActivityEdit
 
         setSaving(true);
         try {
+            // Upload first so a newly-public activity never points at a stale
+            // cap or privacy radius. The legacy files remain available as the
+            // transitional fallback requested by the product.
+            if (isPublic && activity.file_path && points && points.length >= 2) {
+                await uploadPublicProcessedArtifact(
+                    activity.file_path,
+                    points,
+                    speedCap,
+                    hideRadius,
+                );
+            }
+
             const { error } = await supabase
                 .from("activities")
                 .update({
@@ -121,7 +137,11 @@ const ActivityEditor = ({ open, onOpenChange, activity, onUpdate }: ActivityEdit
             if (activity.file_path) {
                 const { error: storageError } = await supabase.storage
                     .from('gpx-files')
-                    .remove([activity.file_path]);
+                    .remove([
+                        activity.file_path,
+                        activity.file_path.replace(/\.gpx$/i, '.processed.json'),
+                        getPublicProcessedPath(activity.file_path),
+                    ]);
 
                 if (storageError) console.error("Storage delete error:", storageError);
             }
