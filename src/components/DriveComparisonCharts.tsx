@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -30,6 +30,8 @@ interface TimelinePoint {
 interface TimelineMouseState {
   activePayload?: Array<{ payload?: TimelinePoint }>;
 }
+
+const READOUT_INTERVAL_MS = 200;
 
 function formatTimeAxis(seconds: number) {
   const hours = Math.floor(seconds / 3600);
@@ -110,15 +112,19 @@ export function DriveComparisonTimeline({
   driveA,
   driveB,
   cursorValue,
+  playing,
   onCursor,
 }: {
   driveA: DriveComparisonTrack;
   driveB: DriveComparisonTrack;
   cursorValue: number;
+  playing: boolean;
   onCursor: (value: number) => void;
 }) {
   const isMobile = useIsMobile();
   const [hoverElapsed, setHoverElapsed] = useState<number | null>(null);
+  const [autoReadoutElapsed, setAutoReadoutElapsed] = useState<number | null>(null);
+  const latestCursorRef = useRef(cursorValue);
   const maximum = Math.max(driveA.duration, driveB.duration);
   const targetCount = isMobile ? 200 : 500;
   const data = useMemo<TimelinePoint[]>(() => {
@@ -138,7 +144,10 @@ export function DriveComparisonTimeline({
       };
     });
   }, [driveA, driveB, maximum, targetCount]);
+  latestCursorRef.current = cursorValue;
   const activeElapsed = hoverElapsed ?? Math.min(maximum, Math.max(0, cursorValue));
+  const readoutElapsed = hoverElapsed
+    ?? Math.min(maximum, Math.max(0, playing ? autoReadoutElapsed ?? cursorValue : cursorValue));
   const xTicks = useMemo(() => calculateNiceTicks(0, maximum, "time", 8), [maximum]);
   const speedConfig = useMemo(
     () => calculateNiceYTicks(0, Math.max(1, ...data.flatMap((point) => [point.speedA, point.speedB])), 7),
@@ -162,10 +171,22 @@ export function DriveComparisonTimeline({
     onCursor(elapsed);
   };
 
+  useEffect(() => {
+    if (!playing) {
+      setAutoReadoutElapsed(null);
+      return;
+    }
+    setAutoReadoutElapsed(latestCursorRef.current);
+    const timer = setInterval(() => {
+      setAutoReadoutElapsed(latestCursorRef.current);
+    }, READOUT_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [playing]);
+
   return (
     <div className="space-y-3">
       <div className="rounded-lg border border-border/50 bg-muted/30 px-2 py-1 text-sm">
-        <TimelineReadout elapsed={activeElapsed} driveA={driveA} driveB={driveB} />
+        <TimelineReadout elapsed={readoutElapsed} driveA={driveA} driveB={driveB} />
       </div>
       <div className="flex h-[300px] w-full cursor-crosshair select-none flex-col rounded-2xl border border-border bg-card p-3">
         <div className="mb-4 min-h-0 w-full flex-[7]">

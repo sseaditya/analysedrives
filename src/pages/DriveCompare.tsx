@@ -190,6 +190,7 @@ export default function DriveCompare() {
             driveA={driveA}
             driveB={driveB}
             cursorValue={cursorValue}
+            playing={playing}
             onCursor={stopPlaybackAt}
           />
         </section>
