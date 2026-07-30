@@ -6,6 +6,7 @@ import {
   BarChart,
   ReferenceLine,
   ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
@@ -256,22 +257,55 @@ export function DriveComparisonDistribution({
           <Button className="h-7 rounded-full px-3 text-xs" size="sm" variant={metric === "distance" ? "default" : "ghost"} onClick={() => setMetric("distance")}>Distance</Button>
         </div>
       </div>
-      {data.length === 0 ? (
-        <div className="flex h-[180px] items-center justify-center rounded-xl border border-dashed text-sm text-muted-foreground">
-          Speed distribution is unavailable for this drive.
-        </div>
-      ) : (
-        <div className="h-[250px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 10, right: 6, left: -12, bottom: 30 }}>
-              <XAxis dataKey="range" tick={chartAxisTick} tickLine={false} axisLine={false} angle={-30} textAnchor="end" height={55} />
-              <YAxis domain={yConfig.domain} ticks={yConfig.ticks} tick={chartAxisTick} tickLine={false} axisLine={false} label={{ value: metric === "time" ? "Minutes" : "Kilometres", angle: -90, position: "insideLeft", ...chartAxisLabel }} />
-              <Bar dataKey="driveA" name={driveA.activity.title} fill="hsl(var(--segment-drive-1))" radius={[4, 4, 0, 0]} maxBarSize={40} />
-              <Bar dataKey="driveB" name={driveB.activity.title} fill="hsl(var(--segment-drive-2))" radius={[4, 4, 0, 0]} maxBarSize={40} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
+      <div className="h-[250px]">
+        <ResponsiveContainer>
+          <BarChart data={data} margin={{ top: 10, right: 6, left: -12, bottom: 30 }}>
+            <defs>
+              <linearGradient id="wholeDriveDistA" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="hsl(15, 52%, 58%)" stopOpacity={0.8} />
+                <stop offset="95%" stopColor="hsl(15, 52%, 58%)" stopOpacity={0.1} />
+              </linearGradient>
+              <linearGradient id="wholeDriveDistB" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="hsl(var(--foreground))" stopOpacity={0.8} />
+                <stop offset="95%" stopColor="hsl(var(--foreground))" stopOpacity={0.1} />
+              </linearGradient>
+            </defs>
+            {yConfig.ticks.map((value) => (
+              <ReferenceLine key={value} y={value} stroke="hsl(var(--muted-foreground))" strokeWidth={0.5} strokeOpacity={0.6} />
+            ))}
+            <XAxis
+              dataKey="range"
+              tick={chartAxisTick}
+              tickLine={false}
+              axisLine={false}
+              label={{ value: "Speed Range (km/h)", position: "insideBottom", offset: -8, dy: 5, ...chartAxisLabel }}
+            />
+            <YAxis
+              domain={yConfig.domain}
+              ticks={yConfig.ticks}
+              tick={chartAxisTick}
+              tickLine={false}
+              axisLine={false}
+              tickFormatter={(value) => `${value}${metric === "time" ? "m" : "km"}`}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: "hsl(var(--card))",
+                borderColor: "hsl(var(--border))",
+                borderRadius: "16px",
+                color: "hsl(var(--foreground))",
+                fontSize: "12px",
+              }}
+              labelStyle={{ color: "hsl(var(--foreground))" }}
+              itemStyle={{ color: "hsl(var(--foreground))" }}
+              cursor={{ fill: "hsl(var(--muted)/0.2)" }}
+              formatter={(value: number) => `${value.toFixed(2)} ${metric === "time" ? "min" : "km"}`}
+            />
+            <Bar dataKey="driveA" name={driveA.activity.title} fill="url(#wholeDriveDistA)" stroke="hsl(var(--segment-drive-1))" strokeWidth={1} radius={[4, 4, 0, 0]} maxBarSize={40} />
+            <Bar dataKey="driveB" name={driveB.activity.title} fill="url(#wholeDriveDistB)" stroke="hsl(var(--segment-drive-2))" strokeWidth={1} radius={[4, 4, 0, 0]} maxBarSize={40} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
