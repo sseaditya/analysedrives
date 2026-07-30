@@ -5,6 +5,7 @@ import { GPXPoint, analyzeSegments, TrackSegment } from "@/utils/gpxParser";
 import { Layers, Activity, Zap, Maximize2, Map } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import { getSpeedRouteColor } from "@/utils/mapColors";
+import { markerPulseDurationSeconds } from "@/lib/driveComparison";
 
 interface TrackMapProps {
   points: GPXPoint[];
@@ -15,10 +16,11 @@ interface TrackMapProps {
   hairpinPoints?: [number, number][];
   privacyMask?: { start: number; end: number } | null;
   preserveViewportOnRangeChange?: boolean;
+  positionSpeed?: number | null;
 
 }
 
-const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints, hairpinPoints, privacyMask, preserveViewportOnRangeChange = false }: TrackMapProps) => {
+const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints, hairpinPoints, privacyMask, preserveViewportOnRangeChange = false, positionSpeed }: TrackMapProps) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const layersRef = useRef<{
@@ -433,7 +435,17 @@ const TrackMap = ({ points, hoveredPoint, zoomRange, stopPoints, tightTurnPoints
       if (popup) popup.setContent(popupText);
       else hoverMarkerRef.current.bindPopup(popupText);
     }
-  }, [hoveredPoint]);
+
+    const element = hoverMarkerRef.current.getElement();
+    const duration = markerPulseDurationSeconds(positionSpeed ?? 0);
+    if (element && duration != null) {
+      element.classList.add("speed-pulse-marker");
+      element.style.setProperty("--marker-pulse-duration", `${duration}s`);
+    } else if (element) {
+      element.classList.remove("speed-pulse-marker");
+      element.style.removeProperty("--marker-pulse-duration");
+    }
+  }, [hoveredPoint, positionSpeed]);
 
   return (
     <div className="rounded-2xl overflow-hidden border border-border bg-card relative shadow-2xl">

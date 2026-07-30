@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "preview": "vite preview",
+    "backfill:public-artifacts": "node --import tsx scripts/backfill-public-processed.ts",
     "generate-video": "npx tsx scripts/generate-video.ts"
   },
   "dependencies": {

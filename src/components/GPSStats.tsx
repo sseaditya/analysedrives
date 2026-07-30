@@ -627,6 +627,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, profil
       let speed = frameAveragedSpeed(cumulativeData.cumTime, cumulativeData.speeds, elapsed, playbackFrameStep);
       if (!isOwner && speedCap) speed = Math.min(speed, speedCap);
       if (showLimiter) speed = Math.min(speed, speedLimit);
+      if (progress === 1) speed = 0;
 
       playbackElapsedRef.current = elapsed;
       if (
@@ -852,6 +853,7 @@ const GPSStats = ({ stats: initialStats, fileName, points: initialPoints, profil
                   tightTurnPoints={stats.tightTurnPoints}
                   hairpinPoints={stats.hairpinPoints}
                   privacyMask={privacyMask}
+                  positionSpeed={readoutSpeed}
                 />
               </div>
 

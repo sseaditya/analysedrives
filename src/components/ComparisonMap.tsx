@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useTheme } from "@/components/ThemeProvider";
+import { markerPulseDurationSeconds } from "@/lib/driveComparison";
 import type { ComparisonPoint, ComparisonSeries, Segment } from "@/types/segments";
 
 function themeColor(property: string) {
@@ -40,6 +41,45 @@ function positionAtDistance(segment: Segment, series: ComparisonSeries, distance
   const start = points[left];
   const end = points[right];
   return [start.lat + (end.lat - start.lat) * ratio, start.lon + (end.lon - start.lon) * ratio];
+}
+
+function speedAtElapsed(points: ComparisonPoint[], elapsed: number, side: "A" | "B") {
+  const elapsedKey = side === "A" ? "elapsedA" : "elapsedB";
+  const speedKey = side === "A" ? "speedA" : "speedB";
+  const last = points.at(-1)!;
+  if (elapsed <= 0) return points[0][speedKey];
+  if (elapsed >= last[elapsedKey]) return 0;
+  let right = points.findIndex((point) => point[elapsedKey] >= elapsed);
+  if (right <= 0) right = 1;
+  const left = right - 1;
+  const span = points[right][elapsedKey] - points[left][elapsedKey];
+  const ratio = span > 0 ? (elapsed - points[left][elapsedKey]) / span : 0;
+  return points[left][speedKey] + (points[right][speedKey] - points[left][speedKey]) * ratio;
+}
+
+function speedAtDistance(points: ComparisonPoint[], distance: number, side: "A" | "B") {
+  const speedKey = side === "A" ? "speedA" : "speedB";
+  if (distance <= 0) return points[0][speedKey];
+  if (distance >= points.at(-1)!.distance) return 0;
+  let right = points.findIndex((point) => point.distance >= distance);
+  if (right <= 0) right = 1;
+  const left = right - 1;
+  const span = points[right].distance - points[left].distance;
+  const ratio = span > 0 ? (distance - points[left].distance) / span : 0;
+  return points[left][speedKey] + (points[right][speedKey] - points[left][speedKey]) * ratio;
+}
+
+function updatePulse(marker: L.CircleMarker | null, speed: number) {
+  const element = marker?.getElement() as SVGElement | undefined;
+  if (!element) return;
+  const duration = markerPulseDurationSeconds(speed);
+  if (duration == null) {
+    element.classList.remove("speed-pulse-marker");
+    element.style.removeProperty("--marker-pulse-duration");
+    return;
+  }
+  element.classList.add("speed-pulse-marker");
+  element.style.setProperty("--marker-pulse-duration", `${duration}s`);
 }
 
 export default function ComparisonMap({ segment, series, cursorMode, cursorValue, driveATitle, driveBTitle }: { segment: Segment; series: ComparisonSeries; cursorMode: "time" | "distance"; cursorValue: number; driveATitle: string; driveBTitle: string }) {
@@ -96,9 +136,13 @@ export default function ComparisonMap({ segment, series, cursorMode, cursorValue
       const position = positionAtDistance(segment, series, cursorValue);
       markerARef.current?.setLatLng(position).setRadius(10);
       markerBRef.current?.setLatLng(position).setRadius(6);
+      updatePulse(markerARef.current, speedAtDistance(series.points, cursorValue, "A"));
+      updatePulse(markerBRef.current, speedAtDistance(series.points, cursorValue, "B"));
     } else {
       markerARef.current?.setLatLng(positionAtElapsed(series.points, cursorValue, "A")).setRadius(8);
       markerBRef.current?.setLatLng(positionAtElapsed(series.points, cursorValue, "B")).setRadius(8);
+      updatePulse(markerARef.current, speedAtElapsed(series.points, cursorValue, "A"));
+      updatePulse(markerBRef.current, speedAtElapsed(series.points, cursorValue, "B"));
     }
   }, [cursorMode, cursorValue, segment, series]);
 

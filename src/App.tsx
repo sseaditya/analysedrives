@@ -23,6 +23,7 @@ import About from "./pages/About";
 import Segments from "./pages/Segments";
 import SegmentLeaderboard from "./pages/SegmentLeaderboard";
 import SegmentCompare from "./pages/SegmentCompare";
+import DriveCompare from "./pages/DriveCompare";
 
 const App = () => (
   <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
@@ -45,6 +46,7 @@ const App = () => (
               />
               <Route path="/feed" element={<Feed />} />
               <Route path="/activity/:id?" element={<Activity />} />
+              <Route path="/activity/:id/compare" element={<ProtectedRoute><DriveCompare /></ProtectedRoute>} />
               <Route
                 path="/analytics"
                 element={

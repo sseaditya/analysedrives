@@ -1,5 +1,5 @@
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { Pencil, Trash2, Loader2, ArrowLeft, Globe, Lock, Fuel, Check, LogIn, Maximize2, Minimize2, Film, Share2 } from "lucide-react";
+import { Pencil, Trash2, Loader2, ArrowLeft, Globe, Lock, Fuel, Check, LogIn, Maximize2, Minimize2, Film, Share2, GitCompareArrows } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import GPSStats from "@/components/GPSStats";
@@ -11,6 +11,7 @@ import ActivityEditor from "@/components/ActivityEditor";
 import { useIsMobile } from "@/hooks/use-mobile";
 import HeaderProfile from "@/components/HeaderProfile";
 import VideoGenerator from "@/components/VideoGenerator";
+import DriveCompareDialog from "@/components/DriveCompareDialog";
 import { createMapShareImage, createTransparentRouteShareImage, downloadImageFile } from "@/utils/shareImage";
 import { toast } from "sonner";
 import { useTheme } from "@/components/ThemeProvider";
@@ -85,6 +86,7 @@ const Activity = () => {
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isVideoOpen, setIsVideoOpen] = useState(false);
+  const [isCompareOpen, setIsCompareOpen] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [segmentRanks, setSegmentRanks] = useState<ActivitySegmentRank[]>([]);
 
@@ -455,6 +457,26 @@ const Activity = () => {
 
             {isOwner && data && (
               <>
+                {metadata && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-2"
+                      onClick={() => setIsCompareOpen(true)}
+                      title="Compare with another drive"
+                      aria-label="Compare with another drive"
+                    >
+                      <GitCompareArrows className="h-4 w-4" />
+                      <span className="hidden sm:inline">Compare</span>
+                    </Button>
+                    <DriveCompareDialog
+                      currentActivityId={metadata.id}
+                      open={isCompareOpen}
+                      onOpenChange={setIsCompareOpen}
+                    />
+                  </>
+                )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
