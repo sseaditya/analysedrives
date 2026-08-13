@@ -18,7 +18,7 @@ import { Slider } from "@/components/ui/slider";
 import { Loader2, Globe, Lock, Gauge, MapPin, Trash2, AlertTriangle, CloudRain, Droplet } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { indexSegmentEfforts } from "@/lib/segmentIndexing";
+import { scheduleSegmentEffortIndexing } from "@/lib/segmentIndexing";
 import type { GPXPoint } from "@/utils/gpxParser";
 import { uploadPublicProcessedArtifact } from "@/lib/publicActivityArtifacts";
 import { getPublicProcessedPath } from "@/utils/publicActivity";
@@ -73,22 +73,7 @@ const ActivityEditor = ({ open, onOpenChange, activity, points, onUpdate }: Acti
         }
 
         setSaving(true);
-        let publicArtifactUpdated = false;
-        let databaseSaved = false;
         try {
-            // Upload first so a newly-public activity never points at a stale
-            // cap or privacy radius. The legacy files remain available as the
-            // transitional fallback requested by the product.
-            if (isPublic && activity.file_path && points && points.length >= 2) {
-                await uploadPublicProcessedArtifact(
-                    activity.file_path,
-                    points,
-                    speedCap,
-                    hideRadius,
-                );
-                publicArtifactUpdated = true;
-            }
-
             const { error } = await supabase
                 .from("activities")
                 .update({
@@ -102,13 +87,10 @@ const ActivityEditor = ({ open, onOpenChange, activity, points, onUpdate }: Acti
                 .eq("id", activity.id);
 
             if (error) throw error;
-            databaseSaved = true;
 
-            try {
-                await indexSegmentEfforts({ activityId: activity.id });
-            } catch (indexError) {
+            scheduleSegmentEffortIndexing({ activityId: activity.id }, (indexError) => {
                 console.warn("Activity saved, but segment efforts could not be refreshed", indexError);
-            }
+            });
 
             toast.success("Activity updated!");
             onOpenChange(false);
@@ -124,26 +106,26 @@ const ActivityEditor = ({ open, onOpenChange, activity, points, onUpdate }: Acti
                     fuel: fuel ? Number(fuel) : null,
                 });
             }
+
+            // The activity is public in the database at this point. Defer the
+            // second processing pass and upload until after the save UI has
+            // completed so publishing does not block the editor.
+            const publicFilePath = activity.file_path;
+            if (isPublic && publicFilePath && points && points.length >= 2) {
+                window.setTimeout(() => {
+                    void uploadPublicProcessedArtifact(
+                        publicFilePath,
+                        points,
+                        speedCap,
+                        hideRadius,
+                    ).catch((artifactError) => {
+                        console.error("Activity was published, but its public artifact could not be created", artifactError);
+                        toast.error("Ride published, but public data is still processing. Try saving again.");
+                    });
+                }, 0);
+            }
         } catch (err) {
             console.error("Error saving activity:", err);
-            if (
-                publicArtifactUpdated
-                && !databaseSaved
-                && activity.file_path
-                && points
-                && points.length >= 2
-            ) {
-                try {
-                    await uploadPublicProcessedArtifact(
-                        activity.file_path,
-                        points,
-                        activity.speed_cap,
-                        activity.hide_radius,
-                    );
-                } catch (rollbackError) {
-                    console.error("Could not restore the previous public artifact after the database update failed", rollbackError);
-                }
-            }
             toast.error("Failed to save changes");
         } finally {
             setSaving(false);

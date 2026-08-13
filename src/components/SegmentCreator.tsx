@@ -10,7 +10,7 @@ import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import TrackMap from "@/components/TrackMap";
 import { supabase } from "@/lib/supabase";
-import { indexSegmentEfforts } from "@/lib/segmentIndexing";
+import { scheduleSegmentEffortIndexing } from "@/lib/segmentIndexing";
 import { cumulativeDistances, extractSegmentGeometry, privacyVisibleRange, segmentBounds } from "@/utils/segmentMatching";
 import type { GPXPoint } from "@/utils/gpxParser";
 
@@ -84,16 +84,17 @@ export default function SegmentCreator({
       toast.error("Could not publish the segment. Apply the segment database migration first if needed.");
       return;
     }
-    try {
-      await indexSegmentEfforts({ segmentId: data.id, force: true });
-    } catch (indexError) {
-      console.warn("Segment created, but its initial effort backfill did not finish", indexError);
-      toast.warning("Segment created. Existing drives will be indexed when the leaderboard opens.");
-    }
     setSaving(false);
     toast.success("Public comparison segment created.");
     setOpen(false);
     navigate(`/segments/${data.id}`);
+
+    // Building the leaderboard may require downloading and aligning many
+    // drives. Start that work only after the segment exists and the user has
+    // been taken to it; the leaderboard retains its live fallback meanwhile.
+    scheduleSegmentEffortIndexing({ segmentId: data.id, force: true }, (indexError) => {
+      console.warn("Segment created, but its initial effort backfill did not finish", indexError);
+    });
   };
 
   if (visibleRange[1] <= visibleRange[0]) return null;

@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
-import { fetchSegment, findRejectedSegmentMatches, findSegmentMatches } from "@/lib/segmentData";
+import { fetchSegment, findRejectedSegmentMatches, findSegmentMatches, loadLeaderboardMatch } from "@/lib/segmentData";
 import { supabase } from "@/lib/supabase";
 import { formatDuration } from "@/utils/gpxParser";
 import { SEGMENT_EFFORT_ALGORITHM_VERSION } from "@/utils/segmentMatching";
@@ -30,7 +30,7 @@ export default function SegmentLeaderboard() {
   const [editDescription, setEditDescription] = useState("");
   const [showRejected, setShowRejected] = useState(false);
   const [includedRejected, setIncludedRejected] = useState<Set<string>>(() => new Set());
-  const segmentQuery = useQuery({ queryKey: ["segment", segmentId], queryFn: () => fetchSegment(segmentId), enabled: !!segmentId });
+  const segmentQuery = useQuery({ queryKey: ["segment", segmentId], queryFn: () => fetchSegment(segmentId), enabled: !!segmentId, staleTime: 5 * 60 * 1000 });
   const matchesQuery = useQuery({
     queryKey: ["segment-matches", segmentId, user?.id, SEGMENT_EFFORT_ALGORITHM_VERSION],
     queryFn: () => findSegmentMatches(segmentQuery.data!, user!.id),
@@ -46,6 +46,14 @@ export default function SegmentLeaderboard() {
   });
 
   const choose = (side: "a" | "b", id: string) => {
+    const entry = matches.find((match) => match.activity.id === id);
+    if (entry && user) {
+      void queryClient.prefetchQuery({
+        queryKey: ["segment-match-track", segmentId, id, user.id, SEGMENT_EFFORT_ALGORITHM_VERSION],
+        queryFn: () => loadLeaderboardMatch(entry, user.id),
+        staleTime: 5 * 60 * 1000,
+      });
+    }
     if (side === "a") {
       setDriveA((current) => current === id ? null : id);
       if (driveB === id) setDriveB(null);

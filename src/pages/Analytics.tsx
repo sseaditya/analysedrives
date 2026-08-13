@@ -165,14 +165,16 @@ const Analytics = () => {
                         // We continue, as DB update is more critical for listing, but this is suboptimal.
                     }
 
-                    // 4. Create/repair the sanitized public artifact for every
-                    // drive, including currently-private drives.
-                    await uploadPublicProcessedArtifact(
-                        gpxPath,
-                        points,
-                        activity.speed_cap,
-                        activity.hide_radius,
-                    );
+                    // 4. Repair the public artifact only for rides that have
+                    // already been published.
+                    if (activity.public) {
+                        await uploadPublicProcessedArtifact(
+                            gpxPath,
+                            points,
+                            activity.speed_cap,
+                            activity.hide_radius,
+                        );
+                    }
 
                     // 5. Update DB
                     const finalStats = {

@@ -42,3 +42,24 @@ export async function indexSegmentEfforts(request: IndexRequest): Promise<Segmen
   }
   return payload;
 }
+
+let backgroundIndexQueue = Promise.resolve();
+
+/**
+ * Run expensive storage downloads and alignment outside the user-facing save
+ * path. A single queue prevents bulk GPX/Strava imports from starting many
+ * server backfills at once.
+ */
+export function scheduleSegmentEffortIndexing(
+  request: IndexRequest,
+  onError?: (error: unknown) => void,
+) {
+  window.setTimeout(() => {
+    backgroundIndexQueue = backgroundIndexQueue
+      .then(() => indexSegmentEfforts(request))
+      .then(() => undefined)
+      .catch((error) => {
+        onError?.(error);
+      });
+  }, 0);
+}

@@ -6,7 +6,7 @@ import { MapPin, LogOut, Upload, Activity, Calendar, Clock, ArrowRight, Trending
 import FileUploader from "@/components/FileUploader";
 import { parseGPX, calculateStats, formatDistance, formatDuration, generatePreviewPolyline, calculateSpeedDistribution, SpeedBucket, generateProcessedTrack } from "@/utils/gpxParser";
 import { supabase } from "@/lib/supabase";
-import { indexSegmentEfforts } from "@/lib/segmentIndexing";
+import { scheduleSegmentEffortIndexing } from "@/lib/segmentIndexing";
 import ActivityMiniMap from "@/components/ActivityMiniMap";
 import { cn } from "@/lib/utils";
 import StravaImport from "@/components/StravaImport";
@@ -14,7 +14,6 @@ import ProfileEditor from "@/components/ProfileEditor";
 import { Slider } from "@/components/ui/slider";
 import SpeedDistributionChart from "@/components/SpeedDistributionChart";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { uploadPublicProcessedArtifact } from "@/lib/publicActivityArtifacts";
 import { getPublicProcessedPath } from "@/utils/publicActivity";
 
 interface Profile {
@@ -394,15 +393,8 @@ const Dashboard = () => {
                         console.warn(`Warning: Could not cache processed data for ${name}`);
                     }
 
-                    // 5. Pre-generate the sanitized artifact. It remains private
-                    // until the activity itself is made public.
-                    try {
-                        await uploadPublicProcessedArtifact(gpxFileName, parsedPoints);
-                    } catch (publicArtifactError) {
-                        console.warn(`Warning: Could not create public processed data for ${name}`, publicArtifactError);
-                    }
-
-                    // 6. Insert Record into 'activities' table
+                    // 5. Insert Record into 'activities' table. Public processed
+                    // artifacts are created only if the owner later publishes it.
                     const { data: insertedActivity, error: dbError } = await supabase
                         .from('activities')
                         .insert([
@@ -421,11 +413,9 @@ const Dashboard = () => {
                         .single();
 
                     if (dbError) throw dbError;
-                    try {
-                        await indexSegmentEfforts({ activityId: insertedActivity.id });
-                    } catch (indexError) {
+                    scheduleSegmentEffortIndexing({ activityId: insertedActivity.id }, (indexError) => {
                         console.warn(`Drive uploaded, but segment indexing will need to be retried for ${name}`, indexError);
-                    }
+                    });
                     successCount++;
                 } catch (err) {
                     console.error(`Error processing ${name}:`, err);

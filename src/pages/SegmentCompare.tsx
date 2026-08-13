@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Info, Pause, Play, RotateCcw, Route } from "lucide-react";
 import ComparisonMap from "@/components/ComparisonMap";
 import { ComparisonDistribution, ComparisonTimeline } from "@/components/ComparisonCharts";
@@ -21,6 +21,7 @@ export default function SegmentCompare() {
   const [params] = useSearchParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [comparisonMode, setComparisonMode] = useState<"time" | "distance">("time");
   const [cursorValue, setCursorValue] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -30,12 +31,20 @@ export default function SegmentCompare() {
   const startedRef = useRef(0);
   const cursorStartRef = useRef(0);
   const cursorRef = useRef(0);
-  const segmentQuery = useQuery({ queryKey: ["segment", segmentId], queryFn: () => fetchSegment(segmentId), enabled: !!segmentId });
+  const segmentQuery = useQuery({ queryKey: ["segment", segmentId], queryFn: () => fetchSegment(segmentId), enabled: !!segmentId, staleTime: 5 * 60 * 1000 });
   const driveIds = [params.get("driveA"), params.get("driveB")].filter((id): id is string => Boolean(id));
+  // Use the exact leaderboard query key so navigating here reuses the matches
+  // (and any already-loaded tracks) from the previous screen.
+  const leaderboardQuery = useQuery({
+    queryKey: ["segment-matches", segmentId, user?.id, SEGMENT_EFFORT_ALGORITHM_VERSION],
+    queryFn: () => findSegmentMatches(segmentQuery.data!, user!.id),
+    enabled: !!segmentQuery.data && !!user,
+    staleTime: 5 * 60 * 1000,
+  });
   const matchesQuery = useQuery({
-    queryKey: ["segment-comparison-matches", segmentId, user?.id, SEGMENT_EFFORT_ALGORITHM_VERSION, ...driveIds],
+    queryKey: ["segment-comparison-tracks", segmentId, user?.id, SEGMENT_EFFORT_ALGORITHM_VERSION, ...driveIds],
     queryFn: async () => {
-      const leaderboard = await findSegmentMatches(segmentQuery.data!, user!.id);
+      const leaderboard = leaderboardQuery.data!;
       const selected = leaderboard.matches.filter((match) => driveIds.includes(match.activity.id));
       if (selected.length < driveIds.length) {
         const rejected = await findRejectedSegmentMatches(
@@ -46,9 +55,13 @@ export default function SegmentCompare() {
         );
         selected.push(...rejected.flatMap((entry) => entry.candidate ? [entry.candidate] : []));
       }
-      return Promise.all(selected.map((entry) => loadLeaderboardMatch(entry, user!.id)));
+      return Promise.all(selected.map((entry) => queryClient.fetchQuery({
+        queryKey: ["segment-match-track", segmentId, entry.activity.id, user!.id, SEGMENT_EFFORT_ALGORITHM_VERSION],
+        queryFn: () => loadLeaderboardMatch(entry, user!.id),
+        staleTime: 5 * 60 * 1000,
+      })));
     },
-    enabled: !!segmentQuery.data && !!user && driveIds.length === 2,
+    enabled: !!segmentQuery.data && !!user && driveIds.length === 2 && !!leaderboardQuery.data,
     staleTime: 5 * 60 * 1000,
   });
   const matchA = matchesQuery.data?.find((match) => match.activity.id === params.get("driveA"));
@@ -80,7 +93,7 @@ export default function SegmentCompare() {
     };
   }, [comparisonMode, playing, series]);
 
-  if (segmentQuery.isLoading || matchesQuery.isLoading) return <div className="flex min-h-screen items-center justify-center"><div className="text-center"><Route className="mx-auto h-8 w-8 animate-pulse text-primary" /><p className="mt-3 text-sm text-muted-foreground">Aligning selected drives…</p></div></div>;
+  if (segmentQuery.isLoading || leaderboardQuery.isLoading || matchesQuery.isLoading) return <div className="flex min-h-screen items-center justify-center"><div className="text-center"><Route className="mx-auto h-8 w-8 animate-pulse text-primary" /><p className="mt-3 text-sm text-muted-foreground">Loading selected drives…</p></div></div>;
   if (!segmentQuery.data || !matchA || !matchB || !series) return <div className="flex min-h-screen items-center justify-center text-center"><div><h1 className="text-xl font-bold">Comparison unavailable</h1><p className="mt-2 text-sm text-muted-foreground">Choose two accessible qualifying drives from the leaderboard.</p><Button className="mt-4" onClick={() => navigate(`/segments/${segmentId}`)}>Back to leaderboard</Button></div></div>;
   const last = series.points[series.points.length - 1];
   // Average speed is derived from the original elapsed time, then hidden at

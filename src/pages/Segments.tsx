@@ -10,7 +10,7 @@ import { fetchSegments } from "@/lib/segmentData";
 export default function Segments() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
-  const query = useQuery({ queryKey: ["segments"], queryFn: fetchSegments });
+  const query = useQuery({ queryKey: ["segments"], queryFn: fetchSegments, staleTime: 5 * 60 * 1000 });
   const segments = useMemo(() => (query.data ?? []).filter((segment) => {
     const haystack = `${segment.name} ${segment.description ?? ""} ${segment.source_title}`.toLowerCase();
     return haystack.includes(search.toLowerCase());
