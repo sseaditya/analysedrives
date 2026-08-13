@@ -450,7 +450,10 @@ const Activity = () => {
                     fuel: metadata.fuel
                   }}
                   points={data.points}
-                  onUpdate={(updated) => setMetadata({ ...metadata, ...updated })}
+                  onUpdate={(updated) => {
+                    setMetadata({ ...metadata, ...updated });
+                    setData((current) => current ? { ...current, fileName: updated.title } : current);
+                  }}
                 />
               </>
             )}

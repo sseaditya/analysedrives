@@ -74,6 +74,11 @@ const ActivityEditor = ({ open, onOpenChange, activity, points, onUpdate }: Acti
 
         setSaving(true);
         try {
+            const segmentInputsChanged = isPublic !== activity.public
+                || (isPublic && (
+                    speedCap !== activity.speed_cap
+                    || hideRadius !== activity.hide_radius
+                ));
             const { error } = await supabase
                 .from("activities")
                 .update({
@@ -88,9 +93,11 @@ const ActivityEditor = ({ open, onOpenChange, activity, points, onUpdate }: Acti
 
             if (error) throw error;
 
-            scheduleSegmentEffortIndexing({ activityId: activity.id }, (indexError) => {
-                console.warn("Activity saved, but segment efforts could not be refreshed", indexError);
-            });
+            if (segmentInputsChanged) {
+                scheduleSegmentEffortIndexing({ activityId: activity.id }, (indexError) => {
+                    console.warn("Activity saved, but segment efforts could not be refreshed", indexError);
+                });
+            }
 
             toast.success("Activity updated!");
             onOpenChange(false);
@@ -111,7 +118,7 @@ const ActivityEditor = ({ open, onOpenChange, activity, points, onUpdate }: Acti
             // second processing pass and upload until after the save UI has
             // completed so publishing does not block the editor.
             const publicFilePath = activity.file_path;
-            if (isPublic && publicFilePath && points && points.length >= 2) {
+            if (segmentInputsChanged && isPublic && publicFilePath && points && points.length >= 2) {
                 window.setTimeout(() => {
                     void uploadPublicProcessedArtifact(
                         publicFilePath,
@@ -120,7 +127,7 @@ const ActivityEditor = ({ open, onOpenChange, activity, points, onUpdate }: Acti
                         hideRadius,
                     ).catch((artifactError) => {
                         console.error("Activity was published, but its public artifact could not be created", artifactError);
-                        toast.error("Ride published, but public data is still processing. Try saving again.");
+                        toast.error("Ride published, but public data is still processing. Change a privacy setting and save to retry.");
                     });
                 }, 0);
             }
