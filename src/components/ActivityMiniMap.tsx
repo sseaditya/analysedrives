@@ -1,3 +1,4 @@
+import { withCartoKey } from "@/utils/carto";
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -116,8 +117,8 @@ const ActivityMiniMap = ({ coordinates, speeds, averageSpeed, className }: Activ
 
         // Update tile layer based on theme
         const tileUrl = theme === 'dark'
-            ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-            : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+            ? withCartoKey("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png")
+            : withCartoKey("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png");
 
         // Remove old tile layer if exists
         if (tileLayerRef.current) {

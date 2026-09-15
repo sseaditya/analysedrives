@@ -34,8 +34,10 @@ const TILE_SIZE = 256;
 const MAP_LABEL_SCALE = 2;       // Raster tile labels are baked in; render lower-z tiles larger for legibility.
 const MAP_TILE_ZOOM_OFFSET = Math.log2(MAP_LABEL_SCALE);
 const ZOOM = 16;                 // Map zoom level
-const TILE_URL = 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png';
-const TILE_CACHE_DIR = path.join(__dirname, '.tile-cache');
+const cartoKey = process.env.CARTO_API;
+const TILE_URL = 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'
+    + (cartoKey ? `?key=${encodeURIComponent(cartoKey)}` : '');
+const TILE_CACHE_DIR = path.join(__dirname, '.tile-cache', cartoKey ? 'authenticated' : 'anonymous');
 
 // HUD Colors
 const HUD_BG = 'rgba(10, 10, 20, 0.85)';

@@ -1,3 +1,4 @@
+import { withCartoKey } from "@/utils/carto";
 import {
   GPXPoint,
   GPXStats,
@@ -382,9 +383,7 @@ const drawMapTiles = async (
       if (y < 0 || y >= maxTile) continue;
       const wrappedX = ((x % maxTile) + maxTile) % maxTile;
       const subdomain = subdomains[Math.abs(x + y) % subdomains.length];
-      const url = theme === "dark"
-        ? `https://${subdomain}.basemaps.cartocdn.com/${style}/${viewport.zoom}/${wrappedX}/${y}.png`
-        : `https://${subdomain}.basemaps.cartocdn.com/${style}/${viewport.zoom}/${wrappedX}/${y}.png`;
+      const url = withCartoKey(`https://${subdomain}.basemaps.cartocdn.com/${style}/${viewport.zoom}/${wrappedX}/${y}.png`);
       const dx = x * TILE_SIZE - viewport.centerX + mapCenter.x;
       const dy = y * TILE_SIZE - viewport.centerY + mapCenter.y;
       tilePromises.push(loadTile(url).then((tile) => {

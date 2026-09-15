@@ -1,3 +1,4 @@
+import { withCartoKey } from "@/utils/carto";
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -60,8 +61,8 @@ export default function WholeDriveComparisonMap({
     tileRef.current?.remove();
     tileRef.current = L.tileLayer(
       theme === "dark"
-        ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-        : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+        ? withCartoKey("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png")
+        : withCartoKey("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"),
       { attribution: "&copy; OpenStreetMap &copy; CARTO" },
     ).addTo(map);
   }, [theme]);

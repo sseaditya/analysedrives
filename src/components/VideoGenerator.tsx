@@ -1,3 +1,4 @@
+import { withCartoKey } from "@/utils/carto";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Film, Download, Loader2, X, Play, ZoomIn, ZoomOut, Sun, Moon } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -31,8 +32,8 @@ function getMapConfig(isDark: boolean, mapType: MapTypeId) {
     let tileFilter = "";
     if (mapType === "standard") {
         url = isDark
-            ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png"
-            : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png";
+            ? withCartoKey("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png")
+            : withCartoKey("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png");
     } else if (mapType === "terrain") {
         url = "https://tile.opentopomap.org/{z}/{x}/{y}.png";
         styleKey = "terrain";
